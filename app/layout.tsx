@@ -1,22 +1,7 @@
 import type { Metadata } from "next";
-import { Open_Sans, Poppins, JetBrains_Mono } from "next/font/google";
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
 import "./globals.css";
-
-const openSans = Open_Sans({
-  subsets: ["latin"],
-  variable: "--font-sans",
-});
-
-const poppins = Poppins({
-  weight: ["500", "600", "700"],
-  subsets: ["latin"],
-  variable: "--font-heading",
-});
-
-const jetbrains = JetBrains_Mono({
-  subsets: ["latin"],
-  variable: "--font-mono",
-});
 
 export const metadata: Metadata = {
   title: "Funnel Dashboard",
@@ -31,9 +16,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${openSans.variable} ${poppins.variable} ${jetbrains.variable} h-full antialiased`}
+      className={`${GeistSans.variable} ${GeistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-[#FBF8F4] text-foreground font-sans">
+      <body className="min-h-full flex flex-col bg-[#FAFAF9] text-foreground font-sans">
         {children}
       </body>
     </html>
