@@ -47,7 +47,7 @@ export default function LoginPage() {
           </svg>
           {loading ? "Redirecting..." : "Sign in with Google"}
         </Button>
-        <p className="text-[11px] text-[var(--t4)] text-center mt-4">Access requires admin approval</p>
+        <p className="text-[11px] text-[var(--t4)] text-center mt-4">Sign in with your Google account to get started</p>
       </div>
     </div>
   );
