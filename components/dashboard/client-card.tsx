@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { AccessManager } from "./access-manager";
 
 interface Props {
   client: {
@@ -86,6 +87,13 @@ export function ClientCard({ client, isAdmin = false }: Props) {
           Delete
         </button>
       </div>}
+
+      {/* Access Manager for owners */}
+      {isAdmin && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <AccessManager clientId={client.id} clientName={client.name} />
+        </div>
+      )}
     </div>
   );
 }
