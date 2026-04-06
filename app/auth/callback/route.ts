@@ -9,26 +9,26 @@ export async function GET(request: Request) {
     const supabase = await createServerSupabase();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
-      // Check if user is approved (exists in agencies table)
       const { data: { user } } = await supabase.auth.getUser();
       if (user?.email) {
+        // Auto-create agency if not exists
         const { data: agency } = await supabase
           .from("agencies")
-          .select("id, role")
+          .select("id")
           .eq("email", user.email)
           .single();
 
-        if (agency) {
-          // Approved user → go to clients
-          return NextResponse.redirect(`${origin}/clients`);
-        } else {
-          // Not approved → show pending page
-          return NextResponse.redirect(`${origin}/pending`);
+        if (!agency) {
+          await supabase.from("agencies").insert({
+            email: user.email,
+            name: user.user_metadata?.full_name || user.email.split("@")[0],
+          });
         }
+
+        return NextResponse.redirect(`${origin}/clients`);
       }
     }
   }
 
-  // Auth error → back to login
   return NextResponse.redirect(`${origin}/login`);
 }

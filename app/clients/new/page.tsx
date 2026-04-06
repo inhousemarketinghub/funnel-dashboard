@@ -86,7 +86,7 @@ export default function NewClientPage() {
     <div className="min-h-dvh bg-[var(--bg)] p-8 flex justify-center">
       <div className="bauhaus-stripe" style={{ position: "fixed", top: 0, left: 0, right: 0 }}><div /><div /><div /><div /></div>
       <div className="card-base w-full max-w-lg h-fit mt-12" style={{ padding: 28 }}>
-        <h1 className="font-heading text-[22px] font-semibold tracking-tight text-[var(--t1)] mb-6">Add New Client</h1>
+        <h1 className="font-heading text-[22px] font-semibold tracking-tight text-[var(--t1)] mb-6">Add New Project</h1>
 
         {/* Step 1: Sheet Link + Scan */}
         <div className="mb-4">

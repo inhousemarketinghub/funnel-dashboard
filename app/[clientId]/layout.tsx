@@ -1,5 +1,4 @@
 import { createServerSupabase } from "@/lib/supabase/server";
-import { getUserRole } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ThemeToggle } from "@/components/dashboard/theme-toggle";
@@ -9,9 +8,6 @@ export default async function ClientLayout({ children, params }: { children: Rea
   const supabase = await createServerSupabase();
   const { data: client } = await supabase.from("clients").select("*").eq("id", clientId).single();
   if (!client) notFound();
-
-  const { role } = await getUserRole();
-  const isAdmin = role === "admin";
 
   return (
     <div>
@@ -27,7 +23,7 @@ export default async function ClientLayout({ children, params }: { children: Rea
         </div>
         <div className="flex items-center gap-[10px]">
           <ThemeToggle />
-          {isAdmin && <Link href={`/${clientId}/settings`} className="topbar-btn">Settings</Link>}
+          <Link href={`/${clientId}/settings`} className="topbar-btn">Settings</Link>
         </div>
       </div>
       <main style={{ maxWidth: 1280, margin: "0 auto", padding: "28px 32px 80px" }}>{children}</main>
