@@ -9,9 +9,21 @@ export default async function ClientsPage() {
   const { role, email } = await getUserRole();
   const isOwner = role === "owner";
 
-  // Debug: check auth state
+  // Debug: check auth state + test RLS
   const { data: { user } } = await supabase.auth.getUser();
-  const debugInfo = { email, role, authEmail: user?.email, userId: user?.id?.slice(0, 8) };
+  const { data: { session } } = await supabase.auth.getSession();
+
+  // Decode JWT to see actual claims
+  let jwtEmail = "no-session";
+  if (session?.access_token) {
+    try {
+      const payload = JSON.parse(atob(session.access_token.split(".")[1]));
+      jwtEmail = payload.email || "no-email-in-jwt";
+    } catch { jwtEmail = "decode-error"; }
+  }
+
+  const { data: myAgency } = await supabase.from("agencies").select("id, email, role").eq("email", user?.email || "").single();
+  const debugInfo = { email, role, jwtEmail, authEmail: user?.email, agencyFound: !!myAgency, projects: clients?.length ?? 0 };
 
   const { data: clients } = await supabase
     .from("clients")
