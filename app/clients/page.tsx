@@ -9,21 +9,6 @@ export default async function ClientsPage() {
   const { role, email } = await getUserRole();
   const isOwner = role === "owner";
 
-  // Debug: check auth state + test RLS
-  const { data: { user } } = await supabase.auth.getUser();
-  const { data: { session } } = await supabase.auth.getSession();
-
-  // Decode JWT to see actual claims
-  let jwtEmail = "no-session";
-  if (session?.access_token) {
-    try {
-      const payload = JSON.parse(atob(session.access_token.split(".")[1]));
-      jwtEmail = payload.email || "no-email-in-jwt";
-    } catch { jwtEmail = "decode-error"; }
-  }
-
-  const { data: myAgency } = await supabase.from("agencies").select("id, email, role").eq("email", user?.email || "").single();
-  const debugInfo = { email, role, jwtEmail, authEmail: user?.email, agencyFound: !!myAgency };
 
   const { data: clients } = await supabase
     .from("clients")
@@ -38,7 +23,6 @@ export default async function ClientsPage() {
           <div>
             <h1 className="font-heading text-[28px] font-semibold tracking-tight text-[var(--t1)]">Business Performance Tracker Dashboard</h1>
             <p className="text-[13px] text-[var(--t3)] mt-1">Select a project to view performance</p>
-            <p className="text-[10px] text-[var(--t4)] mt-1 num">Debug: {JSON.stringify(debugInfo)} | Projects: {clients?.length ?? 0}</p>
           </div>
           <div className="flex items-center gap-3">
             {isOwner && (

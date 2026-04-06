@@ -15,7 +15,7 @@ export async function getUserRole(): Promise<{ email: string | null; role: UserR
 
   return {
     email: user.email,
-    role: (agency?.role as UserRole) || "user",
+    role: (agency?.role === "owner" ? "owner" : "user") as UserRole,
     agencyId: agency?.id || null,
   };
 }
