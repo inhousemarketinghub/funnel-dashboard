@@ -1,12 +1,18 @@
 "use client";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 export default function LoginPage() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
   const supabase = createClient();
+  const router = useRouter();
 
   async function handleGoogleLogin() {
     setLoading(true);
@@ -17,26 +23,44 @@ export default function LoginPage() {
         redirectTo: `${window.location.origin}/auth/callback`,
       },
     });
-    if (error) {
-      setError(error.message);
-      setLoading(false);
+    if (error) { setError(error.message); setLoading(false); }
+  }
+
+  async function handleEmailLogin(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    if (mode === "signup") {
+      const { error } = await supabase.auth.signUp({ email, password });
+      if (error) { setError(error.message); setLoading(false); return; }
+    } else {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) { setError(error.message); setLoading(false); return; }
     }
+
+    setLoading(false);
+    router.push("/clients");
+    router.refresh();
   }
 
   return (
     <div className="min-h-dvh flex items-center justify-center bg-[var(--bg)]">
       <div className="bauhaus-stripe" style={{ position: "fixed", top: 0, left: 0, right: 0 }}><div /><div /><div /><div /></div>
       <div className="card-base w-full max-w-sm" style={{ borderRadius: 14, padding: 32 }}>
-        <div className="text-center mb-8">
+        <div className="text-center mb-6">
           <h1 className="font-heading text-[28px] font-semibold tracking-tight text-[var(--t1)]">Business Performance</h1>
           <h1 className="font-heading text-[28px] font-semibold tracking-tight text-[var(--t1)]">Tracker</h1>
           <p className="text-[var(--t3)] text-[14px] mt-2">Sign in to access your dashboard</p>
         </div>
+
         {error && <p className="text-sm text-[var(--red)] mb-4 text-center">{error}</p>}
+
+        {/* Google */}
         <Button
           onClick={handleGoogleLogin}
           disabled={loading}
-          className="w-full bg-[var(--bg2)] hover:bg-[var(--bg3)] text-[var(--t1)] border border-[var(--border)] hover:border-[var(--border-hover)] transition-all h-11"
+          className="w-full bg-[var(--bg2)] hover:bg-[var(--bg3)] text-[var(--t1)] border border-[var(--border)] hover:border-[var(--border-hover)] transition-all h-11 mb-4"
           style={{ fontWeight: 500 }}
         >
           <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
@@ -47,7 +71,49 @@ export default function LoginPage() {
           </svg>
           {loading ? "Redirecting..." : "Sign in with Google"}
         </Button>
-        <p className="text-[11px] text-[var(--t4)] text-center mt-4">Sign in with your Google account to get started</p>
+
+        {/* Divider */}
+        <div className="flex items-center gap-3 mb-4">
+          <div className="flex-1 h-px bg-[var(--border)]" />
+          <span className="text-[11px] text-[var(--t4)]">or</span>
+          <div className="flex-1 h-px bg-[var(--border)]" />
+        </div>
+
+        {/* Email */}
+        <form onSubmit={handleEmailLogin} className="space-y-3">
+          <Input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            className="border-[var(--border)] focus-visible:ring-[var(--blue)] h-10"
+          />
+          <Input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            minLength={6}
+            className="border-[var(--border)] focus-visible:ring-[var(--blue)] h-10"
+          />
+          <Button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-[var(--t1)] hover:bg-[var(--t2)] text-[var(--bg)] h-10"
+          >
+            {loading ? "Loading..." : mode === "signup" ? "Sign Up" : "Sign In"}
+          </Button>
+        </form>
+
+        <button
+          type="button"
+          onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
+          className="w-full text-[12px] text-[var(--t3)] hover:text-[var(--t1)] transition-colors mt-3 text-center"
+        >
+          {mode === "signin" ? "No account? Sign Up" : "Already have an account? Sign In"}
+        </button>
       </div>
     </div>
   );
