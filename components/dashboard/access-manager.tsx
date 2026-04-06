@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 
 interface AccessUser {
   id: string;
@@ -12,16 +11,23 @@ interface AccessUser {
   accessId: string;
 }
 
+interface Agency {
+  id: string;
+  email: string;
+  name: string;
+}
+
 export function AccessManager({ clientId, clientName }: { clientId: string; clientName: string }) {
   const [users, setUsers] = useState<AccessUser[]>([]);
-  const [email, setEmail] = useState("");
+  const [allAgencies, setAllAgencies] = useState<Agency[]>([]);
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
-    if (open) loadUsers();
+    if (open) { loadUsers(); loadAgencies(); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -44,32 +50,31 @@ export function AccessManager({ clientId, clientName }: { clientId: string; clie
     }
   }
 
-  async function handleAdd() {
-    if (!email.trim()) return;
+  async function loadAgencies() {
+    const { data } = await supabase
+      .from("agencies")
+      .select("id, email, name")
+      .order("email");
+    if (data) setAllAgencies(data);
+  }
+
+  // Filter agencies: not already assigned, matches search
+  const availableAgencies = allAgencies.filter((a) =>
+    !users.some((u) => u.id === a.id) &&
+    (search === "" || a.email.toLowerCase().includes(search.toLowerCase()) || (a.name || "").toLowerCase().includes(search.toLowerCase()))
+  );
+
+  async function handleAdd(agencyId: string) {
     setLoading(true);
     setError(null);
-
-    // Find agency by email
-    const { data: agency } = await supabase
-      .from("agencies")
-      .select("id")
-      .eq("email", email.trim().toLowerCase())
-      .single();
-
-    if (!agency) {
-      setError("User not found. They need to sign in first.");
-      setLoading(false);
-      return;
-    }
-
     const { error: insertErr } = await supabase
       .from("project_access")
-      .insert({ agency_id: agency.id, client_id: clientId });
+      .insert({ agency_id: agencyId, client_id: clientId });
 
     if (insertErr) {
       setError(insertErr.message.includes("duplicate") ? "User already has access" : insertErr.message);
     } else {
-      setEmail("");
+      setSearch("");
       await loadUsers();
     }
     setLoading(false);
@@ -92,7 +97,7 @@ export function AccessManager({ clientId, clientName }: { clientId: string; clie
   }
 
   return (
-    <div className="mt-3 pt-3 border-t border-[var(--border)]">
+    <div className="mt-3 pt-3 border-t border-[var(--border)]" onClick={(e) => e.stopPropagation()}>
       <div className="flex items-center justify-between mb-2">
         <span className="font-label text-[10px] uppercase tracking-widest text-[var(--t4)]">
           User Access — {clientName}
@@ -100,7 +105,7 @@ export function AccessManager({ clientId, clientName }: { clientId: string; clie
         <button onClick={() => setOpen(false)} className="text-[11px] text-[var(--t3)] hover:text-[var(--t1)]">Close</button>
       </div>
 
-      {/* User list */}
+      {/* Assigned users */}
       {users.length > 0 ? (
         <div className="space-y-1 mb-3">
           {users.map((u) => (
@@ -122,24 +127,39 @@ export function AccessManager({ clientId, clientName }: { clientId: string; clie
         <p className="text-[11px] text-[var(--t4)] mb-3">No users assigned yet</p>
       )}
 
-      {/* Add user */}
+      {/* Search + Add user */}
       {error && <p className="text-[11px] text-[var(--red)] mb-2">{error}</p>}
-      <div className="flex gap-2">
-        <Input
-          type="email"
-          placeholder="user@email.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="border-[var(--border)] focus-visible:ring-[var(--blue)] h-8 text-[12px] flex-1"
-          onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+      <div className="relative">
+        <input
+          type="text"
+          placeholder="Search users by email or name..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full h-8 px-3 text-[12px] rounded-[6px] border border-[var(--border)] bg-[var(--bg2)] text-[var(--t1)] outline-none focus:border-[var(--blue)]"
         />
-        <Button
-          onClick={handleAdd}
-          disabled={loading || !email.trim()}
-          className="bg-[var(--blue)] hover:bg-[#153D7A] text-white h-8 text-[11px] px-3"
-        >
-          {loading ? "..." : "Add"}
-        </Button>
+        {search && availableAgencies.length > 0 && (
+          <div className="absolute top-9 left-0 right-0 bg-[var(--bg2)] border border-[var(--border)] rounded-[6px] shadow-md z-10 max-h-[160px] overflow-y-auto">
+            {availableAgencies.slice(0, 5).map((a) => (
+              <button
+                key={a.id}
+                onClick={() => handleAdd(a.id)}
+                disabled={loading}
+                className="w-full text-left px-3 py-2 text-[12px] hover:bg-[var(--bg3)] transition-colors flex justify-between items-center"
+              >
+                <div>
+                  <span className="text-[var(--t1)]">{a.name || a.email}</span>
+                  {a.name && <span className="text-[var(--t4)] ml-2">{a.email}</span>}
+                </div>
+                <span className="text-[10px] text-[var(--blue)]">+ Add</span>
+              </button>
+            ))}
+          </div>
+        )}
+        {search && availableAgencies.length === 0 && (
+          <div className="absolute top-9 left-0 right-0 bg-[var(--bg2)] border border-[var(--border)] rounded-[6px] shadow-md z-10 p-3">
+            <p className="text-[11px] text-[var(--t4)]">No users found. They need to sign in first.</p>
+          </div>
+        )}
       </div>
     </div>
   );
