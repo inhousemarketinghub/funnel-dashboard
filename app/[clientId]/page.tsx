@@ -1,4 +1,5 @@
 import { createServerSupabase } from "@/lib/supabase/server";
+import { getProjectPermissions } from "@/lib/auth";
 import { fetchPerformanceData, fetchLeadData, countEstShowUp, fetchKPIData, fetchPersonData, detectBrandsOrdered, fetchOverallKPI } from "@/lib/sheets";
 import type { PersonData, PerfResult } from "@/lib/sheets";
 import { BrandSelector } from "@/components/dashboard/brand-selector";
@@ -135,6 +136,9 @@ export default async function DashboardPage({
     { label: "CPA%", value: tm.cpa_pct ? (kpi.cpa_pct / tm.cpa_pct) * 100 : 0, target: `${kpi.cpa_pct}%`, actual: `${tm.cpa_pct.toFixed(2)}%`, prevActual: `${lm.cpa_pct.toFixed(2)}%` },
   ];
 
+  const perms = await getProjectPermissions(clientId);
+  const canReport = perms.includes("view_report");
+
   return (
     <div>
       {/* Header */}
@@ -151,7 +155,7 @@ export default async function DashboardPage({
           </div>
         </div>
         <div className="flex items-start gap-2">
-          <MonthPickerDialog clientId={clientId} />
+          {canReport && <MonthPickerDialog clientId={clientId} />}
           <Suspense>
             <DateRangePicker clientId={clientId} />
           </Suspense>

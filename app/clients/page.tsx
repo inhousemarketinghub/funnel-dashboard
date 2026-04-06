@@ -30,6 +30,7 @@ export default async function ClientsPage() {
                 + Add Project
               </Link>
             )}
+            <span className="text-[11px] text-[var(--t4)] num">{email}</span>
             <LogoutButton />
           </div>
         </div>

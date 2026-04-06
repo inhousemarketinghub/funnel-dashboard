@@ -9,6 +9,7 @@ interface AccessUser {
   email: string;
   name: string;
   accessId: string;
+  permissions: string[];
 }
 
 interface Agency {
@@ -16,6 +17,13 @@ interface Agency {
   email: string;
   name: string;
 }
+
+const PERMISSION_OPTIONS = [
+  { key: "view_dashboard", label: "Dashboard" },
+  { key: "view_report", label: "Report" },
+  { key: "edit_settings", label: "Settings" },
+  { key: "manage_access", label: "Manage Access" },
+];
 
 export function AccessManager({ clientId, clientName }: { clientId: string; clientName: string }) {
   const [users, setUsers] = useState<AccessUser[]>([]);
@@ -34,7 +42,7 @@ export function AccessManager({ clientId, clientName }: { clientId: string; clie
   async function loadUsers() {
     const { data } = await supabase
       .from("project_access")
-      .select("id, agency_id, agencies(email, name)")
+      .select("id, agency_id, permissions, agencies(email, name)")
       .eq("client_id", clientId);
 
     if (data) {
@@ -45,20 +53,17 @@ export function AccessManager({ clientId, clientName }: { clientId: string; clie
           email: agency?.email || "",
           name: agency?.name || "",
           accessId: d.id as string,
+          permissions: (d.permissions as string[]) || ["view_dashboard"],
         };
       }));
     }
   }
 
   async function loadAgencies() {
-    const { data } = await supabase
-      .from("agencies")
-      .select("id, email, name")
-      .order("email");
+    const { data } = await supabase.from("agencies").select("id, email, name").order("email");
     if (data) setAllAgencies(data);
   }
 
-  // Filter agencies: not already assigned, matches search
   const availableAgencies = allAgencies.filter((a) =>
     !users.some((u) => u.id === a.id) &&
     (search === "" || a.email.toLowerCase().includes(search.toLowerCase()) || (a.name || "").toLowerCase().includes(search.toLowerCase()))
@@ -69,8 +74,7 @@ export function AccessManager({ clientId, clientName }: { clientId: string; clie
     setError(null);
     const { error: insertErr } = await supabase
       .from("project_access")
-      .insert({ agency_id: agencyId, client_id: clientId });
-
+      .insert({ agency_id: agencyId, client_id: clientId, permissions: ["view_dashboard"] });
     if (insertErr) {
       setError(insertErr.message.includes("duplicate") ? "User already has access" : insertErr.message);
     } else {
@@ -85,12 +89,25 @@ export function AccessManager({ clientId, clientName }: { clientId: string; clie
     await loadUsers();
   }
 
+  async function togglePermission(accessId: string, currentPerms: string[], perm: string) {
+    const newPerms = currentPerms.includes(perm)
+      ? currentPerms.filter((p) => p !== perm)
+      : [...currentPerms, perm];
+    // Always keep view_dashboard
+    if (!newPerms.includes("view_dashboard")) newPerms.unshift("view_dashboard");
+    await supabase.from("project_access").update({ permissions: newPerms }).eq("id", accessId);
+    setUsers((prev) => prev.map((u) => u.accessId === accessId ? { ...u, permissions: newPerms } : u));
+  }
+
+  async function setFullAccess(accessId: string) {
+    const allPerms = PERMISSION_OPTIONS.map((p) => p.key);
+    await supabase.from("project_access").update({ permissions: allPerms }).eq("id", accessId);
+    setUsers((prev) => prev.map((u) => u.accessId === accessId ? { ...u, permissions: allPerms } : u));
+  }
+
   if (!open) {
     return (
-      <button
-        onClick={() => setOpen(true)}
-        className="text-[11px] text-[var(--t3)] hover:text-[var(--blue)] transition-colors"
-      >
+      <button onClick={() => setOpen(true)} className="text-[11px] text-[var(--t3)] hover:text-[var(--blue)] transition-colors">
         Manage Access
       </button>
     );
@@ -98,28 +115,48 @@ export function AccessManager({ clientId, clientName }: { clientId: string; clie
 
   return (
     <div className="mt-3 pt-3 border-t border-[var(--border)]" onClick={(e) => e.stopPropagation()}>
-      <div className="flex items-center justify-between mb-2">
-        <span className="font-label text-[10px] uppercase tracking-widest text-[var(--t4)]">
-          User Access — {clientName}
-        </span>
+      <div className="flex items-center justify-between mb-3">
+        <span className="font-label text-[10px] uppercase tracking-widest text-[var(--t4)]">User Access — {clientName}</span>
         <button onClick={() => setOpen(false)} className="text-[11px] text-[var(--t3)] hover:text-[var(--t1)]">Close</button>
       </div>
 
-      {/* Assigned users */}
+      {/* Assigned users with permission checkboxes */}
       {users.length > 0 ? (
-        <div className="space-y-1 mb-3">
+        <div className="space-y-3 mb-4">
           {users.map((u) => (
-            <div key={u.accessId} className="flex items-center justify-between py-1">
-              <div>
-                <span className="text-[12px] text-[var(--t1)]">{u.name || u.email}</span>
-                {u.name && <span className="text-[11px] text-[var(--t4)] ml-2">{u.email}</span>}
+            <div key={u.accessId} className="bg-[var(--bg3)] rounded-[8px] p-3" style={{ transition: "background 500ms ease" }}>
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <span className="text-[12px] font-medium text-[var(--t1)]">{u.name || u.email}</span>
+                  {u.name && <span className="text-[10px] text-[var(--t4)] ml-2">{u.email}</span>}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setFullAccess(u.accessId)} className="text-[9px] text-[var(--blue)] hover:underline">
+                    Full Access
+                  </button>
+                  <button onClick={() => handleRemove(u.accessId)} className="text-[9px] text-[var(--red)] hover:underline">
+                    Remove
+                  </button>
+                </div>
               </div>
-              <button
-                onClick={() => handleRemove(u.accessId)}
-                className="text-[10px] text-[var(--red)] hover:underline"
-              >
-                Remove
-              </button>
+              <div className="flex flex-wrap gap-2">
+                {PERMISSION_OPTIONS.map((perm) => {
+                  const checked = u.permissions.includes(perm.key);
+                  const isBase = perm.key === "view_dashboard";
+                  return (
+                    <label key={perm.key} className={`flex items-center gap-[5px] text-[10px] cursor-pointer ${isBase ? "opacity-60" : ""}`}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={isBase}
+                        onChange={() => togglePermission(u.accessId, u.permissions, perm.key)}
+                        className="w-3 h-3 rounded accent-[var(--blue)]"
+                      />
+                      <span className={checked ? "text-[var(--t1)]" : "text-[var(--t3)]"}>{perm.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
             </div>
           ))}
         </div>
