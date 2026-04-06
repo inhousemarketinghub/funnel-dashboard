@@ -23,7 +23,7 @@ export default async function ClientsPage() {
   }
 
   const { data: myAgency } = await supabase.from("agencies").select("id, email, role").eq("email", user?.email || "").single();
-  const debugInfo = { email, role, jwtEmail, authEmail: user?.email, agencyFound: !!myAgency, projects: clients?.length ?? 0 };
+  const debugInfo = { email, role, jwtEmail, authEmail: user?.email, agencyFound: !!myAgency };
 
   const { data: clients } = await supabase
     .from("clients")
