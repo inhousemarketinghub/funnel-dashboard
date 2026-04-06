@@ -1,49 +1,96 @@
 "use client";
+
 import { useState } from "react";
 
-interface KPIItem { label: string; value: number; target: string; actual: string; }
+interface KPIItem {
+  label: string;
+  value: number;
+  target: string;
+  actual: string;
+  prevActual?: string;
+}
+
+function getStatus(value: number): { color: string; text: string } {
+  if (value >= 100) return { color: "var(--green)", text: "Excellent" };
+  if (value >= 80) return { color: "var(--yellow)", text: "Warning" };
+  return { color: "var(--red)", text: "Poor" };
+}
 
 export function KPIChart({ items }: { items: KPIItem[] }) {
   const [hovered, setHovered] = useState<number | null>(null);
-  const maxPct = 120;
+
+  const maxScale = 150;
 
   return (
-    <div className="bg-white border border-[rgba(214,211,209,0.5)] rounded-lg p-6">
-      <h3 className="font-[family-name:var(--font-geist-sans)] font-bold text-[15px] tracking-tight mb-1">KPI Achievement</h3>
-      <p className="text-[11px] text-[#78716C] mb-4">Red line = KPI target · Hover for details</p>
-      <div className="space-y-2">
-        {items.map((item, i) => {
-          const barPct = Math.min(item.value / maxPct * 100, 100);
-          const color = item.value >= 100 ? "#16A34A" : item.value >= 80 ? "#CA8A04" : "#DC2626";
-          return (
-            <div key={item.label} className="flex items-center gap-3 h-8 relative"
-              onMouseEnter={() => setHovered(i)} onMouseLeave={() => setHovered(null)}>
-              <div className="w-28 text-right text-[11px] font-semibold text-[#78716C] font-[family-name:var(--font-geist-mono)] shrink-0">{item.label}</div>
-              <div className="flex-1 h-5 bg-[#F5F5F4] rounded-md relative cursor-pointer">
-                <div className="h-full rounded-md transition-all duration-300 flex items-center justify-end pr-2"
-                  style={{ width: `${barPct}%`, background: color }}>
-                  {barPct >= 30 && <span className="text-[11px] font-bold text-white font-[family-name:var(--font-geist-mono)]">{item.value.toFixed(0)}%</span>}
-                </div>
-                {barPct < 30 && (
-                  <span className="absolute text-[11px] font-bold font-[family-name:var(--font-geist-mono)]"
-                    style={{ left: `${barPct + 2}%`, top: "50%", transform: "translateY(-50%)", color }}>
-                    {item.value.toFixed(0)}%
-                  </span>
-                )}
-                <div className="absolute top-[-4px] bottom-[-4px] w-0.5 bg-[#DC2626]" style={{ left: `${100 / maxPct * 100}%` }} />
-                {hovered === i && (
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white border border-[rgba(214,211,209,0.5)] rounded-lg p-3 shadow-lg z-10 min-w-[180px]">
-                    <div className="font-bold text-[13px] text-[#1C1917] mb-2 pb-1 border-b border-[rgba(214,211,209,0.5)]">{item.label}</div>
-                    <div className="flex justify-between text-[12px] font-[family-name:var(--font-geist-mono)] text-[#78716C] py-0.5"><span>Target</span><b className="text-[#1C1917]">{item.target}</b></div>
-                    <div className="flex justify-between text-[12px] font-[family-name:var(--font-geist-mono)] text-[#78716C] py-0.5"><span>Actual</span><b className="text-[#1C1917]">{item.actual}</b></div>
-                    <div className="flex justify-between text-[12px] font-[family-name:var(--font-geist-mono)] text-[#78716C] py-0.5"><span>Achievement</span><b style={{ color }}>{item.value.toFixed(0)}%</b></div>
-                  </div>
-                )}
+    <div>
+      {items.map((item, i) => {
+        const status = getStatus(item.value);
+        const currentWidth = Math.min((item.value / maxScale) * 100, 100);
+        const targetPos = (100 / maxScale) * 100;
+
+        return (
+          <div
+            key={item.label}
+            className="flex items-center gap-3 py-[10px] border-b border-[var(--border)] last:border-b-0 relative"
+            onMouseEnter={() => setHovered(i)}
+            onMouseLeave={() => setHovered(null)}
+            style={{ transition: "border-color 500ms ease" }}
+          >
+            <span className="text-[13px] font-medium min-w-[120px] text-[var(--t1)]" style={{ transition: "color 500ms ease" }}>
+              {item.label}
+            </span>
+            <div className="flex-1 relative">
+              <div
+                className="h-[8px] rounded-[4px] relative overflow-visible"
+                style={{ background: "var(--sand)", transition: "background 500ms ease" }}
+              >
+                {/* Current period bar — color by status */}
+                <div
+                  className="h-full rounded-[4px] absolute top-0 left-0"
+                  style={{
+                    width: `${currentWidth}%`,
+                    background: status.color,
+                    transition: "width 1000ms ease",
+                  }}
+                />
+                {/* KPI Target dashed line */}
+                <div
+                  className="absolute top-[-4px] bottom-[-4px] w-0"
+                  style={{
+                    left: `${targetPos}%`,
+                    borderLeft: "2px dashed var(--t3)",
+                    zIndex: 2,
+                  }}
+                />
               </div>
             </div>
-          );
-        })}
-      </div>
+            {/* Status label instead of percentage */}
+            <span
+              className="text-[11px] font-semibold min-w-[70px] text-right"
+              style={{ color: status.color, transition: "color 500ms ease" }}
+            >
+              {status.text}
+            </span>
+
+            {/* Hover tooltip */}
+            {hovered === i && (
+              <div
+                className="tip show"
+                style={{
+                  position: "absolute",
+                  top: -28,
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  zIndex: 20,
+                }}
+              >
+                {item.label}: {item.actual} / KPI: {item.target}
+                {item.prevActual && ` / Prev: ${item.prevActual}`}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

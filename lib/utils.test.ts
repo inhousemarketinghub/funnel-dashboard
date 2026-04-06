@@ -37,13 +37,13 @@ describe("momPct", () => {
 });
 
 describe("kpiColorClass", () => {
-  it("returns green for above KPI", () => {
-    expect(kpiColorClass(44, 30, false)).toBe("text-signal-green");
+  it("returns blue for above KPI", () => {
+    expect(kpiColorClass(44, 30, false)).toBe("text-[var(--blue)]");
   });
   it("returns red for below KPI", () => {
-    expect(kpiColorClass(19.4, 33, false)).toBe("text-signal-red");
+    expect(kpiColorClass(19.4, 33, false)).toBe("text-[var(--red)]");
   });
-  it("returns green for inverted below KPI", () => {
-    expect(kpiColorClass(25, 26, true)).toBe("text-signal-green");
+  it("returns blue for inverted below KPI", () => {
+    expect(kpiColorClass(25, 26, true)).toBe("text-[var(--blue)]");
   });
 });

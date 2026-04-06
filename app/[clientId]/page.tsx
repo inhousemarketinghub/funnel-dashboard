@@ -1,85 +1,229 @@
 import { createServerSupabase } from "@/lib/supabase/server";
-import { fetchPerformanceData, fetchLeadData, countEstShowUp } from "@/lib/sheets";
+import { fetchPerformanceData, fetchLeadData, countEstShowUp, fetchKPIData, fetchPersonData, detectBrandsOrdered, fetchOverallKPI } from "@/lib/sheets";
+import type { PersonData, PerfResult } from "@/lib/sheets";
+import { BrandSelector } from "@/components/dashboard/brand-selector";
 import { computeMetrics, computeMoM, computeAchievement } from "@/lib/metrics";
 import { fmtRM, fmtROAS } from "@/lib/utils";
+import { resolveSearchParams, getPreviousPeriod, formatRangeLabel, formatDateParam } from "@/lib/dates";
 import { HeroCards } from "@/components/dashboard/hero-cards";
 import { FunnelFlow } from "@/components/dashboard/funnel-flow";
 import { KPIChart } from "@/components/dashboard/kpi-chart";
+import { PersonPerformance } from "@/components/dashboard/person-performance";
 import { MoMTable } from "@/components/dashboard/mom-table";
+import { DateRangePicker } from "@/components/dashboard/date-range-picker";
+import { SplitText } from "@/components/animations/split-text";
+import { MonthPickerDialog } from "@/components/dashboard/month-picker-dialog";
+import { CardReveal } from "@/components/animations/card-reveal";
+import { BlurText } from "@/components/animations/blur-text";
 import type { KPIConfig } from "@/lib/types";
+import { Suspense } from "react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
 
-export default async function DashboardPage({ params }: { params: Promise<{ clientId: string }> }) {
+export default async function DashboardPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ clientId: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   const { clientId } = await params;
+  const sp = await searchParams;
   const supabase = await createServerSupabase();
   const { data: client } = await supabase.from("clients").select("*").eq("id", clientId).single();
   if (!client) return <p className="text-[#78716C] p-8">Client not found</p>;
 
-  const now = new Date();
-  const reportEnd = new Date(now.getFullYear(), now.getMonth(), 0);
-  const reportStart = new Date(reportEnd.getFullYear(), reportEnd.getMonth(), 1);
-  const prevEnd = new Date(reportStart.getTime() - 86400000);
-  const prevStart = new Date(prevEnd.getFullYear(), prevEnd.getMonth(), 1);
+  // Date range from URL params (defaults to this month 1st → today)
+  const { from: reportStart, to: reportEnd } = resolveSearchParams(sp.from, sp.to);
+  // Support manual previous period from URL params
+  const autoPrev = getPreviousPeriod(reportStart, reportEnd);
+  const prevFromParam = sp.prevFrom ? new Date(sp.prevFrom as string) : null;
+  const prevToParam = sp.prevTo ? new Date(sp.prevTo as string) : null;
+  const prevStart = prevFromParam && !isNaN(prevFromParam.getTime()) ? prevFromParam : autoPrev.from;
+  const prevEnd = prevToParam && !isNaN(prevToParam.getTime()) ? prevToParam : autoPrev.to;
 
+  // KPI lookup for the month containing the start of the range
   const monthStr = `${reportStart.getFullYear()}-${String(reportStart.getMonth() + 1).padStart(2, "0")}-01`;
   let { data: kpiRow } = await supabase.from("kpi_configs").select("*").eq("client_id", clientId).eq("month", monthStr).single();
   if (!kpiRow) {
     const { data } = await supabase.from("kpi_configs").select("*").eq("client_id", clientId).order("month", { ascending: false }).limit(1).single();
     kpiRow = data;
   }
-  const kpi: KPIConfig = kpiRow || {
+  // Brand detection (ordered by KPI tab)
+  const brands = await detectBrandsOrdered(client.sheet_id);
+  const brandParam = sp.brand as string | undefined;
+  // "Overall" or no selection = no brand filter (aggregate all)
+  const selectedBrand = brandParam && brandParam !== "Overall" ? brandParam : brands.length === 1 ? brands[0] : undefined;
+
+  let perfResult: PerfResult = { data: [], funnelType: "appointment" };
+  let leadData: import("@/lib/types").Lead[] = [];
+  let sheetKPI: KPIConfig | null = null;
+  let personData: PersonData = { appointmentPersons: [], salesPersons: [], brandBreakdowns: {} };
+  let fetchError: string | null = null;
+  try {
+    [perfResult, leadData, sheetKPI, personData] = await Promise.all([
+      fetchPerformanceData(client.sheet_id, selectedBrand),
+      fetchLeadData(client.sheet_id, selectedBrand),
+      fetchKPIData(client.sheet_id, selectedBrand),
+      fetchPersonData(client.sheet_id, reportStart, reportEnd, selectedBrand),
+    ]);
+  } catch (err) {
+    perfResult = { data: [], funnelType: "appointment" };
+    leadData = [];
+    fetchError = err instanceof Error ? err.message : "Failed to fetch Google Sheet data";
+  }
+
+  // For Overall (multi-brand, no selectedBrand): ALWAYS sum all brand KPIs
+  if (brands.length > 1 && !selectedBrand) {
+    sheetKPI = await fetchOverallKPI(client.sheet_id, brands);
+  }
+
+  // KPI: prefer Sheet data, fallback to Supabase, then defaults
+  const kpi: KPIConfig = sheetKPI || kpiRow || {
     sales: 300000, orders: 6, aov: 50000, cpl: 26, respond_rate: 30,
     appt_rate: 33, showup_rate: 90, conv_rate: 25, ad_spend: 7500,
     daily_ad: 250, roas: 40, cpa_pct: 2.5, target_contact: 80, target_appt: 27, target_showup: 24,
   };
 
-  const [perfData, leadData] = await Promise.all([
-    fetchPerformanceData(client.sheet_id),
-    fetchLeadData(client.sheet_id),
-  ]);
-
-  const thisMonthRows = perfData.filter((r) => r.date >= reportStart && r.date <= reportEnd);
-  const lastMonthRows = perfData.filter((r) => r.date >= prevStart && r.date <= prevEnd);
+  const perfData = perfResult.data;
+  const detectedFunnelType = perfResult.funnelType;
+  const thisRangeRows = perfData.filter((r) => r.date >= reportStart && r.date <= reportEnd);
+  const prevRangeRows = perfData.filter((r) => r.date >= prevStart && r.date <= prevEnd);
   const estSU = countEstShowUp(leadData, reportStart, reportEnd);
-  const estSULast = countEstShowUp(leadData, prevStart, prevEnd);
+  const estSUPrev = countEstShowUp(leadData, prevStart, prevEnd);
 
-  const tm = computeMetrics(thisMonthRows, estSU);
-  const lm = computeMetrics(lastMonthRows, estSULast);
+  const tm = computeMetrics(thisRangeRows, estSU);
+  const lm = computeMetrics(prevRangeRows, estSUPrev);
   const mom = computeMoM(tm, lm);
   const ach = computeAchievement(tm, kpi);
 
-  const thisMonthName = reportStart.toLocaleDateString("en", { month: "long", year: "numeric" });
-  const lastMonthName = prevStart.toLocaleDateString("en", { month: "long", year: "numeric" });
+  const thisRangeLabel = formatRangeLabel(reportStart, reportEnd);
+  const prevRangeLabel = formatRangeLabel(prevStart, prevEnd);
+
+  // Days in current range for daily avg calculation
+  const rangeDays = Math.max(1, Math.round((reportEnd.getTime() - reportStart.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+
+  const isWalkin = detectedFunnelType === "walkin";
+  const walkinVisitRate = tm.inquiry > 0 ? (tm.contact / tm.inquiry) * 100 : 0;
+  const walkinVisitRatePrev = lm.inquiry > 0 ? (lm.contact / lm.inquiry) * 100 : 0;
+  const walkinConvRate = tm.contact > 0 ? (tm.orders / tm.contact) * 100 : 0;
+  const walkinConvRatePrev = lm.contact > 0 ? (lm.orders / lm.contact) * 100 : 0;
 
   const kpiItems = [
-    { label: "Sales", value: ach.sales, target: fmtRM(kpi.sales), actual: fmtRM(tm.sales) },
-    { label: "Ad Spend", value: ach.ad_spend, target: fmtRM(kpi.ad_spend), actual: fmtRM(tm.ad_spend) },
-    { label: "AOV", value: ach.aov, target: fmtRM(kpi.aov), actual: fmtRM(tm.aov) },
-    { label: "CPL", value: ach.cpl, target: fmtRM(kpi.cpl), actual: fmtRM(tm.cpl) },
-    { label: "Respond Rate", value: ach.respond_rate, target: `${kpi.respond_rate}%`, actual: `${tm.respond_rate.toFixed(1)}%` },
-    { label: "Appt Rate", value: ach.appt_rate, target: `${kpi.appt_rate}%`, actual: `${tm.appt_rate.toFixed(1)}%` },
-    { label: "Show Up Rate", value: ach.showup_rate, target: `${kpi.showup_rate}%`, actual: `${tm.showup_rate.toFixed(1)}%` },
-    { label: "Conv Rate", value: Math.min(ach.conv_rate, 200), target: `${kpi.conv_rate}%`, actual: `${tm.conv_rate.toFixed(1)}%` },
-    { label: "CPA%", value: tm.cpa_pct ? (kpi.cpa_pct / tm.cpa_pct) * 100 : 0, target: `${kpi.cpa_pct}%`, actual: `${tm.cpa_pct.toFixed(2)}%` },
+    { label: "Sales", value: ach.sales, target: fmtRM(kpi.sales), actual: fmtRM(tm.sales), prevActual: fmtRM(lm.sales) },
+    { label: "Ad Spend", value: ach.ad_spend, target: fmtRM(kpi.ad_spend), actual: fmtRM(tm.ad_spend), prevActual: fmtRM(lm.ad_spend) },
+    { label: "Orders", value: ach.orders, target: String(kpi.orders), actual: String(tm.orders), prevActual: String(lm.orders) },
+    { label: "AOV", value: ach.aov, target: fmtRM(kpi.aov), actual: fmtRM(tm.aov), prevActual: fmtRM(lm.aov) },
+    { label: "CPL", value: ach.cpl, target: fmtRM(kpi.cpl), actual: fmtRM(tm.cpl), prevActual: fmtRM(lm.cpl) },
+    {
+      label: isWalkin ? "Visit Rate" : "Respond Rate",
+      value: isWalkin ? (kpi.respond_rate > 0 ? (walkinVisitRate / kpi.respond_rate) * 100 : 0) : ach.respond_rate,
+      target: `${kpi.respond_rate}%`,
+      actual: isWalkin ? `${walkinVisitRate.toFixed(1)}%` : `${tm.respond_rate.toFixed(1)}%`,
+      prevActual: isWalkin ? `${walkinVisitRatePrev.toFixed(1)}%` : `${lm.respond_rate.toFixed(1)}%`,
+    },
+    ...(!isWalkin ? [
+      { label: "Appt Rate", value: ach.appt_rate, target: `${kpi.appt_rate}%`, actual: `${tm.appt_rate.toFixed(1)}%`, prevActual: `${lm.appt_rate.toFixed(1)}%` },
+      { label: "Show Up Rate", value: ach.showup_rate, target: `${kpi.showup_rate}%`, actual: `${tm.showup_rate.toFixed(1)}%`, prevActual: `${lm.showup_rate.toFixed(1)}%` },
+    ] : []),
+    {
+      label: "Conv Rate",
+      value: isWalkin ? (kpi.conv_rate > 0 ? (walkinConvRate / kpi.conv_rate) * 100 : 0) : Math.min(ach.conv_rate, 200),
+      target: `${kpi.conv_rate}%`,
+      actual: isWalkin ? `${walkinConvRate.toFixed(1)}%` : `${tm.conv_rate.toFixed(1)}%`,
+      prevActual: isWalkin ? `${walkinConvRatePrev.toFixed(1)}%` : `${lm.conv_rate.toFixed(1)}%`,
+    },
+    { label: "CPA%", value: tm.cpa_pct ? (kpi.cpa_pct / tm.cpa_pct) * 100 : 0, target: `${kpi.cpa_pct}%`, actual: `${tm.cpa_pct.toFixed(2)}%`, prevActual: `${lm.cpa_pct.toFixed(2)}%` },
   ];
 
   return (
     <div>
-      <HeroCards metrics={tm} kpi={kpi} achievement={ach} />
-      <FunnelFlow metrics={tm} />
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <div className="bg-white border border-[rgba(214,211,209,0.5)] rounded-lg p-6">
-          <h3 className="font-[family-name:var(--font-geist-sans)] font-bold text-[15px] tracking-tight mb-4">MoM Funnel Comparison</h3>
-          <MoMTable tm={tm} lm={lm} mom={mom} kpi={kpi} thisMonth={thisMonthName} lastMonth={lastMonthName} />
+      {/* Header */}
+      <div className="flex justify-between items-start mb-7">
+        <div>
+          <SplitText text="Performance Overview" />
+          <div className="flex items-center gap-3 mt-[3px]">
+            <p className="text-[14px] text-[var(--t3)] font-light">{thisRangeLabel}</p>
+            {brands.length > 0 && (
+              <Suspense>
+                <BrandSelector clientId={clientId} brands={brands.length > 1 ? ["Overall", ...brands] : brands} />
+              </Suspense>
+            )}
+          </div>
         </div>
-        <KPIChart items={kpiItems} />
+        <div className="flex items-start gap-2">
+          <MonthPickerDialog clientId={clientId} />
+          <Suspense>
+            <DateRangePicker clientId={clientId} />
+          </Suspense>
+        </div>
       </div>
-      <div className="flex gap-3">
-        <Link href={`/${clientId}/report/monthly`}>
-          <Button className="bg-[#D97706] hover:bg-[#B45309] text-white active:translate-y-px transition-transform">Generate Monthly Report</Button>
-        </Link>
+
+      {/* Error banner */}
+      {fetchError && (
+        <div className="mb-4 p-4 rounded-[10px] border border-[var(--red)] bg-[var(--red-bg)] text-[var(--red)] text-[13px]">
+          <strong>Data Error:</strong> {fetchError}
+          <p className="text-[12px] mt-1 opacity-80">Make sure the Google Sheet is shared as &quot;Anyone with the link can view&quot; and has tabs named &quot;Performance Tracker&quot; and &quot;Lead &amp; Sales Tracker&quot;.</p>
+        </div>
+      )}
+
+      {/* KPI Cards: 2 rows x 5 */}
+      <div className={`grid grid-cols-2 md:grid-cols-3 ${detectedFunnelType === "walkin" ? "lg:grid-cols-4" : "lg:grid-cols-5"} gap-[10px] mb-[10px]`}>
+        <HeroCards metrics={tm} kpi={kpi} achievement={ach} prevMetrics={lm} days={rangeDays} funnelType={detectedFunnelType || "appointment"} />
       </div>
+
+      {/* Bento Grid */}
+      <div className="bento">
+        {/* Row 2: Funnel + Period Comparison */}
+        <CardReveal delay={200} className="c5">
+          <div className="card-base">
+            <div className="font-label text-[11px] uppercase tracking-widest text-[var(--t3)] mb-1">Conversion</div>
+            <BlurText>
+              <div className="text-[14px] font-semibold text-[var(--t1)] mb-4">Lead Funnel</div>
+            </BlurText>
+            <FunnelFlow metrics={tm} funnelType={detectedFunnelType} />
+          </div>
+        </CardReveal>
+        <CardReveal delay={280} className="c7">
+          <div className="card-deep">
+            <div className="font-label text-[11px] uppercase tracking-widest text-[var(--t3)] mb-1">Analysis</div>
+            <BlurText>
+              <div className="text-[14px] font-semibold text-[var(--t1)] mb-4">Period Comparison</div>
+            </BlurText>
+            <MoMTable tm={tm} lm={lm} mom={mom} kpi={kpi} thisMonth={thisRangeLabel} lastMonth={prevRangeLabel} funnelType={detectedFunnelType} />
+          </div>
+        </CardReveal>
+
+        {/* Row 3: KPI Achievement */}
+        <CardReveal delay={360} className="c12">
+          <div className="card-deep">
+            <div className="font-label text-[11px] uppercase tracking-widest text-[var(--t3)] mb-1">Targets</div>
+            <BlurText>
+              <div className="text-[14px] font-semibold text-[var(--t1)] mb-4">KPI Achievement</div>
+            </BlurText>
+            <KPIChart items={kpiItems} />
+          </div>
+        </CardReveal>
+      </div>
+
+      {/* Person Performance — bottom section */}
+      {(personData.appointmentPersons.length > 0 || personData.salesPersons.length > 0) && (
+        <CardReveal delay={500} className="mt-[10px]">
+          <div className="card-base">
+            <div className="font-label text-[11px] uppercase tracking-widest text-[var(--t3)] mb-1">Team</div>
+            <BlurText>
+              <div className="text-[14px] font-semibold text-[var(--t1)] mb-4">Person Performance</div>
+            </BlurText>
+            <PersonPerformance
+              appointmentPersons={personData.appointmentPersons}
+              salesPersons={personData.salesPersons}
+              kpi={kpi}
+              brandBreakdowns={personData.brandBreakdowns}
+              hasMultiBrand={brands.length > 1}
+              funnelType={detectedFunnelType}
+            />
+          </div>
+        </CardReveal>
+      )}
     </div>
   );
 }

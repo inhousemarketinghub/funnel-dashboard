@@ -27,9 +27,9 @@ export function momPct(current: number, previous: number): number | null {
 }
 
 export function achEmoji(p: number): string {
-  if (p >= 100) return "✅";
-  if (p >= 80) return "⚠️";
-  return "❌";
+  if (p >= 100) return "●";
+  if (p >= 80) return "◐";
+  return "○";
 }
 
 export function achLabel(p: number): string {
@@ -41,11 +41,11 @@ export function achLabel(p: number): string {
 export function kpiColorClass(tmRaw: number | null, kpiRaw: number | null, inverted: boolean): string {
   if (tmRaw === null || kpiRaw === null) return "";
   if (inverted) {
-    if (tmRaw <= kpiRaw) return "text-signal-green";
-    if (tmRaw <= kpiRaw * 1.15) return "text-signal-amber";
-    return "text-signal-red";
+    if (tmRaw <= kpiRaw) return "text-[var(--blue)]";
+    if (tmRaw <= kpiRaw * 1.15) return "text-[var(--yellow)]";
+    return "text-[var(--red)]";
   }
-  if (tmRaw >= kpiRaw) return "text-signal-green";
-  if (tmRaw >= kpiRaw * 0.85) return "text-signal-amber";
-  return "text-signal-red";
+  if (tmRaw >= kpiRaw) return "text-[var(--blue)]";
+  if (tmRaw >= kpiRaw * 0.85) return "text-[var(--yellow)]";
+  return "text-[var(--red)]";
 }

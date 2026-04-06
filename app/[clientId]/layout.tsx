@@ -1,6 +1,7 @@
 import { createServerSupabase } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { ThemeToggle } from "@/components/dashboard/theme-toggle";
 
 export default async function ClientLayout({ children, params }: { children: React.ReactNode; params: Promise<{ clientId: string }> }) {
   const { clientId } = await params;
@@ -9,17 +10,23 @@ export default async function ClientLayout({ children, params }: { children: Rea
   if (!client) notFound();
 
   return (
-    <div className="min-h-dvh bg-[#FAFAF9]">
-      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-sm border-b border-[rgba(214,211,209,0.5)] px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link href="/clients" className="text-[#78716C] hover:text-[#D97706] text-sm transition-colors">← Clients</Link>
-          <h1 className="font-[family-name:var(--font-geist-sans)] font-bold text-lg text-[#1C1917] tracking-tight">{client.name}</h1>
+    <div>
+      <div className="bauhaus-stripe"><div/><div/><div/><div/></div>
+      <div className="topbar">
+        <div className="flex items-center gap-[14px]">
+          <Link href="/clients" className="topbar-logo" style={{ textDecoration: "none" }}>Funnel</Link>
+          <div className="topbar-sep" />
+          {client.logo_url && (
+            <img src={client.logo_url} alt="" className="w-8 h-8 rounded-[6px] object-contain bg-white p-[2px]" />
+          )}
+          <span className="topbar-crumb">{client.name}</span>
         </div>
-        <div className="flex items-center gap-3">
-          <Link href={`/${clientId}/settings`} className="text-sm text-[#78716C] hover:text-[#D97706] transition-colors">Settings</Link>
+        <div className="flex items-center gap-[10px]">
+          <ThemeToggle />
+          <Link href={`/${clientId}/settings`} className="topbar-btn">Settings</Link>
         </div>
-      </header>
-      <main className="max-w-[1200px] mx-auto p-6">{children}</main>
+      </div>
+      <main style={{ maxWidth: 1280, margin: "0 auto", padding: "28px 32px 80px" }}>{children}</main>
     </div>
   );
 }
