@@ -2,6 +2,7 @@ import { createServerSupabase } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ThemeToggle } from "@/components/dashboard/theme-toggle";
+import { LogoutButton } from "@/components/dashboard/logout-button";
 
 export default async function ClientLayout({ children, params }: { children: React.ReactNode; params: Promise<{ clientId: string }> }) {
   const { clientId } = await params;
@@ -24,6 +25,7 @@ export default async function ClientLayout({ children, params }: { children: Rea
         <div className="flex items-center gap-[10px]">
           <ThemeToggle />
           <Link href={`/${clientId}/settings`} className="topbar-btn">Settings</Link>
+          <LogoutButton />
         </div>
       </div>
       <main style={{ maxWidth: 1280, margin: "0 auto", padding: "28px 32px 80px" }}>{children}</main>

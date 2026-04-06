@@ -1,6 +1,7 @@
 import { createServerSupabase } from "@/lib/supabase/server";
 import Link from "next/link";
 import { ClientCard } from "@/components/dashboard/client-card";
+import { LogoutButton } from "@/components/dashboard/logout-button";
 
 export default async function ClientsPage() {
   const supabase = await createServerSupabase();
@@ -19,9 +20,12 @@ export default async function ClientsPage() {
             <h1 className="font-heading text-[28px] font-semibold tracking-tight text-[var(--t1)]">Business Performance Tracker Dashboard</h1>
             <p className="text-[13px] text-[var(--t3)] mt-1">Select a project to view performance</p>
           </div>
-          <Link href="/clients/new" className="topbar-btn" style={{ background: "var(--blue)", color: "white", borderColor: "var(--blue)" }}>
-            + Add Project
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link href="/clients/new" className="topbar-btn" style={{ background: "var(--blue)", color: "white", borderColor: "var(--blue)" }}>
+              + Add Project
+            </Link>
+            <LogoutButton />
+          </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-[10px]">
           {clients?.map((client) => (
