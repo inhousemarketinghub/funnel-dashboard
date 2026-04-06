@@ -6,8 +6,12 @@ import { LogoutButton } from "@/components/dashboard/logout-button";
 
 export default async function ClientsPage() {
   const supabase = await createServerSupabase();
-  const { role } = await getUserRole();
+  const { role, email } = await getUserRole();
   const isOwner = role === "owner";
+
+  // Debug: check auth state
+  const { data: { user } } = await supabase.auth.getUser();
+  const debugInfo = { email, role, authEmail: user?.email, userId: user?.id?.slice(0, 8) };
 
   const { data: clients } = await supabase
     .from("clients")
@@ -22,6 +26,7 @@ export default async function ClientsPage() {
           <div>
             <h1 className="font-heading text-[28px] font-semibold tracking-tight text-[var(--t1)]">Business Performance Tracker Dashboard</h1>
             <p className="text-[13px] text-[var(--t3)] mt-1">Select a project to view performance</p>
+            <p className="text-[10px] text-[var(--t4)] mt-1 num">Debug: {JSON.stringify(debugInfo)} | Projects: {clients?.length ?? 0}</p>
           </div>
           <div className="flex items-center gap-3">
             {isOwner && (
