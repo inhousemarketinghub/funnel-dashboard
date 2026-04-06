@@ -12,9 +12,10 @@ interface Props {
     logo_url: string | null;
     funnel_type: string;
   };
+  isAdmin?: boolean;
 }
 
-export function ClientCard({ client }: Props) {
+export function ClientCard({ client, isAdmin = false }: Props) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(client.name);
@@ -69,7 +70,7 @@ export function ClientCard({ client }: Props) {
       </div>
 
       {/* Action buttons — visible on hover */}
-      <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+      {isAdmin && <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
         <button
           onClick={(e) => { e.stopPropagation(); setEditing(true); }}
           className="text-[11px] text-[var(--t3)] hover:text-[var(--t1)] px-2 py-1 rounded-[4px] hover:bg-[var(--bg3)] transition-colors"
@@ -84,7 +85,7 @@ export function ClientCard({ client }: Props) {
         >
           Delete
         </button>
-      </div>
+      </div>}
     </div>
   );
 }
