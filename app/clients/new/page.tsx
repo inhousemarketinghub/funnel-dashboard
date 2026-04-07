@@ -45,7 +45,8 @@ export default function NewClientPage() {
         setName(data.brands[0].name);
       }
     } catch (err) {
-      setScanError(err instanceof Error ? err.message : "Failed to scan sheet");
+      const msg = err instanceof Error ? err.message : "Failed to scan sheet";
+      setScanError(`${msg}. Make sure the sheet is shared as "Anyone with the link can view" and contains Performance Tracker + Lead & Sales Tracker tabs.`);
     } finally {
       setScanning(false);
     }
@@ -101,9 +102,14 @@ export default function NewClientPage() {
             <Button
               onClick={handleScan}
               disabled={!sheetLink.trim() || scanning}
-              className="bg-[var(--blue)] hover:bg-[#153D7A] text-white px-4 shrink-0"
+              className="bg-[var(--blue)] hover:bg-[#153D7A] text-white px-5 shrink-0 min-w-[90px]"
             >
-              {scanning ? "Scanning..." : "Scan"}
+              {scanning ? (
+              <span className="flex items-center gap-2">
+                <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Scanning
+              </span>
+            ) : "Scan"}
             </Button>
           </div>
           <p className="text-xs text-[var(--t4)] mt-1">Paste the full Google Sheet URL. We&apos;ll auto-detect brands and funnel type.</p>

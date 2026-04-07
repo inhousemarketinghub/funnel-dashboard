@@ -162,14 +162,17 @@ export default async function DashboardPage({
         </div>
       </div>
 
-      {/* Error banner */}
+      {/* Error banner — show instead of data */}
       {fetchError && (
-        <div className="mb-4 p-4 rounded-[10px] border border-[var(--red)] bg-[var(--red-bg)] text-[var(--red)] text-[13px]">
-          <strong>Data Error:</strong> {fetchError}
-          <p className="text-[12px] mt-1 opacity-80">Make sure the Google Sheet is shared as &quot;Anyone with the link can view&quot; and has tabs named &quot;Performance Tracker&quot; and &quot;Lead &amp; Sales Tracker&quot;.</p>
+        <div className="p-8 rounded-[10px] border border-[var(--red)] bg-[var(--red-bg)] text-center">
+          <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-[var(--red)]/10 flex items-center justify-center text-[var(--red)] text-[20px] font-bold">!</div>
+          <p className="text-[var(--red)] text-[15px] font-medium mb-1">Unable to load data</p>
+          <p className="text-[var(--red)]/70 text-[13px] mb-3">{fetchError}</p>
+          <p className="text-[var(--t4)] text-[12px]">Make sure the Google Sheet is shared as &quot;Anyone with the link can view&quot; and contains the required tabs.</p>
         </div>
       )}
 
+      {!fetchError && <>
       {/* KPI Cards: 2 rows x 5 */}
       <div className={`grid grid-cols-2 md:grid-cols-3 ${detectedFunnelType === "walkin" ? "lg:grid-cols-4" : "lg:grid-cols-5"} gap-[10px] mb-[10px]`}>
         <HeroCards metrics={tm} kpi={kpi} achievement={ach} prevMetrics={lm} days={rangeDays} funnelType={detectedFunnelType || "appointment"} />
@@ -228,6 +231,7 @@ export default async function DashboardPage({
           </div>
         </CardReveal>
       )}
+      </>}
     </div>
   );
 }

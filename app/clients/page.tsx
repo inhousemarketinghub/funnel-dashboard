@@ -39,7 +39,23 @@ export default async function ClientsPage() {
             <ClientCard key={client.id} client={client} isAdmin={isOwner} />
           ))}
           {(!clients || clients.length === 0) && (
-            <p className="text-[var(--t3)] col-span-2 text-center py-12">No projects assigned to you yet.</p>
+            <div className="col-span-2 text-center py-16">
+              <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-[var(--sand)] flex items-center justify-center text-[22px] text-[var(--t4)]">+</div>
+              {isOwner ? (
+                <>
+                  <p className="text-[var(--t2)] text-[15px] font-medium mb-1">No projects yet</p>
+                  <p className="text-[var(--t4)] text-[13px] mb-4">Create your first project to start tracking performance</p>
+                  <Link href="/clients/new" className="topbar-btn inline-flex" style={{ background: "var(--blue)", color: "white", borderColor: "var(--blue)" }}>
+                    + Add Project
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <p className="text-[var(--t2)] text-[15px] font-medium mb-1">No projects assigned</p>
+                  <p className="text-[var(--t4)] text-[13px]">Contact your admin to get access to a project</p>
+                </>
+              )}
+            </div>
           )}
         </div>
       </div>
