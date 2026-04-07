@@ -112,17 +112,19 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [language, setLanguage] = useState<string>("en");
 
   const monthOptions = getMonthOptions();
 
-  // Fetch logo on mount
+  // Fetch logo and language on mount
   useEffect(() => {
-    async function fetchLogo() {
+    async function fetchClientSettings() {
       const supabase = createClient();
-      const { data } = await supabase.from("clients").select("logo_url").eq("id", clientId).single();
+      const { data } = await supabase.from("clients").select("logo_url, language").eq("id", clientId).single();
       if (data?.logo_url) setLogoUrl(data.logo_url);
+      if (data?.language) setLanguage(data.language);
     }
-    fetchLogo();
+    fetchClientSettings();
   }, [clientId]);
 
   async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -173,6 +175,17 @@ export default function SettingsPage() {
       toast.success("Logo removed");
     }
     setUploading(false);
+  }
+
+  async function handleLanguageChange(val: string) {
+    setLanguage(val);
+    const supabase = createClient();
+    const { error } = await supabase.from("clients").update({ language: val }).eq("id", clientId);
+    if (error) {
+      toast.error("Failed to update language");
+    } else {
+      toast.success("Language updated");
+    }
   }
 
   useEffect(() => {
@@ -275,6 +288,22 @@ export default function SettingsPage() {
             <p className="text-[11px] text-[var(--t4)]">PNG, JPG, or SVG. Max 2MB.</p>
           </div>
         </div>
+      </div>
+
+      {/* Summary Language */}
+      <div className="mb-6 bg-[var(--bg2)] border border-[var(--border)] rounded-[10px] p-6">
+        <h2 className="font-semibold text-[15px] tracking-tight text-[var(--t1)] mb-4">Summary Language</h2>
+        <Select value={language} onValueChange={(val) => { if (val) handleLanguageChange(val); }}>
+          <SelectTrigger className="w-[220px] border-[var(--border)] focus-visible:ring-[var(--blue)]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="en">English</SelectItem>
+            <SelectItem value="zh">中文</SelectItem>
+            <SelectItem value="ms">Bahasa Melayu</SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-[11px] text-[var(--t4)] mt-2">Language for the Performance Summary section on the dashboard.</p>
       </div>
 
       {/* Month Selector */}

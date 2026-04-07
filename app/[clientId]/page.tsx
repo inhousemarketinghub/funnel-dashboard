@@ -19,6 +19,8 @@ import { BlurText } from "@/components/animations/blur-text";
 import { ScrollReveal } from "@/components/animations/scroll-reveal";
 import { Stagger } from "@/components/animations/stagger";
 import type { KPIConfig } from "@/lib/types";
+import { generateInsights } from "@/lib/insights";
+import { SummaryCards } from "@/components/dashboard/summary-cards";
 import { Suspense } from "react";
 import Link from "next/link";
 
@@ -34,6 +36,7 @@ export default async function DashboardPage({
   const supabase = await createServerSupabase();
   const { data: client } = await supabase.from("clients").select("*").eq("id", clientId).single();
   if (!client) return <p className="text-[#78716C] p-8">Client not found</p>;
+  const clientLanguage = (client.language as "en" | "zh" | "ms") || "en";
 
   // Date range from URL params (defaults to this month 1st → today)
   const { from: reportStart, to: reportEnd } = resolveSearchParams(sp.from, sp.to);
@@ -118,6 +121,13 @@ export default async function DashboardPage({
   const paceAchAdSpend = paceAdSpend > 0 ? (tm.ad_spend / paceAdSpend) * 100 : 0;
   const paceAchOrders = paceOrders > 0 ? (tm.orders / paceOrders) * 100 : 0;
 
+  // Performance Summary insights
+  const summaryAch = { ...ach, sales: paceAchSales, ad_spend: paceAchAdSpend, orders: paceAchOrders };
+  const insights = generateInsights({
+    metrics: tm, kpi, achievement: summaryAch,
+    paceRatio, funnelType: detectedFunnelType, language: clientLanguage,
+  });
+
   const isWalkin = detectedFunnelType === "walkin";
   const walkinVisitRate = tm.inquiry > 0 ? (tm.contact / tm.inquiry) * 100 : 0;
   const walkinVisitRatePrev = lm.inquiry > 0 ? (lm.contact / lm.inquiry) * 100 : 0;
@@ -191,6 +201,11 @@ export default async function DashboardPage({
       {/* KPI Cards: 2 rows with stagger animation */}
       <Stagger className={`grid grid-cols-2 md:grid-cols-3 ${detectedFunnelType === "walkin" ? "lg:grid-cols-4" : "lg:grid-cols-5"} gap-[10px] mb-[10px]`} staggerMs={50}>
         <HeroCards metrics={tm} kpi={kpi} achievement={{...ach, sales: paceAchSales, ad_spend: paceAchAdSpend, orders: paceAchOrders}} prevMetrics={lm} days={rangeDays} funnelType={detectedFunnelType || "appointment"} paceKpi={{sales: paceSales, ad_spend: paceAdSpend, orders: paceOrders}} />
+      </Stagger>
+
+      {/* Performance Summary */}
+      <Stagger className="grid grid-cols-1 md:grid-cols-3 gap-[10px] my-[10px]" staggerMs={200}>
+        <SummaryCards insights={insights} />
       </Stagger>
 
       {/* Bento Grid */}

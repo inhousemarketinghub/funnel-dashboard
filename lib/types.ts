@@ -82,6 +82,21 @@ export interface ClientConfig {
   sheet_id: string;
   logo_url: string | null;
   funnel_type: "appointment" | "walkin";
+  language?: InsightLanguage;
 }
 
 export type DateRange = [Date, Date];
+
+export type InsightLanguage = "en" | "zh" | "ms";
+
+export interface Insight {
+  metric: string;
+  message: string;
+}
+
+export interface InsightGroup {
+  topPerformers: Insight[];
+  needsAttention: Insight[];
+  paceForecast: Insight[];
+  labels: { topPerformer: string; needsAttention: string; paceForecast: string };
+}
