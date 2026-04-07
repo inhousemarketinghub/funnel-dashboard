@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,14 @@ const PERMISSION_OPTIONS = [
 ];
 
 export default function AccessPage() {
+  return (
+    <Suspense>
+      <AccessPageInner />
+    </Suspense>
+  );
+}
+
+function AccessPageInner() {
   const searchParams = useSearchParams();
   const clientId = searchParams.get("project") || "";
   const clientName = searchParams.get("name") || "Project";
