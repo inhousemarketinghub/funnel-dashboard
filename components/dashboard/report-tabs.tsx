@@ -1,27 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 interface Props {
   tabs: string[];
-  children: (activeTab: string) => React.ReactNode;
+  contents: ReactNode[];
 }
 
-export function ReportTabs({ tabs, children }: Props) {
-  const [active, setActive] = useState(tabs[0] || "");
+export function ReportTabs({ tabs, contents }: Props) {
+  const [activeIdx, setActiveIdx] = useState(0);
 
-  if (tabs.length <= 1) return <>{children(tabs[0] || "")}</>;
+  if (tabs.length <= 1) return <>{contents[0]}</>;
 
   return (
     <div>
-      {/* Tab bar — sticky below topbar */}
       <div className="flex gap-1 border-b border-[var(--border)] mb-8 no-print">
-        {tabs.map((tab) => (
+        {tabs.map((tab, i) => (
           <button
             key={tab}
-            onClick={() => setActive(tab)}
+            onClick={() => setActiveIdx(i)}
             className={`text-[13px] font-medium pb-2 px-4 border-b-2 transition-colors ${
-              active === tab
+              activeIdx === i
                 ? "border-[var(--blue)] text-[var(--t1)]"
                 : "border-transparent text-[var(--t3)] hover:text-[var(--t1)]"
             }`}
@@ -30,7 +29,11 @@ export function ReportTabs({ tabs, children }: Props) {
           </button>
         ))}
       </div>
-      {children(active)}
+      {contents.map((content, i) => (
+        <div key={i} style={{ display: activeIdx === i ? "block" : "none" }}>
+          {content}
+        </div>
+      ))}
     </div>
   );
 }

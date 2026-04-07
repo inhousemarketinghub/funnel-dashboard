@@ -263,16 +263,15 @@ export default async function ReportPage({
         {/* Content with tabs (multi-brand) or direct (single) */}
         <div className="py-10">
           {isMultiBrand ? (
-            <ReportTabs tabs={tabs}>
-              {(activeTab: string) => {
-                if (activeTab === "Overall") {
-                  return <ReportSection d={overall} title="Overall Performance" />;
-                }
-                const bd = brandBundles.find((b) => b.name === activeTab);
-                if (!bd) return null;
-                return <ReportSection d={bd} title={bd.name} />;
-              }}
-            </ReportTabs>
+            <ReportTabs
+              tabs={tabs}
+              contents={[
+                <ReportSection key="overall" d={overall} title="Overall Performance" />,
+                ...brandBundles.map((bd) => (
+                  <ReportSection key={bd.name} d={bd} title={bd.name} />
+                )),
+              ]}
+            />
           ) : (
             <ReportSection d={overall} title="" />
           )}
