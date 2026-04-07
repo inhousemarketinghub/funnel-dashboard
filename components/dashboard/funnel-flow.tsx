@@ -5,19 +5,19 @@ import type { FunnelMetrics } from "@/lib/types";
 import { fmtRM } from "@/lib/utils";
 
 const APPOINTMENT_STEPS = [
-  { key: "inquiry", label: "Inquiry", color: "var(--red)" },
-  { key: "contact", label: "Contact", color: "var(--blue)" },
-  { key: "appointment", label: "Appointment", color: "var(--yellow)" },
-  { key: "showup", label: "Show Up", color: "var(--t3)" },
-  { key: "orders", label: "Orders", color: "var(--t4)" },
-  { key: "sales", label: "Sales", color: "var(--t1)" },
+  { key: "inquiry", label: "Inquiry", colors: ["#D42B2B", "#B82424"] },
+  { key: "contact", label: "Contact", colors: ["#1B4F9B", "#164082"] },
+  { key: "appointment", label: "Appointment", colors: ["#D4960A", "#B88008"] },
+  { key: "showup", label: "Show Up", colors: ["#777777", "#5E5E5E"] },
+  { key: "orders", label: "Orders", colors: ["#444444", "#333333"] },
+  { key: "sales", label: "Sales", colors: ["#111111", "#000000"] },
 ] as const;
 
 const WALKIN_STEPS = [
-  { key: "inquiry", label: "Inquiry", color: "var(--red)" },
-  { key: "contact", label: "Visit", color: "var(--blue)" },
-  { key: "orders", label: "Orders", color: "var(--t3)" },
-  { key: "sales", label: "Sales", color: "var(--t1)" },
+  { key: "inquiry", label: "Inquiry", colors: ["#D42B2B", "#B82424"] },
+  { key: "contact", label: "Visit", colors: ["#1B4F9B", "#164082"] },
+  { key: "orders", label: "Orders", colors: ["#D4960A", "#B88008"] },
+  { key: "sales", label: "Sales", colors: ["#111111", "#000000"] },
 ] as const;
 
 export function FunnelFlow({ metrics, funnelType = "appointment" }: { metrics: FunnelMetrics; funnelType?: string }) {
@@ -30,11 +30,7 @@ export function FunnelFlow({ metrics, funnelType = "appointment" }: { metrics: F
     const el = ref.current;
     if (!el) return;
     const obs = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((e) => {
-          if (e.isIntersecting) { setVisible(true); obs.unobserve(el); }
-        });
-      },
+      (entries) => { entries.forEach((e) => { if (e.isIntersecting) { setVisible(true); obs.unobserve(el); } }); },
       { threshold: 0.2 }
     );
     obs.observe(el);
@@ -52,103 +48,190 @@ export function FunnelFlow({ metrics, funnelType = "appointment" }: { metrics: F
     orders: metrics.conv_rate, sales: null,
   };
   const values = STEPS.map((s) => valueMap[s.key] ?? 0);
-  const maxVal = Math.max(values[0], 1);
   const rates = STEPS.map((s) => rateMap[s.key] ?? null);
-  const lastIdx = STEPS.length - 1;
 
   function formatValue(idx: number, val: number) {
     if (STEPS[idx].key === "sales") return fmtRM(val);
     return val.toLocaleString();
   }
 
-  // Pre-compute widths ensuring strictly decreasing funnel shape
-  const widthPcts: number[] = [];
-  for (let idx = 0; idx < STEPS.length; idx++) {
-    if (STEPS[idx].key === "sales") {
-      // Sales step: slightly narrower than previous
-      widthPcts.push(Math.max(15, (widthPcts[idx - 1] || 30) * 0.7));
+  // SVG dimensions
+  const svgW = 220;
+  const svgH = STEPS.length * 52 + 30;
+  const cx = svgW / 2;
+  const topRx = 90; // widest ellipse radius x
+  const ry = 12;    // ellipse radius y (3D depth)
+  const levelH = 48; // height per level
+  const minRx = 25;  // narrowest level
+
+  // Compute radii per level: strictly decreasing
+  const radii: number[] = [];
+  const maxVal = Math.max(values[0], 1);
+  for (let i = 0; i < STEPS.length; i++) {
+    if (STEPS[i].key === "sales") {
+      radii.push(Math.max(minRx, (radii[i - 1] || minRx + 10) * 0.6));
     } else {
-      const raw = Math.max(15, (values[idx] / maxVal) * 100);
-      // Ensure this step is never wider than the previous
-      const prev = idx > 0 ? widthPcts[idx - 1] : 100;
-      widthPcts.push(Math.min(raw, prev));
+      const raw = Math.max(minRx, (values[i] / maxVal) * topRx);
+      const prev = i > 0 ? radii[i - 1] : topRx;
+      radii.push(Math.min(raw, prev));
     }
   }
 
-  function getWidths(idx: number): { topPct: number; bottomPct: number } {
-    const topPct = widthPcts[idx];
-    const bottomPct = idx < lastIdx ? widthPcts[idx + 1] : Math.max(15, topPct * 0.7);
-    return { topPct, bottomPct };
-  }
-
   return (
-    <div ref={ref}>
-      {STEPS.map((step, i) => {
-        const { topPct, bottomPct } = getWidths(i);
-        // clip-path to create trapezoid: wider at top, narrower at bottom
-        const insetL = (100 - topPct) / 2;
-        const insetR = 100 - insetL;
-        const insetLBottom = (100 - bottomPct) / 2;
-        const insetRBottom = 100 - insetLBottom;
-        const clipPath = visible
-          ? `polygon(${insetL}% 0%, ${insetR}% 0%, ${insetRBottom}% 100%, ${insetLBottom}% 100%)`
-          : `polygon(50% 0%, 50% 0%, 50% 100%, 50% 100%)`; // collapsed
+    <div ref={ref} className="flex gap-4 items-start">
+      {/* Left labels */}
+      <div className="flex flex-col" style={{ paddingTop: 8 }}>
+        {STEPS.map((step, i) => {
+          const isHovered = hoveredIdx === i;
+          return (
+            <div
+              key={step.key}
+              className="flex items-center gap-2 cursor-pointer transition-opacity"
+              style={{
+                height: levelH + 4,
+                opacity: visible ? 1 : 0,
+                transform: visible ? "translateX(0)" : "translateX(-10px)",
+                transition: `opacity 500ms ease ${i * 100 + 200}ms, transform 500ms ease ${i * 100 + 200}ms`,
+              }}
+              onMouseEnter={() => setHoveredIdx(i)}
+              onMouseLeave={() => setHoveredIdx(null)}
+            >
+              {/* Color dot */}
+              <span
+                className="w-[8px] h-[8px] rounded-full flex-shrink-0"
+                style={{ background: step.colors[0] }}
+              />
+              <div>
+                <div className={`font-label text-[10px] uppercase tracking-wider ${isHovered ? "text-[var(--t1)]" : "text-[var(--t3)]"} transition-colors`}>
+                  {step.label}
+                </div>
+                <div className="flex items-baseline gap-1">
+                  <span className={`num text-[14px] font-semibold ${isHovered ? "text-[var(--t1)]" : "text-[var(--t2)]"} transition-colors`}>
+                    {formatValue(i, values[i])}
+                  </span>
+                  {rates[i] !== null && (
+                    <span className="text-[10px] text-[var(--t4)]">{rates[i]!.toFixed(1)}%</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
 
-        return (
-          <div
-            key={step.key}
-            className="flex items-center gap-3 relative"
-            style={{ marginBottom: 1 }}
-            onMouseEnter={() => setHoveredIdx(i)}
-            onMouseLeave={() => setHoveredIdx(null)}
-          >
-            {/* Trapezoid shape */}
-            <div className="flex-1 relative" style={{ height: 34 }}>
-              <div
+      {/* 3D SVG Funnel */}
+      <div className="relative flex-shrink-0">
+        <svg width={svgW} height={svgH} viewBox={`0 0 ${svgW} ${svgH}`}>
+          <defs>
+            {STEPS.map((step, i) => (
+              <linearGradient key={`grad-${i}`} id={`funnelGrad${i}`} x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stopColor={step.colors[1]} />
+                <stop offset="50%" stopColor={step.colors[0]} />
+                <stop offset="100%" stopColor={step.colors[1]} />
+              </linearGradient>
+            ))}
+          </defs>
+
+          {STEPS.map((step, i) => {
+            const topY = i * (levelH + 4) + ry;
+            const bottomY = topY + levelH;
+            const topR = radii[i];
+            const bottomR = i < STEPS.length - 1 ? radii[i + 1] : Math.max(minRx * 0.6, topR * 0.6);
+            const isHovered = hoveredIdx === i;
+
+            // Side walls path (trapezoid connecting two ellipses)
+            const wallPath = `
+              M ${cx - topR} ${topY}
+              L ${cx - bottomR} ${bottomY}
+              A ${bottomR} ${ry} 0 0 0 ${cx + bottomR} ${bottomY}
+              L ${cx + topR} ${topY}
+              A ${topR} ${ry} 0 0 1 ${cx - topR} ${topY}
+              Z
+            `;
+
+            return (
+              <g
+                key={step.key}
                 style={{
-                  position: "absolute",
-                  inset: 0,
-                  background: step.color,
-                  clipPath,
-                  transition: `clip-path 800ms ease ${i * 80}ms`,
+                  opacity: visible ? 1 : 0,
+                  transform: visible ? "translateY(0)" : "translateY(-20px)",
+                  transition: `opacity 600ms ease ${i * 120}ms, transform 600ms ease ${i * 120}ms`,
                   cursor: "pointer",
                 }}
-              />
-            </div>
-            {/* Labels outside the shape */}
-            <div className="flex items-center gap-2 min-w-[160px]">
-              <span className="font-label text-[11px] uppercase tracking-wider text-[var(--t3)] min-w-[80px]">
-                {step.label}
-              </span>
-              <span className="num text-[14px] font-semibold text-[var(--t1)]">
-                {formatValue(i, values[i])}
-              </span>
-              {rates[i] !== null && (
-                <span className="text-[11px] text-[var(--t4)]">
-                  {rates[i]!.toFixed(1)}%
-                </span>
-              )}
-            </div>
-
-            {/* Tooltip */}
-            {hoveredIdx === i && (
-              <div
-                className="tip show"
-                style={{
-                  position: "absolute",
-                  top: -28,
-                  left: "30%",
-                  transform: "translateX(-50%)",
-                  zIndex: 20,
-                }}
+                onMouseEnter={() => setHoveredIdx(i)}
+                onMouseLeave={() => setHoveredIdx(null)}
               >
-                {step.label}: {formatValue(i, values[i])}
-                {rates[i] !== null && ` (${rates[i]!.toFixed(1)}%)`}
-              </div>
-            )}
+                {/* Side walls */}
+                <path
+                  d={wallPath}
+                  fill={`url(#funnelGrad${i})`}
+                  style={{
+                    filter: isHovered ? "brightness(1.15)" : "brightness(1)",
+                    transition: "filter 200ms ease",
+                  }}
+                />
+                {/* Top ellipse (lighter = top surface) */}
+                {i === 0 && (
+                  <ellipse
+                    cx={cx} cy={topY} rx={topR} ry={ry}
+                    fill={step.colors[0]}
+                    opacity={0.6}
+                  />
+                )}
+                {/* Bottom ellipse (visible between levels) */}
+                <ellipse
+                  cx={cx} cy={bottomY} rx={bottomR} ry={ry}
+                  fill={step.colors[1]}
+                  opacity={0.4}
+                />
+                {/* Label on the funnel */}
+                <text
+                  x={cx} y={topY + levelH / 2 + 4}
+                  textAnchor="middle"
+                  className="num"
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    fill: "white",
+                    opacity: isHovered ? 1 : 0.8,
+                    transition: "opacity 200ms ease",
+                    pointerEvents: "none",
+                  }}
+                >
+                  {step.label.toUpperCase()}
+                </text>
+              </g>
+            );
+          })}
+
+          {/* Arrow at bottom */}
+          <polygon
+            points={`${cx - 6},${STEPS.length * (levelH + 4) + ry + 4} ${cx + 6},${STEPS.length * (levelH + 4) + ry + 4} ${cx},${STEPS.length * (levelH + 4) + ry + 16}`}
+            fill="var(--t4)"
+            style={{
+              opacity: visible ? 1 : 0,
+              transition: `opacity 600ms ease ${STEPS.length * 120 + 200}ms`,
+            }}
+          />
+        </svg>
+
+        {/* Hover tooltip */}
+        {hoveredIdx !== null && (
+          <div
+            className="tip show"
+            style={{
+              position: "absolute",
+              top: hoveredIdx * (levelH + 4) - 8,
+              left: svgW + 8,
+              zIndex: 20,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {STEPS[hoveredIdx].label}: {formatValue(hoveredIdx, values[hoveredIdx])}
+            {rates[hoveredIdx] !== null && ` (${rates[hoveredIdx]!.toFixed(1)}%)`}
           </div>
-        );
-      })}
+        )}
+      </div>
     </div>
   );
 }
