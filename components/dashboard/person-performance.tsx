@@ -53,8 +53,20 @@ export function PersonPerformance({ appointmentPersons, salesPersons, kpi, brand
       }
     : salesPersons.find((p) => p.name === selectedSales) || salesPersons[0];
 
-  // Brand breakdown for selected person
-  const selectedBrandBreakdown = selectedSales !== "all" ? (brandBreakdowns[selectedSales] || []) : [];
+  // Brand breakdown — for "all": aggregate all persons; for individual: that person's data
+  const selectedBrandBreakdown = (() => {
+    if (selectedSales !== "all") return brandBreakdowns[selectedSales] || [];
+    // Aggregate all persons' brand breakdowns
+    const map = new Map<string, { brand: string; orders: number; sales: number }>();
+    for (const bds of Object.values(brandBreakdowns)) {
+      for (const b of bds) {
+        const existing = map.get(b.brand);
+        if (existing) { existing.orders += b.orders; existing.sales += b.sales; }
+        else map.set(b.brand, { ...b });
+      }
+    }
+    return Array.from(map.values());
+  })();
 
   return (
     <div>
@@ -139,13 +151,13 @@ export function PersonPerformance({ appointmentPersons, salesPersons, kpi, brand
             />
           </div>
 
-          {/* 3. Brand Visit Distribution (multi-brand only) */}
-          {hasMultiBrand && selectedSales !== "all" && selectedBrandBreakdown.length > 0 && (
+          {/* 3. Brand Orders Distribution (multi-brand only) */}
+          {hasMultiBrand && selectedBrandBreakdown.length > 0 && (
             <div>
               <DonutChart
                 data={selectedBrandBreakdown.map((b) => ({ name: b.brand, value: b.orders }))}
                 label="orders"
-                title={`${selectedSales} — Brand Orders`}
+                title="Brand Orders"
                 hoverFn={(d) => {
                   const bb = selectedBrandBreakdown.find((b) => b.brand === d.name);
                   return `${d.name}: ${bb?.orders || 0} orders`;
@@ -155,12 +167,12 @@ export function PersonPerformance({ appointmentPersons, salesPersons, kpi, brand
           )}
 
           {/* 4. Brand Sales Distribution (multi-brand only) */}
-          {hasMultiBrand && selectedSales !== "all" && selectedBrandBreakdown.length > 0 && (
+          {hasMultiBrand && selectedBrandBreakdown.length > 0 && (
             <div>
               <DonutChart
                 data={selectedBrandBreakdown.map((b) => ({ name: b.brand, value: b.sales }))}
                 label="sales"
-                title={`${selectedSales} — Brand Sales`}
+                title="Brand Sales"
                 hoverFn={(d) => {
                   const bb = selectedBrandBreakdown.find((b) => b.brand === d.name);
                   return `${d.name}: ${fmtRM(d.value)} (${bb?.orders || 0} orders)`;
