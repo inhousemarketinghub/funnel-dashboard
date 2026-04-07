@@ -125,9 +125,9 @@ export default async function DashboardPage({
   const walkinConvRatePrev = lm.contact > 0 ? (lm.orders / lm.contact) * 100 : 0;
 
   const kpiItems = [
-    { label: "Sales", value: paceAchSales, target: fmtRM(paceSales), actual: fmtRM(tm.sales), prevActual: fmtRM(lm.sales) },
-    { label: "Ad Spend", value: paceAchAdSpend, target: fmtRM(paceAdSpend), actual: fmtRM(tm.ad_spend), prevActual: fmtRM(lm.ad_spend) },
-    { label: "Orders", value: paceAchOrders, target: String(Math.round(paceOrders)), actual: String(tm.orders), prevActual: String(lm.orders) },
+    { label: "Sales", value: paceAchSales, target: `Pace: ${fmtRM(paceSales)}`, actual: fmtRM(tm.sales), prevActual: fmtRM(lm.sales), monthlyTarget: `Monthly: ${fmtRM(kpi.sales)}` },
+    { label: "Ad Spend", value: paceAchAdSpend, target: `Pace: ${fmtRM(paceAdSpend)}`, actual: fmtRM(tm.ad_spend), prevActual: fmtRM(lm.ad_spend), monthlyTarget: `Monthly: ${fmtRM(kpi.ad_spend)}` },
+    { label: "Orders", value: paceAchOrders, target: `Pace: ${Math.round(paceOrders)}`, actual: String(tm.orders), prevActual: String(lm.orders), monthlyTarget: `Monthly: ${kpi.orders}` },
     { label: "AOV", value: ach.aov, target: fmtRM(kpi.aov), actual: fmtRM(tm.aov), prevActual: fmtRM(lm.aov) },
     { label: "CPL", value: ach.cpl, target: fmtRM(kpi.cpl), actual: fmtRM(tm.cpl), prevActual: fmtRM(lm.cpl) },
     {

@@ -49,9 +49,11 @@ export function HeroCards({ metrics: tm, kpi, achievement: ach, prevMetrics: lm,
 
   const cards: CardDef[] = isWalkin ? [
     // Walk-in Row 1 (4 cards)
-    { label: "Total Sales", value: fmtRM(tm.sales), rawValue: tm.sales, prefix: "RM", decimals: 2, kpiLabel: `Pace: ${fmtRM(pk.sales)}`, achievement: ach.sales },
+    { label: "Total Sales", value: fmtRM(tm.sales), rawValue: tm.sales, prefix: "RM", decimals: 2, kpiLabel: `Pace: ${fmtRM(pk.sales)}`, achievement: ach.sales,
+      expandContent: (<div className="flex gap-4"><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">Monthly Target</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(kpi.sales)}</div></div><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">Pace Target</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(pk.sales)}</div></div></div>),
+    },
     { label: "Total Ad Spend", value: fmtRM(tm.ad_spend), rawValue: tm.ad_spend, prefix: "RM", decimals: 2, kpiLabel: `Pace: ${fmtRM(pk.ad_spend)}`, achievement: ach.ad_spend,
-      expandContent: (<div className="flex gap-4"><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">Avg. Daily</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(avgDaily)}</div></div><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">Daily Budget (Inc. SST)</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(kpi.daily_ad)}</div></div></div>),
+      expandContent: (<div className="flex gap-4 flex-wrap"><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">Monthly Target</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(kpi.ad_spend)}</div></div><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">Avg. Daily</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(avgDaily)}</div></div><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">Daily Budget</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(kpi.daily_ad)}</div></div></div>),
     },
     { label: "CPA%", value: `${tm.cpa_pct.toFixed(2)}%`, rawValue: tm.cpa_pct, suffix: "%", decimals: 2, kpiLabel: `Target: ${kpi.cpa_pct}%`, achievement: tm.cpa_pct > 0 ? (kpi.cpa_pct / tm.cpa_pct) * 100 : 0 },
     { label: "Orders", value: String(tm.orders), rawValue: tm.orders, kpiLabel: `Pace: ${Math.round(pk.orders)}`, achievement: ach.orders },
@@ -68,9 +70,11 @@ export function HeroCards({ metrics: tm, kpi, achievement: ach, prevMetrics: lm,
     { label: "AOV", value: fmtRM(tm.aov), rawValue: tm.aov, prefix: "RM", decimals: 2, kpiLabel: `Target: ${fmtRM(kpi.aov)}`, achievement: ach.aov },
   ] : [
     // Appointment Row 1 (5 cards)
-    { label: "Total Sales", value: fmtRM(tm.sales), rawValue: tm.sales, prefix: "RM", decimals: 2, kpiLabel: `Pace: ${fmtRM(pk.sales)}`, achievement: ach.sales },
+    { label: "Total Sales", value: fmtRM(tm.sales), rawValue: tm.sales, prefix: "RM", decimals: 2, kpiLabel: `Pace: ${fmtRM(pk.sales)}`, achievement: ach.sales,
+      expandContent: (<div className="flex gap-4"><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">Monthly Target</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(kpi.sales)}</div></div><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">Pace Target</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(pk.sales)}</div></div></div>),
+    },
     { label: "Total Ad Spend", value: fmtRM(tm.ad_spend), rawValue: tm.ad_spend, prefix: "RM", decimals: 2, kpiLabel: `Pace: ${fmtRM(pk.ad_spend)}`, achievement: ach.ad_spend,
-      expandContent: (<div className="flex gap-4"><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">Avg. Daily</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(avgDaily)}</div></div><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">Daily Budget (Inc. SST)</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(kpi.daily_ad)}</div></div></div>),
+      expandContent: (<div className="flex gap-4 flex-wrap"><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">Monthly Target</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(kpi.ad_spend)}</div></div><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">Avg. Daily</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(avgDaily)}</div></div><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">Daily Budget</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(kpi.daily_ad)}</div></div></div>),
     },
     { label: "CPA%", value: `${tm.cpa_pct.toFixed(2)}%`, rawValue: tm.cpa_pct, suffix: "%", decimals: 2, kpiLabel: `Target: ${kpi.cpa_pct}%`, achievement: tm.cpa_pct > 0 ? (kpi.cpa_pct / tm.cpa_pct) * 100 : 0 },
     { label: "Orders", value: String(tm.orders), rawValue: tm.orders, kpiLabel: `Pace: ${Math.round(pk.orders)}`, achievement: ach.orders },

@@ -340,7 +340,7 @@ function aggregateSalesPersons(
 ): SalesPersonMetrics[] {
   // Sales Person: filter by PURCHASE DATE (not lead date)
   // This captures all orders closed in the period regardless of when the lead came in
-  const map = new Map<string, { appts: number; showUps: number; orders: number; sales: number }>();
+  const map = new Map<string, { visits: number; showUps: number; orders: number; sales: number }>();
 
   for (let i = 1; i < rows.length; i++) {
     const cols = rows[i];
@@ -361,28 +361,37 @@ function aggregateSalesPersons(
       if (!leadInRange && !hasOrderInRange) continue;
     }
 
-    if (!map.has(person)) map.set(person, { appts: 0, showUps: 0, orders: 0, sales: 0 });
+    // Only count visits/appointments for leads that came in during the range (not purchase-date-only matches)
+    const leadDate = parseDate(cols[colMap.date]);
+    const leadInRange = !startDate || !endDate || (leadDate && leadDate >= startDate && leadDate <= endDate);
+
+    if (!map.has(person)) map.set(person, { visits: 0, showUps: 0, orders: 0, sales: 0 });
     const m = map.get(person)!;
-    // For walk-in (no appointment column): every lead row = a visit
-    if (colMap.appointmentDate !== null) {
-      if ((cols[colMap.appointmentDate] || "").trim()) m.appts++;
-    } else {
-      m.appts++; // walk-in: each row is a visit
+    // Count visits only for leads within date range
+    if (leadInRange) {
+      if (colMap.appointmentDate !== null) {
+        if ((cols[colMap.appointmentDate] || "").trim()) m.visits++;
+      } else {
+        m.visits++; // walk-in: each lead row in range = a visit
+      }
+      if (colMap.showedUp !== null && ["yes", "true"].includes((cols[colMap.showedUp] || "").toLowerCase())) m.showUps++;
     }
-    if (colMap.showedUp !== null && ["yes", "true"].includes((cols[colMap.showedUp] || "").toLowerCase())) m.showUps++;
     if (hasOrderInRange) {
       m.orders++;
       m.sales += colMap.sales !== null ? parseRM(cols[colMap.sales]) : 0;
     }
   }
 
+  const isWalkinFunnel = colMap.appointmentDate === null;
+
   return Array.from(map.entries()).map(([name, m]) => ({
     name,
-    appointment: m.appts,
+    appointment: m.visits,
     showUp: m.showUps,
-    showUpRate: m.appts > 0 ? (m.showUps / m.appts) * 100 : 0,
+    showUpRate: m.visits > 0 ? (m.showUps / m.visits) * 100 : 0,
     orders: m.orders,
-    convRate: m.showUps > 0 ? (m.orders / m.showUps) * 100 : 0,
+    // Walk-in: conv = orders/visits. Appointment: conv = orders/showUps
+    convRate: isWalkinFunnel ? (m.visits > 0 ? (m.orders / m.visits) * 100 : 0) : (m.showUps > 0 ? (m.orders / m.showUps) * 100 : 0),
     sales: m.sales,
     aov: m.orders > 0 ? m.sales / m.orders : 0,
   })).sort((a, b) => b.orders - a.orders);

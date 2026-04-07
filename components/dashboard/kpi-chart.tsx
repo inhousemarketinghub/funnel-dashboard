@@ -8,6 +8,7 @@ interface KPIItem {
   target: string;
   actual: string;
   prevActual?: string;
+  monthlyTarget?: string;
 }
 
 function getStatus(value: number): { color: string; text: string } {
@@ -97,7 +98,8 @@ export function KPIChart({ items }: { items: KPIItem[] }) {
                   zIndex: 20,
                 }}
               >
-                {item.label}: {item.actual} / KPI: {item.target}
+                {item.label}: {item.actual} / {item.target}
+                {item.monthlyTarget && ` / ${item.monthlyTarget}`}
                 {item.prevActual && ` / Prev: ${item.prevActual}`}
               </div>
             )}
