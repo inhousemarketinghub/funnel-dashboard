@@ -106,7 +106,7 @@ function KPICard({ card, accent }: { card: CardDef; accent: string }) {
 
   return (
     <div
-      className={`card-base accent-top ${accent} ${open ? "accordion-open" : ""}`}
+      className={`card-base accent-top ${accent} ${open ? "accordion-open" : ""} stagger-child`}
       style={{ cursor: card.expandContent ? "pointer" : "default", userSelect: "none" }}
       onClick={() => card.expandContent && setOpen(!open)}
     >

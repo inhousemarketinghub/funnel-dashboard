@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 interface KPIItem {
   label: string;
@@ -18,11 +18,24 @@ function getStatus(value: number): { color: string; text: string } {
 
 export function KPIChart({ items }: { items: KPIItem[] }) {
   const [hovered, setHovered] = useState<number | null>(null);
+  const [visible, setVisible] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      (entries) => { entries.forEach((e) => { if (e.isIntersecting) { setVisible(true); obs.unobserve(el); } }); },
+      { threshold: 0.2 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
 
   const maxScale = 150;
 
   return (
-    <div>
+    <div ref={ref}>
       {items.map((item, i) => {
         const status = getStatus(item.value);
         const currentWidth = Math.min((item.value / maxScale) * 100, 100);
@@ -48,9 +61,9 @@ export function KPIChart({ items }: { items: KPIItem[] }) {
                 <div
                   className="h-full rounded-[4px] absolute top-0 left-0"
                   style={{
-                    width: `${currentWidth}%`,
+                    width: visible ? `${currentWidth}%` : "0%",
                     background: status.color,
-                    transition: "width 1000ms ease",
+                    transition: `width 1000ms ease ${i * 80}ms`,
                   }}
                 />
                 {/* KPI Target dashed line */}

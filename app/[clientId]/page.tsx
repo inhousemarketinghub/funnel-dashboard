@@ -16,6 +16,8 @@ import { SplitText } from "@/components/animations/split-text";
 import { MonthPickerDialog } from "@/components/dashboard/month-picker-dialog";
 import { CardReveal } from "@/components/animations/card-reveal";
 import { BlurText } from "@/components/animations/blur-text";
+import { ScrollReveal } from "@/components/animations/scroll-reveal";
+import { Stagger } from "@/components/animations/stagger";
 import type { KPIConfig } from "@/lib/types";
 import { Suspense } from "react";
 import Link from "next/link";
@@ -173,10 +175,10 @@ export default async function DashboardPage({
       )}
 
       {!fetchError && <>
-      {/* KPI Cards: 2 rows x 5 */}
-      <div className={`grid grid-cols-2 md:grid-cols-3 ${detectedFunnelType === "walkin" ? "lg:grid-cols-4" : "lg:grid-cols-5"} gap-[10px] mb-[10px]`}>
+      {/* KPI Cards: 2 rows with stagger animation */}
+      <Stagger className={`grid grid-cols-2 md:grid-cols-3 ${detectedFunnelType === "walkin" ? "lg:grid-cols-4" : "lg:grid-cols-5"} gap-[10px] mb-[10px]`} staggerMs={50}>
         <HeroCards metrics={tm} kpi={kpi} achievement={ach} prevMetrics={lm} days={rangeDays} funnelType={detectedFunnelType || "appointment"} />
-      </div>
+      </Stagger>
 
       {/* Bento Grid */}
       <div className="bento">
