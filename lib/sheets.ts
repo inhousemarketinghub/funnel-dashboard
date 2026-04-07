@@ -340,61 +340,62 @@ function aggregateSalesPersons(
 ): SalesPersonMetrics[] {
   // Sales Person: filter by PURCHASE DATE (not lead date)
   // This captures all orders closed in the period regardless of when the lead came in
-  const map = new Map<string, { visits: number; showUps: number; orders: number; sales: number }>();
+  const map = new Map<string, { estShowUp: number; showUps: number; orders: number; sales: number }>();
+  const isWalkinFunnel = colMap.appointmentDate === null;
 
+  // First pass: scan ALL rows for est.show up (appointment date in range) and visits (walk-in)
+  // This matches countEstShowUp logic exactly
   for (let i = 1; i < rows.length; i++) {
     const cols = rows[i];
     const person = (cols[personCol] || "").trim();
     if (!person) continue;
+    if (!map.has(person)) map.set(person, { estShowUp: 0, showUps: 0, orders: 0, sales: 0 });
+    const m = map.get(person)!;
 
-    // For orders/sales: filter by purchase date
-    // For appointment/show-up counts: include all rows for this person (no date filter on lead date)
-    // so we get a complete picture of the person's pipeline
+    if (isWalkinFunnel) {
+      // Walk-in: count leads with leadDate in range
+      const leadDate = parseDate(cols[colMap.date]);
+      if (leadDate && (!startDate || !endDate || (leadDate >= startDate && leadDate <= endDate))) {
+        m.estShowUp++;
+      }
+    } else {
+      // Appointment: count leads with appointmentDate in range (same as countEstShowUp)
+      if (colMap.appointmentDate !== null) {
+        const apptDate = parseDate(cols[colMap.appointmentDate]);
+        if (apptDate && (!startDate || !endDate || (apptDate >= startDate && apptDate <= endDate))) {
+          m.estShowUp++;
+        }
+      }
+    }
+
+    // Show up + orders: filter by leadDate OR purchaseDate in range
+    const leadDate = parseDate(cols[colMap.date]);
+    const leadInRange = leadDate && (!startDate || !endDate || (leadDate >= startDate && leadDate <= endDate));
     const purchaseDateStr = colMap.purchaseDate !== null ? (cols[colMap.purchaseDate] || "").trim() : "";
     const purchaseDate = purchaseDateStr ? parseDate(purchaseDateStr) : null;
     const hasOrderInRange = purchaseDate && (!startDate || !endDate || (purchaseDate >= startDate && purchaseDate <= endDate));
 
-    // Only count rows where the lead date OR purchase date falls in range
-    if (startDate && endDate) {
-      const leadDate = parseDate(cols[colMap.date]);
-      const leadInRange = leadDate && leadDate >= startDate && leadDate <= endDate;
-      if (!leadInRange && !hasOrderInRange) continue;
-    }
+    if (!leadInRange && !hasOrderInRange) continue;
 
-    // Only count visits/appointments for leads that came in during the range (not purchase-date-only matches)
-    const leadDate = parseDate(cols[colMap.date]);
-    const leadInRange = !startDate || !endDate || (leadDate && leadDate >= startDate && leadDate <= endDate);
-
-    if (!map.has(person)) map.set(person, { visits: 0, showUps: 0, orders: 0, sales: 0 });
-    const m = map.get(person)!;
-    // Count visits only for leads within date range
-    if (leadInRange) {
-      if (colMap.appointmentDate !== null) {
-        if ((cols[colMap.appointmentDate] || "").trim()) m.visits++;
-      } else {
-        m.visits++; // walk-in: each lead row in range = a visit
-      }
-      if (colMap.showedUp !== null && ["yes", "true"].includes((cols[colMap.showedUp] || "").toLowerCase())) m.showUps++;
-    }
+    if (leadInRange && colMap.showedUp !== null && ["yes", "true"].includes((cols[colMap.showedUp] || "").toLowerCase())) m.showUps++;
     if (hasOrderInRange) {
       m.orders++;
       m.sales += colMap.sales !== null ? parseRM(cols[colMap.sales]) : 0;
     }
   }
 
-  const isWalkinFunnel = colMap.appointmentDate === null;
-
-  return Array.from(map.entries()).map(([name, m]) => ({
-    name,
-    appointment: m.visits,
-    showUp: m.showUps,
-    showUpRate: m.visits > 0 ? (m.showUps / m.visits) * 100 : 0,
-    orders: m.orders,
-    // Walk-in: conv = orders/visits. Appointment: conv = orders/showUps
-    convRate: isWalkinFunnel ? (m.visits > 0 ? (m.orders / m.visits) * 100 : 0) : (m.showUps > 0 ? (m.orders / m.showUps) * 100 : 0),
-    sales: m.sales,
-    aov: m.orders > 0 ? m.sales / m.orders : 0,
-  })).sort((a, b) => b.orders - a.orders);
+  return Array.from(map.entries())
+    .filter(([, m]) => m.estShowUp > 0 || m.orders > 0 || m.showUps > 0)
+    .map(([name, m]) => ({
+      name,
+      appointment: m.estShowUp,
+      showUp: m.showUps,
+      showUpRate: m.estShowUp > 0 ? (m.showUps / m.estShowUp) * 100 : 0,
+      orders: m.orders,
+      convRate: isWalkinFunnel ? (m.estShowUp > 0 ? (m.orders / m.estShowUp) * 100 : 0) : (m.showUps > 0 ? (m.orders / m.showUps) * 100 : 0),
+      sales: m.sales,
+      aov: m.orders > 0 ? m.sales / m.orders : 0,
+    })).sort((a, b) => b.orders - a.orders);
 }
 
 // ── KPI Indicator parsing ──────────────────────────────────────
