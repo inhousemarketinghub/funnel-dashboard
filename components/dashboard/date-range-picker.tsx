@@ -81,14 +81,16 @@ export function DateRangePicker({ clientId }: Props) {
     if (range?.from && range?.to) {
       const autoPrev = getPreviousPeriod(range.from, range.to);
       setCompareRange({ from: autoPrev.from, to: autoPrev.to });
-      navigate(range.from, range.to);
     }
   }
 
   function handleCompareSelect(range: DateRange | undefined) {
     setCompareRange(range);
-    if (range?.from && range?.to && calRange?.from && calRange?.to) {
-      navigate(calRange.from, calRange.to, range.from, range.to);
+  }
+
+  function handleApply() {
+    if (calRange?.from && calRange?.to) {
+      navigate(calRange.from, calRange.to, compareRange?.from, compareRange?.to);
     }
   }
 
@@ -177,6 +179,28 @@ export function DateRangePicker({ clientId }: Props) {
               </div>
             </>
           )}
+
+          {/* Apply / Cancel bar */}
+          <div className="flex items-center justify-between p-3 border-t border-[var(--border)]">
+            <span className="text-[11px] text-[var(--t4)] num">
+              {calRange?.from && calRange?.to
+                ? formatRangeLabel(calRange.from, calRange.to)
+                : "Select date range"}
+            </span>
+            <div className="flex gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setOpen(false)} className="text-xs h-7 text-[var(--t3)]">
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleApply}
+                disabled={!calRange?.from || !calRange?.to}
+                className="text-xs h-7 bg-[var(--blue)] hover:bg-[#153D7A] text-white"
+              >
+                Apply
+              </Button>
+            </div>
+          </div>
         </PopoverContent>
       </Popover>
       <span className="text-[11px] text-[var(--t3)] num">

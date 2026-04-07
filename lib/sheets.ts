@@ -363,7 +363,12 @@ function aggregateSalesPersons(
 
     if (!map.has(person)) map.set(person, { appts: 0, showUps: 0, orders: 0, sales: 0 });
     const m = map.get(person)!;
-    if (colMap.appointmentDate !== null && (cols[colMap.appointmentDate] || "").trim()) m.appts++;
+    // For walk-in (no appointment column): every lead row = a visit
+    if (colMap.appointmentDate !== null) {
+      if ((cols[colMap.appointmentDate] || "").trim()) m.appts++;
+    } else {
+      m.appts++; // walk-in: each row is a visit
+    }
     if (colMap.showedUp !== null && ["yes", "true"].includes((cols[colMap.showedUp] || "").toLowerCase())) m.showUps++;
     if (hasOrderInRange) {
       m.orders++;

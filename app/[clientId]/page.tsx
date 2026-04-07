@@ -104,6 +104,19 @@ export default async function DashboardPage({
 
   // Days in current range for daily avg calculation
   const rangeDays = Math.max(1, Math.round((reportEnd.getTime() - reportStart.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+  // Days in the month for pace calculation
+  const daysInMonth = new Date(reportStart.getFullYear(), reportStart.getMonth() + 1, 0).getDate();
+  const paceRatio = rangeDays / daysInMonth; // e.g., 7/30 = 0.233
+
+  // Pace-adjusted KPI targets for cumulative metrics (Sales, Ad Spend, Orders)
+  const paceSales = kpi.sales * paceRatio;
+  const paceAdSpend = kpi.ad_spend * paceRatio;
+  const paceOrders = kpi.orders * paceRatio;
+
+  // Pace-adjusted achievement for cumulative metrics
+  const paceAchSales = paceSales > 0 ? (tm.sales / paceSales) * 100 : 0;
+  const paceAchAdSpend = paceAdSpend > 0 ? (tm.ad_spend / paceAdSpend) * 100 : 0;
+  const paceAchOrders = paceOrders > 0 ? (tm.orders / paceOrders) * 100 : 0;
 
   const isWalkin = detectedFunnelType === "walkin";
   const walkinVisitRate = tm.inquiry > 0 ? (tm.contact / tm.inquiry) * 100 : 0;
@@ -112,9 +125,9 @@ export default async function DashboardPage({
   const walkinConvRatePrev = lm.contact > 0 ? (lm.orders / lm.contact) * 100 : 0;
 
   const kpiItems = [
-    { label: "Sales", value: ach.sales, target: fmtRM(kpi.sales), actual: fmtRM(tm.sales), prevActual: fmtRM(lm.sales) },
-    { label: "Ad Spend", value: ach.ad_spend, target: fmtRM(kpi.ad_spend), actual: fmtRM(tm.ad_spend), prevActual: fmtRM(lm.ad_spend) },
-    { label: "Orders", value: ach.orders, target: String(kpi.orders), actual: String(tm.orders), prevActual: String(lm.orders) },
+    { label: "Sales", value: paceAchSales, target: fmtRM(paceSales), actual: fmtRM(tm.sales), prevActual: fmtRM(lm.sales) },
+    { label: "Ad Spend", value: paceAchAdSpend, target: fmtRM(paceAdSpend), actual: fmtRM(tm.ad_spend), prevActual: fmtRM(lm.ad_spend) },
+    { label: "Orders", value: paceAchOrders, target: String(Math.round(paceOrders)), actual: String(tm.orders), prevActual: String(lm.orders) },
     { label: "AOV", value: ach.aov, target: fmtRM(kpi.aov), actual: fmtRM(tm.aov), prevActual: fmtRM(lm.aov) },
     { label: "CPL", value: ach.cpl, target: fmtRM(kpi.cpl), actual: fmtRM(tm.cpl), prevActual: fmtRM(lm.cpl) },
     {
@@ -177,7 +190,7 @@ export default async function DashboardPage({
       {!fetchError && <>
       {/* KPI Cards: 2 rows with stagger animation */}
       <Stagger className={`grid grid-cols-2 md:grid-cols-3 ${detectedFunnelType === "walkin" ? "lg:grid-cols-4" : "lg:grid-cols-5"} gap-[10px] mb-[10px]`} staggerMs={50}>
-        <HeroCards metrics={tm} kpi={kpi} achievement={ach} prevMetrics={lm} days={rangeDays} funnelType={detectedFunnelType || "appointment"} />
+        <HeroCards metrics={tm} kpi={kpi} achievement={{...ach, sales: paceAchSales, ad_spend: paceAchAdSpend, orders: paceAchOrders}} prevMetrics={lm} days={rangeDays} funnelType={detectedFunnelType || "appointment"} paceKpi={{sales: paceSales, ad_spend: paceAdSpend, orders: paceOrders}} />
       </Stagger>
 
       {/* Bento Grid */}
