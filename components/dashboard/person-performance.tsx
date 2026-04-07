@@ -95,9 +95,10 @@ export function PersonPerformance({ appointmentPersons, salesPersons, kpi, brand
             </div>
             <div className="w-[260px] flex-shrink-0">
               <DonutChart
-                data={appointmentPersons.map((p) => ({ name: p.name, value: p.contactGiven }))}
-                label="contacts"
-                title="Person Visit Distribution"
+                data={appointmentPersons.map((p) => ({ name: p.name, value: p.appointment }))}
+                label="appts"
+                title="Person Appt Distribution"
+                hoverFn={(d) => `${d.name}: ${d.value} appointments`}
               />
             </div>
           </div>
@@ -117,7 +118,7 @@ export function PersonPerformance({ appointmentPersons, salesPersons, kpi, brand
 
         {/* Metrics */}
         <div className={`grid grid-cols-3 ${isWalkin ? "lg:grid-cols-5" : "lg:grid-cols-7"} gap-[8px] mb-5`}>
-          <Metric label={isWalkin ? "Visit" : "Appointment"} value={selectedSalesData.appointment} />
+          <Metric label={isWalkin ? "Visit" : "Est.Show Up"} value={selectedSalesData.appointment} />
           {!isWalkin && <Metric label="Show Up" value={selectedSalesData.showUp} />}
           {!isWalkin && <Metric label="Show Up Rate" text={`${selectedSalesData.showUpRate.toFixed(1)}%`} />}
           <Metric label="Orders" value={selectedSalesData.orders} />
@@ -132,9 +133,9 @@ export function PersonPerformance({ appointmentPersons, salesPersons, kpi, brand
           <div>
             <DonutChart
               data={salesPersons.map((p) => ({ name: p.name, value: p.appointment }))}
-              label={isWalkin ? "visits" : "appointments"}
-              title={isWalkin ? "Person Visit" : "Person Appointment"}
-              hoverFn={(d) => `${d.name}: ${d.value} ${isWalkin ? "visits" : "appts"}`}
+              label={isWalkin ? "visits" : "est.show up"}
+              title={isWalkin ? "Person Visit" : "Person Est.Show Up"}
+              hoverFn={(d) => `${d.name}: ${d.value} ${isWalkin ? "visits" : "est.show up"}`}
             />
           </div>
 
