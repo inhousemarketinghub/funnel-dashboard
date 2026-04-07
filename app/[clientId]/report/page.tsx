@@ -153,13 +153,17 @@ export default async function ReportPage({
   // ── Render helpers ──
 
   function HeroGrid({ stats }: { stats: ReturnType<typeof heroStats> }) {
+    const all = [...stats.row1, ...stats.row2];
+    const mid = Math.ceil(all.length / 2);
+    const r1 = all.slice(0, mid);
+    const r2 = all.slice(mid);
     return (
       <>
-        <div className={`grid grid-cols-2 ${isWalkin ? "md:grid-cols-4" : "md:grid-cols-5"} gap-[10px] mb-[10px]`}>
-          {stats.row1.map((s) => <HeroCard key={s.label} s={s} />)}
+        <div className="gap-[10px] mb-[10px]" style={{ display: "grid", gridTemplateColumns: `repeat(${mid}, 1fr)` }}>
+          {r1.map((s) => <HeroCard key={s.label} s={s} />)}
         </div>
-        <div className={`grid grid-cols-2 ${isWalkin ? "md:grid-cols-3" : "md:grid-cols-5"} gap-[10px]`}>
-          {stats.row2.map((s) => <HeroCard key={s.label} s={s} />)}
+        <div className="gap-[10px]" style={{ display: "grid", gridTemplateColumns: `repeat(${r2.length}, 1fr)` }}>
+          {r2.map((s) => <HeroCard key={s.label} s={s} />)}
         </div>
       </>
     );
