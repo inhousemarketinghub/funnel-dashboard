@@ -59,22 +59,30 @@ export function FunnelFlow({ metrics, funnelType = "appointment" }: { metrics: F
   const svgW = 220;
   const svgH = STEPS.length * 52 + 30;
   const cx = svgW / 2;
-  const topRx = 90; // widest ellipse radius x
+  const topRx = 95; // widest ellipse radius x
   const ry = 12;    // ellipse radius y (3D depth)
   const levelH = 48; // height per level
-  const minRx = 25;  // narrowest level
+  const minRx = 12;  // narrowest level
 
-  // Compute radii per level: strictly decreasing
+  // Compute radii: blend data-proportional width with forced taper
+  // This ensures a clear funnel shape even when values are close
   const radii: number[] = [];
   const maxVal = Math.max(values[0], 1);
-  for (let i = 0; i < STEPS.length; i++) {
-    if (STEPS[i].key === "sales") {
-      radii.push(Math.max(minRx, (radii[i - 1] || minRx + 10) * 0.6));
-    } else {
-      const raw = Math.max(minRx, (values[i] / maxVal) * topRx);
-      const prev = i > 0 ? radii[i - 1] : topRx;
-      radii.push(Math.min(raw, prev));
-    }
+  const n = STEPS.length;
+  for (let i = 0; i < n; i++) {
+    // Data-based radius
+    const dataRatio = STEPS[i].key === "sales" ? (values[Math.max(0, i - 1)] / maxVal) * 0.5 : values[i] / maxVal;
+    const dataRx = Math.max(minRx, dataRatio * topRx);
+
+    // Position-based taper: first level = 100%, last = ~20%, linear interpolation
+    const taperRx = topRx * (1 - (i / (n - 1)) * 0.8);
+
+    // Blend: 40% data + 60% taper — ensures visual funnel shape regardless of data
+    const blended = dataRx * 0.4 + taperRx * 0.6;
+
+    // Ensure strictly decreasing
+    const prev = i > 0 ? radii[i - 1] : topRx + 1;
+    radii.push(Math.min(blended, prev - 3)); // at least 3px narrower than previous
   }
 
   return (
