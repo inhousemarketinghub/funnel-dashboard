@@ -104,25 +104,64 @@ export async function PATCH(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { memberId, newRole } = body;
+    const { memberId, newRole, clientIds } = body;
 
-    if (!memberId || !newRole) {
-      return NextResponse.json({ error: "memberId and newRole are required" }, { status: 400 });
+    if (!memberId) {
+      return NextResponse.json({ error: "memberId is required" }, { status: 400 });
     }
 
-    const permissions =
-      newRole === "manager"
-        ? ["view_dashboard", "view_report", "edit_settings"]
-        : ["view_dashboard", "view_report"];
-
     const supabase = await createServerSupabase();
-    const { error } = await supabase
-      .from("project_access")
-      .update({ role: newRole, permissions })
-      .eq("agency_id", memberId);
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    // Update role if provided
+    if (newRole) {
+      const permissions =
+        newRole === "manager"
+          ? ["view_dashboard", "view_report", "edit_settings"]
+          : ["view_dashboard", "view_report"];
+
+      const { error } = await supabase
+        .from("project_access")
+        .update({ role: newRole, permissions })
+        .eq("agency_id", memberId);
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+    }
+
+    // Update client assignments if provided
+    if (clientIds && Array.isArray(clientIds)) {
+      // Get current role for this member
+      const { data: existing } = await supabase
+        .from("project_access")
+        .select("client_id, role, permissions")
+        .eq("agency_id", memberId);
+
+      const currentClientIds = (existing || []).map((r) => r.client_id);
+      const memberRole = existing?.[0]?.role || "viewer";
+      const memberPerms = existing?.[0]?.permissions || ["view_dashboard", "view_report"];
+
+      // Remove clients no longer assigned
+      const toRemove = currentClientIds.filter((id: string) => !clientIds.includes(id));
+      if (toRemove.length > 0) {
+        await supabase
+          .from("project_access")
+          .delete()
+          .eq("agency_id", memberId)
+          .in("client_id", toRemove);
+      }
+
+      // Add newly assigned clients
+      const toAdd = clientIds.filter((id: string) => !currentClientIds.includes(id));
+      if (toAdd.length > 0) {
+        const records = toAdd.map((clientId: string) => ({
+          agency_id: memberId,
+          client_id: clientId,
+          role: memberRole,
+          permissions: memberPerms,
+        }));
+        await supabase.from("project_access").insert(records);
+      }
     }
 
     return NextResponse.json({ success: true });

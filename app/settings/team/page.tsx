@@ -69,6 +69,15 @@ export default function TeamPage() {
     await loadData();
   }
 
+  async function handleClientChange(memberId: string, clientIds: string[]) {
+    await fetch("/api/team", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ memberId, clientIds }),
+    });
+    await loadData();
+  }
+
   async function handleRemove(memberId: string) {
     const confirmed = window.confirm(
       "Are you sure you want to remove this team member? They will lose access to all assigned clients."
@@ -188,7 +197,9 @@ export default function TeamPage() {
               <MemberCard
                 key={member.id}
                 member={member}
+                allClients={clients}
                 onRoleChange={handleRoleChange}
+                onClientChange={handleClientChange}
                 onRemove={handleRemove}
               />
             ))}
