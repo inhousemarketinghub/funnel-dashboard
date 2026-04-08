@@ -2,6 +2,8 @@
 import { useState } from "react";
 import { StatsBar } from "./stats-bar";
 import { ClientKpiCard } from "./client-kpi-card";
+import { Stagger } from "@/components/animations/stagger";
+import { CardReveal } from "@/components/animations/card-reveal";
 import type { ClientOverview, OverviewStats } from "@/lib/types";
 
 type Filter = "all" | "active" | "alert";
@@ -27,8 +29,10 @@ export function OverviewShell({
 
       {filtered.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {filtered.map((client) => (
-            <ClientKpiCard key={client.id} client={client} />
+          {filtered.map((client, i) => (
+            <CardReveal key={client.id} delay={i * 100}>
+              <ClientKpiCard client={client} />
+            </CardReveal>
           ))}
         </div>
       ) : (
