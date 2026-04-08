@@ -1,13 +1,14 @@
 import { createServerSupabase } from "./supabase/server";
+import type { MemberRole } from "./types";
 
 export type UserRole = "owner" | "user" | null;
 
 const ALL_PERMISSIONS = ["view_dashboard", "view_report", "edit_settings", "manage_access"];
 
-export async function getUserRole(): Promise<{ email: string | null; role: UserRole; agencyId: string | null }> {
+export async function getUserRole(): Promise<{ email: string | null; role: UserRole; agencyId: string | null; memberRole: MemberRole | null }> {
   const supabase = await createServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user?.email) return { email: null, role: null, agencyId: null };
+  if (!user?.email) return { email: null, role: null, agencyId: null, memberRole: null };
 
   const { data: agency } = await supabase
     .from("agencies")
@@ -15,10 +16,36 @@ export async function getUserRole(): Promise<{ email: string | null; role: UserR
     .eq("email", user.email)
     .single();
 
+  if (!agency?.id) {
+    return {
+      email: user.email,
+      role: "user" as UserRole,
+      agencyId: null,
+      memberRole: null,
+    };
+  }
+
+  const isOwner = agency.role === "owner";
+
+  let memberRole: MemberRole | null = null;
+  if (isOwner) {
+    memberRole = "owner";
+  } else {
+    const { data: access } = await supabase
+      .from("project_access")
+      .select("role")
+      .eq("agency_id", agency.id)
+      .limit(1)
+      .single();
+
+    memberRole = (access?.role as MemberRole | undefined) ?? "viewer";
+  }
+
   return {
     email: user.email,
-    role: (agency?.role === "owner" ? "owner" : "user") as UserRole,
-    agencyId: agency?.id || null,
+    role: (isOwner ? "owner" : "user") as UserRole,
+    agencyId: agency.id,
+    memberRole,
   };
 }
 
