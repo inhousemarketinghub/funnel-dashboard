@@ -27,6 +27,10 @@ export default async function ClientLayout({ children, params }: { children: Rea
             <img src={client.logo_url} alt="" className="w-8 h-8 rounded-[6px] object-contain bg-white p-[2px]" />
           )}
           <span className="topbar-crumb">{client.name}</span>
+          <div className="topbar-sep" />
+          <Link href={`/${clientId}`} className="text-[12px] text-[var(--t3)]" style={{ textDecoration: "none" }}>Dashboard</Link>
+          <span className="text-[12px] text-[var(--t4)]">·</span>
+          <Link href={`/${clientId}/trends`} className="text-[12px] text-[var(--t3)]" style={{ textDecoration: "none" }}>Trends</Link>
         </div>
         <div className="flex items-center gap-[10px]">
           <ThemeToggle />
