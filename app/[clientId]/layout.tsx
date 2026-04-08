@@ -28,9 +28,8 @@ export default async function ClientLayout({ children, params }: { children: Rea
           )}
           <span className="topbar-crumb">{client.name}</span>
           <div className="topbar-sep" />
-          <Link href={`/${clientId}`} className="text-[12px] text-[var(--t3)]" style={{ textDecoration: "none" }}>Dashboard</Link>
-          <span className="text-[12px] text-[var(--t4)]">·</span>
-          <Link href={`/${clientId}/trends`} className="text-[12px] text-[var(--t3)]" style={{ textDecoration: "none" }}>Trends</Link>
+          <Link href={`/${clientId}`} className="topbar-btn" style={{ fontSize: 12, padding: "4px 12px" }}>Dashboard</Link>
+          <Link href={`/${clientId}/trends`} className="topbar-btn" style={{ fontSize: 12, padding: "4px 12px" }}>Trends</Link>
         </div>
         <div className="flex items-center gap-[10px]">
           <ThemeToggle />

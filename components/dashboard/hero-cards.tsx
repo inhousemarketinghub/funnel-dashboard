@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { FunnelMetrics, KPIConfig, Achievement } from "@/lib/types";
 import { fmtRM } from "@/lib/utils";
 import { CountUp } from "@/components/animations/count-up";
+import { Stagger } from "@/components/animations/stagger";
 
 interface Props {
   metrics: FunnelMetrics;
@@ -123,11 +124,11 @@ export function HeroCards({ metrics: tm, kpi, achievement: ach, prevMetrics: lm,
         <div className="font-label text-[10px] uppercase tracking-widest text-[var(--t4)] mb-2">
           {label}
         </div>
-        <div className={`grid ${gridCols(groupCards.length)} gap-[10px]`}>
+        <Stagger className={`grid ${gridCols(groupCards.length)} gap-[10px]`} staggerMs={60}>
           {groupCards.map((card, i) => (
             <KPICard key={card.label} card={card} accent={ACCENT_COLORS[startIndex + i]} />
           ))}
-        </div>
+        </Stagger>
       </div>
     );
   }

@@ -198,10 +198,10 @@ export default async function DashboardPage({
       )}
 
       {!fetchError && <>
-      {/* KPI Cards: 2 rows with stagger animation */}
-      <Stagger className="mb-[10px]" staggerMs={50}>
+      {/* KPI Cards: grouped by Frontend/Midend/Backend */}
+      <div className="mb-[10px]">
         <HeroCards metrics={tm} kpi={kpi} achievement={{...ach, sales: paceAchSales, ad_spend: paceAchAdSpend, orders: paceAchOrders}} prevMetrics={lm} days={rangeDays} funnelType={detectedFunnelType || "appointment"} paceKpi={{sales: paceSales, ad_spend: paceAdSpend, orders: paceOrders}} />
-      </Stagger>
+      </div>
 
       {/* Performance Summary */}
       <Stagger className="grid grid-cols-1 md:grid-cols-3 gap-[10px] my-[10px]" staggerMs={200}>
