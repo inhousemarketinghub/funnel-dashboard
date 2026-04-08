@@ -25,9 +25,17 @@ export async function getUserRole(): Promise<{ email: string | null; role: UserR
     };
   }
 
-  // Pre-migration compatibility: treat any user with an agency record as owner.
-  // After migration adds proper role values, this naturally resolves to checking agency.role === "owner".
-  const isOwner = agency.role === "owner" || agency.role === "user" || !agency.role;
+  // Check owner status: explicit role, or legacy records where role was never set
+  // (pre-migration agencies that own clients are treated as owners)
+  let isOwner = agency.role === "owner";
+  if (!isOwner && !agency.role) {
+    const { data: ownedClients } = await supabase
+      .from("clients")
+      .select("id")
+      .eq("agency_id", agency.id)
+      .limit(1);
+    isOwner = (ownedClients?.length ?? 0) > 0;
+  }
 
   let memberRole: MemberRole | null = null;
   if (isOwner) {
