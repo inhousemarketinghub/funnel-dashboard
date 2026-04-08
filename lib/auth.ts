@@ -25,7 +25,9 @@ export async function getUserRole(): Promise<{ email: string | null; role: UserR
     };
   }
 
-  const isOwner = agency.role === "owner";
+  // Backwards compatible: if role column doesn't exist yet (pre-migration),
+  // anyone with an agency record is treated as owner
+  const isOwner = agency.role === "owner" || !agency.role;
 
   let memberRole: MemberRole | null = null;
   if (isOwner) {
