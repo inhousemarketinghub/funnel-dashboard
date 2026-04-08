@@ -97,12 +97,47 @@ export function HeroCards({ metrics: tm, kpi, achievement: ach, prevMetrics: lm,
     },
   ];
 
+  // Group cards by funnel section
+  const frontendCards = isWalkin
+    ? [cards[1], cards[4]]           // Total Ad Spend (1), CPL (4)
+    : [cards[1], cards[5]];          // Total Ad Spend (1), CPL (5)
+
+  const midendCards = isWalkin
+    ? [cards[5]]                     // Visit Rate (5)
+    : [cards[6], cards[7], cards[8]]; // Respond Rate (6), Appointment Rate (7), Show Up Rate (8)
+
+  const backendCards = isWalkin
+    ? [cards[0], cards[3], cards[6], cards[7], cards[2]] // Total Sales (0), Orders (3), Conv Rate (6), AOV (7), CPA% (2)
+    : [cards[0], cards[3], cards[9], cards[4], cards[2]]; // Total Sales (0), Orders (3), Conv Rate (9), AOV (4), CPA% (2)
+
+  function gridCols(count: number): string {
+    if (count === 1) return "grid-cols-1 md:grid-cols-2";
+    if (count === 2) return "grid-cols-2";
+    if (count === 3) return "grid-cols-2 md:grid-cols-3";
+    return "grid-cols-2 md:grid-cols-3 lg:grid-cols-5";
+  }
+
+  function renderGroup(label: string, groupCards: CardDef[], startIndex: number) {
+    return (
+      <div>
+        <div className="font-label text-[10px] uppercase tracking-widest text-[var(--t4)] mb-2">
+          {label}
+        </div>
+        <div className={`grid ${gridCols(groupCards.length)} gap-[10px]`}>
+          {groupCards.map((card, i) => (
+            <KPICard key={card.label} card={card} accent={ACCENT_COLORS[startIndex + i]} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <>
-      {cards.map((card, i) => (
-        <KPICard key={card.label} card={card} accent={ACCENT_COLORS[i]} />
-      ))}
-    </>
+    <div className="space-y-3">
+      {renderGroup("FRONTEND — Ad Performance", frontendCards, 0)}
+      {renderGroup("MIDEND — Lead Pipeline", midendCards, frontendCards.length)}
+      {renderGroup("BACKEND — Revenue", backendCards, frontendCards.length + midendCards.length)}
+    </div>
   );
 }
 
