@@ -199,12 +199,12 @@ export default async function DashboardPage({
 
       {!fetchError && <>
       {/* KPI Cards: grouped by Frontend/Midend/Backend */}
-      <div className="mb-[10px]">
+      <div className="mb-8">
         <HeroCards metrics={tm} kpi={kpi} achievement={{...ach, sales: paceAchSales, ad_spend: paceAchAdSpend, orders: paceAchOrders}} prevMetrics={lm} days={rangeDays} funnelType={detectedFunnelType || "appointment"} paceKpi={{sales: paceSales, ad_spend: paceAdSpend, orders: paceOrders}} />
       </div>
 
       {/* Performance Summary */}
-      <Stagger className="grid grid-cols-1 md:grid-cols-3 gap-[10px] my-[10px]" staggerMs={200}>
+      <Stagger className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8" staggerMs={150}>
         <SummaryCards insights={insights} />
       </Stagger>
 

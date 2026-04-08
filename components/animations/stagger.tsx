@@ -41,8 +41,8 @@ export function Stagger({ children, className = "", staggerMs = 60, threshold = 
       <style>{`
         .stagger-child {
           opacity: 0;
-          transform: translateY(8px);
-          transition: opacity 500ms ease, transform 500ms ease;
+          transform: translateY(12px);
+          transition: opacity 800ms cubic-bezier(0.215, 0.61, 0.355, 1), transform 800ms cubic-bezier(0.215, 0.61, 0.355, 1);
         }
       `}</style>
       {children}

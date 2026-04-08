@@ -39,8 +39,8 @@ export function CardReveal({
       className={className}
       style={{
         opacity: 0,
-        transform: "translateY(10px)",
-        transition: `opacity 600ms ease, transform 600ms ease`,
+        transform: "translateY(12px)",
+        transition: `opacity 800ms cubic-bezier(0.215, 0.61, 0.355, 1), transform 800ms cubic-bezier(0.215, 0.61, 0.355, 1)`,
       }}
     >
       {children}

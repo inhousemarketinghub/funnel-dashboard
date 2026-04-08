@@ -121,10 +121,10 @@ export function HeroCards({ metrics: tm, kpi, achievement: ach, prevMetrics: lm,
   function renderGroup(label: string, groupCards: CardDef[], startIndex: number) {
     return (
       <div>
-        <div className="font-label text-[10px] uppercase tracking-widest text-[var(--t4)] mb-2">
+        <div className="font-label text-[11px] uppercase text-[var(--t4)] mb-3" style={{ letterSpacing: "0.2em" }}>
           {label}
         </div>
-        <Stagger className={`grid ${gridCols(groupCards.length)} gap-[10px]`} staggerMs={60}>
+        <Stagger className={`grid ${gridCols(groupCards.length)} gap-4`} staggerMs={150}>
           {groupCards.map((card, i) => (
             <KPICard key={card.label} card={card} accent={ACCENT_COLORS[startIndex + i]} />
           ))}
