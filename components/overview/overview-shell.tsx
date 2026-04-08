@@ -18,7 +18,7 @@ export function OverviewShell({
   const [filter, setFilter] = useState<Filter>("all");
 
   const filtered = clients.filter((c) => {
-    if (filter === "active") return c.health === "good" || c.health === "watch";
+    if (filter === "active") return c.status === "active";
     if (filter === "alert") return c.health === "alert";
     return true;
   });
