@@ -30,12 +30,12 @@ export function OverviewShell({
       {filtered.length > 0 ? (
         <Stagger
           className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"
-          staggerMs={80}
+          staggerMs={100}
         >
           {filtered.map((client) => (
-            <CardReveal key={client.id}>
+            <div key={client.id} className="stagger-child">
               <ClientKpiCard client={client} />
-            </CardReveal>
+            </div>
           ))}
         </Stagger>
       ) : (
