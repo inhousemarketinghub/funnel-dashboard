@@ -100,3 +100,73 @@ export interface InsightGroup {
   paceForecast: Insight[];
   labels: { topPerformer: string; needsAttention: string; paceForecast: string };
 }
+
+// --- Phase 1: Management Foundation ---
+
+export type MemberRole = "owner" | "manager" | "viewer";
+
+export interface MemberInfo {
+  id: string;
+  email: string;
+  name: string | null;
+  role: MemberRole;
+  clients: { id: string; name: string }[];
+  invited_at: string | null;
+}
+
+export interface PendingInvitation {
+  id: string;
+  email: string;
+  role: MemberRole;
+  client_ids: string[];
+  client_names: string[];
+  token: string;
+  expires_at: string;
+  created_at: string;
+}
+
+export interface ClientOverview {
+  id: string;
+  name: string;
+  logo_url: string | null;
+  status: "onboarding" | "active" | "paused";
+  metrics: {
+    sales: number;
+    cpl: number;
+    roas: number;
+    conv_rate: number;
+    ad_spend: number;
+  };
+  achievement: {
+    sales: number;
+    cpl: number;
+    roas: number;
+    conv_rate: number;
+    average: number;
+  };
+  health: "good" | "watch" | "alert";
+}
+
+export interface OverviewStats {
+  activeClients: number;
+  needAttention: number;
+  totalAdSpend: number;
+  totalSales: number;
+}
+
+export interface ColumnMapping {
+  performance: Record<string, string>;
+  lead: Record<string, string>;
+}
+
+export interface OnboardingState {
+  step: number;
+  name: string;
+  industry: string;
+  logoFile: File | null;
+  sheetId: string;
+  scanResult: import("@/lib/sheet-scanner").SheetScanResult | null;
+  columnMapping: ColumnMapping | null;
+  kpiConfig: Partial<KPIConfig>;
+  invites: { email: string; role: MemberRole }[];
+}
