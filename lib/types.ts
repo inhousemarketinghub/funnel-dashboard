@@ -134,6 +134,7 @@ export interface ClientOverview {
     sales: number;
     cpl: number;
     roas: number;
+    cpa_pct: number;
     conv_rate: number;
     ad_spend: number;
   };
@@ -141,6 +142,7 @@ export interface ClientOverview {
     sales: number;
     cpl: number;
     roas: number;
+    cpa_pct: number;
     conv_rate: number;
     average: number;
   };

@@ -3,8 +3,9 @@ import Link from "next/link";
 import { getUserRole } from "@/lib/auth";
 import { canViewOverview, canCreateClient } from "@/lib/permissions";
 import { fetchAllClientsOverview } from "@/lib/overview";
-import { StatsBar } from "@/components/overview/stats-bar";
+import { OverviewShell } from "@/components/overview/overview-shell";
 import { ClientKpiCard } from "@/components/overview/client-kpi-card";
+import { SplitText } from "@/components/animations/split-text";
 import { LogoutButton } from "@/components/dashboard/logout-button";
 
 export default async function ClientsPage() {
@@ -31,13 +32,11 @@ export default async function ClientsPage() {
     <div className="min-h-dvh bg-[var(--bg)]" style={{ transition: "background 500ms ease" }}>
       <div className="bauhaus-stripe"><div /><div /><div /><div /></div>
 
-      <div className="max-w-5xl mx-auto p-8">
+      <div className="max-w-7xl mx-auto p-8">
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="font-heading text-[28px] font-semibold tracking-tight text-[var(--t1)]">
-              {title}
-            </h1>
+            <SplitText text={title} />
             <p className="text-[13px] text-[var(--t3)] mt-1">
               {isOwnerOrManager
                 ? "Current month performance across all clients"
@@ -64,16 +63,19 @@ export default async function ClientsPage() {
           </div>
         </div>
 
-        {/* Stats bar — owners and managers only */}
-        {showOverview && clients.length > 0 && <StatsBar stats={stats} />}
-
-        {/* Client KPI card grid */}
+        {/* Client grid */}
         {clients.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {clients.map((client) => (
-              <ClientKpiCard key={client.id} client={client} />
-            ))}
-          </div>
+          showOverview ? (
+            /* Owners/managers: stats bar + filterable card grid */
+            <OverviewShell clients={clients} stats={stats} />
+          ) : (
+            /* Viewers with multiple clients: plain grid, no stats */
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {clients.map((client) => (
+                <ClientKpiCard key={client.id} client={client} />
+              ))}
+            </div>
+          )
         ) : (
           <div className="col-span-2 text-center py-16">
             <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-[var(--sand)] flex items-center justify-center text-[22px] text-[var(--t4)]">

@@ -52,9 +52,9 @@ export function ClientKpiCard({ client }: Props) {
       ach: client.achievement.cpl,
     },
     {
-      label: "ROAS",
-      value: fmtMultiplier(client.metrics.roas),
-      ach: client.achievement.roas,
+      label: "CPA%",
+      value: fmtRate(client.metrics.cpa_pct),
+      ach: client.achievement.cpa_pct,
     },
     {
       label: "Conv%",
@@ -66,7 +66,7 @@ export function ClientKpiCard({ client }: Props) {
   return (
     <Link
       href={`/${client.id}`}
-      className="card-base block no-underline transition-all hover:shadow-md hover:border-[var(--blue)] hover:-translate-y-[1px]"
+      className="card-base block no-underline transition-all hover:shadow-md hover:border-[var(--blue)] hover:-translate-y-[1px] hover:scale-[1.01]"
       style={{ transitionDuration: "150ms" }}
     >
       {/* Header: logo/initial + name + health badge */}
@@ -85,7 +85,7 @@ export function ClientKpiCard({ client }: Props) {
             {client.name.charAt(0).toUpperCase()}
           </div>
         )}
-        <span className="font-heading text-[15px] font-semibold text-[var(--t1)] truncate flex-1">
+        <span className="font-heading text-[18px] font-semibold text-[var(--t1)] truncate flex-1">
           {client.name}
         </span>
         <span

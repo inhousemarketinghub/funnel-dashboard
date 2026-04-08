@@ -47,11 +47,11 @@ export async function fetchAllClientsOverview(): Promise<{
 
         const achievement = kpi
           ? computeAchievement(metrics, kpi)
-          : { sales: 0, cpl: 0, roas: 0, conv_rate: 0, orders: 0, ad_spend: 0, respond_rate: 0, appt_rate: 0, showup_rate: 0, aov: 0 };
+          : { sales: 0, cpl: 0, roas: 0, cpa_pct: 0, conv_rate: 0, orders: 0, ad_spend: 0, respond_rate: 0, appt_rate: 0, showup_rate: 0, aov: 0 };
 
         // Average of the 4 key tracked metrics
         const average =
-          (achievement.sales + achievement.cpl + achievement.roas + achievement.conv_rate) / 4;
+          (achievement.sales + achievement.cpl + (achievement.cpa_pct || 0) + achievement.conv_rate) / 4;
 
         const health: ClientOverview["health"] =
           average >= 80 ? "good" : average >= 60 ? "watch" : "alert";
@@ -65,6 +65,7 @@ export async function fetchAllClientsOverview(): Promise<{
             sales: metrics.sales,
             cpl: metrics.cpl,
             roas: metrics.roas,
+            cpa_pct: metrics.cpa_pct,
             conv_rate: metrics.conv_rate,
             ad_spend: metrics.ad_spend,
           },
@@ -72,6 +73,7 @@ export async function fetchAllClientsOverview(): Promise<{
             sales: achievement.sales,
             cpl: achievement.cpl,
             roas: achievement.roas,
+            cpa_pct: achievement.cpa_pct || 0,
             conv_rate: achievement.conv_rate,
             average,
           },
@@ -84,8 +86,8 @@ export async function fetchAllClientsOverview(): Promise<{
           name: client.name,
           logo_url: client.logo_url ?? null,
           status: "active" as const,
-          metrics: { sales: 0, cpl: 0, roas: 0, conv_rate: 0, ad_spend: 0 },
-          achievement: { sales: 0, cpl: 0, roas: 0, conv_rate: 0, average: 0 },
+          metrics: { sales: 0, cpl: 0, roas: 0, cpa_pct: 0, conv_rate: 0, ad_spend: 0 },
+          achievement: { sales: 0, cpl: 0, roas: 0, cpa_pct: 0, conv_rate: 0, average: 0 },
           health: "alert" as const,
         };
       }
