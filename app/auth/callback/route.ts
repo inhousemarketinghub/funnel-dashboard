@@ -25,6 +25,17 @@ export async function GET(request: Request) {
           });
         }
 
+        // After existing logic, handle invite token
+        const requestUrl = new URL(request.url);
+        const inviteToken = requestUrl.searchParams.get("invite");
+        if (inviteToken) {
+          await fetch(`${origin}/api/invitations/${inviteToken}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+          });
+          return NextResponse.redirect(new URL("/clients", origin));
+        }
+
         return NextResponse.redirect(`${origin}/clients`);
       }
     }
