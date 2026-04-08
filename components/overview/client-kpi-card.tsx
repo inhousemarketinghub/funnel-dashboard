@@ -1,22 +1,11 @@
+"use client";
 import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 import type { ClientOverview } from "@/lib/types";
+import { CountUp } from "@/components/animations/count-up";
 
 interface Props {
   client: ClientOverview;
-}
-
-// Format helpers
-function fmtCurrency(value: number): string {
-  if (value >= 1000) return `RM ${Math.round(value / 1000)}K`;
-  return `RM ${Math.round(value)}`;
-}
-
-function fmtRate(value: number): string {
-  return `${value.toFixed(1)}%`;
-}
-
-function fmtMultiplier(value: number): string {
-  return `${value.toFixed(1)}x`;
 }
 
 function achievementColor(pct: number): string {
@@ -39,28 +28,30 @@ function healthBadgeStyle(health: ClientOverview["health"]): { bg: string; color
 export function ClientKpiCard({ client }: Props) {
   const badge = healthBadgeStyle(client.health);
   const avg = client.achievement.average;
+  const barRef = useRef<HTMLDivElement>(null);
+  const [barVisible, setBarVisible] = useState(false);
+
+  useEffect(() => {
+    const el = barRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setBarVisible(true);
+          obs.unobserve(el);
+        }
+      },
+      { threshold: 0.3 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
 
   const metrics = [
-    {
-      label: "Sales",
-      value: fmtCurrency(client.metrics.sales),
-      ach: client.achievement.sales,
-    },
-    {
-      label: "CPL",
-      value: fmtCurrency(client.metrics.cpl),
-      ach: client.achievement.cpl,
-    },
-    {
-      label: "CPA%",
-      value: fmtRate(client.metrics.cpa_pct),
-      ach: client.achievement.cpa_pct,
-    },
-    {
-      label: "Conv%",
-      value: fmtRate(client.metrics.conv_rate),
-      ach: client.achievement.conv_rate,
-    },
+    { label: "Sales", raw: client.metrics.sales, prefix: "RM ", suffix: client.metrics.sales >= 1000 ? "K" : "", displayValue: client.metrics.sales >= 1000 ? client.metrics.sales / 1000 : client.metrics.sales, decimals: client.metrics.sales >= 1000 ? 0 : 0, ach: client.achievement.sales },
+    { label: "CPL", raw: client.metrics.cpl, prefix: "RM ", suffix: "", displayValue: client.metrics.cpl, decimals: 0, ach: client.achievement.cpl },
+    { label: "CPA%", raw: client.metrics.cpa_pct, prefix: "", suffix: "%", displayValue: client.metrics.cpa_pct, decimals: 1, ach: client.achievement.cpa_pct },
+    { label: "Conv%", raw: client.metrics.conv_rate, prefix: "", suffix: "%", displayValue: client.metrics.conv_rate, decimals: 1, ach: client.achievement.conv_rate },
   ];
 
   return (
@@ -96,15 +87,12 @@ export function ClientKpiCard({ client }: Props) {
         </span>
       </div>
 
-      {/* 4 metrics grid */}
+      {/* 4 metrics grid with CountUp */}
       <div className="grid grid-cols-4 gap-2 mb-4">
         {metrics.map((m) => (
           <div key={m.label} className="text-center">
-            <div
-              className="num text-[13px] font-semibold"
-              style={{ color: achievementColor(m.ach) }}
-            >
-              {m.value}
+            <div className="num text-[13px] font-semibold" style={{ color: achievementColor(m.ach) }}>
+              <CountUp value={m.displayValue} prefix={m.prefix} suffix={m.suffix} decimals={m.decimals} className="text-[13px] font-semibold" />
             </div>
             <div className="font-label text-[10px] text-[var(--t4)] mt-[2px] uppercase tracking-wide">
               {m.label}
@@ -113,28 +101,23 @@ export function ClientKpiCard({ client }: Props) {
         ))}
       </div>
 
-      {/* Achievement progress bar */}
-      <div>
+      {/* Achievement progress bar with scroll-triggered animation */}
+      <div ref={barRef}>
         <div className="flex justify-between items-center mb-1">
           <span className="font-label text-[10px] text-[var(--t4)] uppercase tracking-wide">
             Avg Achievement
           </span>
-          <span
-            className="num text-[11px] font-semibold"
-            style={{ color: achievementColor(avg) }}
-          >
-            {avg.toFixed(0)}%
+          <span className="num text-[11px] font-semibold" style={{ color: achievementColor(avg) }}>
+            <CountUp value={avg} suffix="%" decimals={0} className="text-[11px] font-semibold" />
           </span>
         </div>
-        <div
-          className="h-[4px] rounded-full"
-          style={{ background: "var(--border)" }}
-        >
+        <div className="h-[4px] rounded-full" style={{ background: "var(--border)" }}>
           <div
-            className="h-full rounded-full transition-all"
+            className="h-full rounded-full"
             style={{
-              width: `${Math.min(avg, 100)}%`,
+              width: barVisible ? `${Math.min(avg, 100)}%` : "0%",
               background: achievementColor(avg),
+              transition: "width 800ms cubic-bezier(0.215, 0.61, 0.355, 1)",
             }}
           />
         </div>
