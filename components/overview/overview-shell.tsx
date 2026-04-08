@@ -2,8 +2,6 @@
 import { useState } from "react";
 import { StatsBar } from "./stats-bar";
 import { ClientKpiCard } from "./client-kpi-card";
-import { Stagger } from "@/components/animations/stagger";
-import { CardReveal } from "@/components/animations/card-reveal";
 import type { ClientOverview, OverviewStats } from "@/lib/types";
 
 type Filter = "all" | "active" | "alert";
@@ -28,16 +26,11 @@ export function OverviewShell({
       <StatsBar stats={stats} filter={filter} onFilterChange={setFilter} />
 
       {filtered.length > 0 ? (
-        <Stagger
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"
-          staggerMs={100}
-        >
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {filtered.map((client) => (
-            <div key={client.id} className="stagger-child">
-              <ClientKpiCard client={client} />
-            </div>
+            <ClientKpiCard key={client.id} client={client} />
           ))}
-        </Stagger>
+        </div>
       ) : (
         <div className="text-center py-16">
           <p className="text-[var(--t2)] text-[15px] font-medium mb-1">
