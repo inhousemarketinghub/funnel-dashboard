@@ -21,7 +21,7 @@ export default async function ClientLayout({ children, params }: { children: Rea
       <div className="bauhaus-stripe"><div/><div/><div/><div/></div>
       <div className="topbar">
         <div className="flex items-center gap-[14px]">
-          <Link href="/clients" className="topbar-logo" style={{ textDecoration: "none" }}>Funnel</Link>
+          <Link href="/clients" className="topbar-logo" style={{ textDecoration: "none" }}>Dashboard</Link>
           <div className="topbar-sep" />
           {client.logo_url && (
             <img src={client.logo_url} alt="" className="w-8 h-8 rounded-[6px] object-contain bg-white p-[2px]" />

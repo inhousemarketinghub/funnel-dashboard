@@ -34,8 +34,8 @@ function formatValue(value: number, key: string): string {
 
 function formatYAxis(value: number, isPercent: boolean): string {
   if (isPercent) return `${value}%`;
-  if (value >= 1000) return `${(value / 1000).toFixed(0)}K`;
-  return String(value);
+  if (value >= 1000) return `RM ${(value / 1000).toFixed(0)}K`;
+  return `RM ${value}`;
 }
 
 export function TrendChart({ data, selectedMetrics }: TrendChartProps) {

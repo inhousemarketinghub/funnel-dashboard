@@ -225,7 +225,7 @@
 .card-base {
   background: var(--bg2);
   border: none;
-  border-radius: 0px;
+  border-radius: 12px;
   padding: 26px;
   position: relative;
   transition: background 500ms ease;
@@ -236,7 +236,7 @@
 .card-deep {
   background: var(--bg2);
   border: none;
-  border-radius: 0px;
+  border-radius: 12px;
   padding: 26px;
   position: relative;
   transition: background 500ms ease;
