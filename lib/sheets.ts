@@ -463,13 +463,14 @@ function parseKPIRows(rows: string[][], brandName?: string): KPIConfig {
     }
   }
 
-  // "Current Daily Ad Spend (Included 8% SST)" lives in a separate vertical table
+  // "Current/Actual Daily Ad Spend (Included 8% SST)" lives in a separate vertical table
   // at the bottom of the sheet: header row has the label, data row below has brand + value
+  // Key: match on "daily ad spend" + "included" (SST), as some sheets say "Current" others "Actual"
   for (let ri = 0; ri < rows.length; ri++) {
     const row = rows[ri];
     for (let ci = 0; ci < (row?.length || 0); ci++) {
       const cell = (row[ci] || "").toLowerCase();
-      if (cell.includes("current daily ad spend") || (cell.includes("current") && cell.includes("daily") && cell.includes("ad spend"))) {
+      if (cell.includes("daily ad spend") && cell.includes("included")) {
         // Found the header — scan subsequent rows for matching brand or first data row
         for (let di = ri + 1; di < Math.min(ri + 10, rows.length); di++) {
           const dataRow = rows[di];
