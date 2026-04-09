@@ -452,7 +452,7 @@ function parseKPIRows(rows: string[][], brandName?: string): KPIConfig {
     } else if (label.includes("cpl")) {
       kpi.cpl = parseRM(val4);
     } else if (label.includes("targeted") && label.includes("ad spend") && !label.includes("daily")) {
-      // First match = monthly ad spend, second = daily
+      // First match = monthly ad spend, second = daily (fallback)
       if (kpi.ad_spend === 0) {
         kpi.ad_spend = parseRM(val4);
       } else {
@@ -461,6 +461,35 @@ function parseKPIRows(rows: string[][], brandName?: string): KPIConfig {
     } else if (label.includes("roas") && !label.includes("total")) {
       kpi.roas = parseFloat(val4.replace(/[^\d.\-]/g, "")) || 0;
     }
+  }
+
+  // "Current Daily Ad Spend (Included 8% SST)" lives in a separate vertical table
+  // at the bottom of the sheet: header row has the label, data row below has brand + value
+  for (let ri = 0; ri < rows.length; ri++) {
+    const row = rows[ri];
+    for (let ci = 0; ci < (row?.length || 0); ci++) {
+      const cell = (row[ci] || "").toLowerCase();
+      if (cell.includes("current daily ad spend") || (cell.includes("current") && cell.includes("daily") && cell.includes("ad spend"))) {
+        // Found the header — scan subsequent rows for matching brand or first data row
+        for (let di = ri + 1; di < Math.min(ri + 10, rows.length); di++) {
+          const dataRow = rows[di];
+          if (!dataRow || dataRow.every((c) => !c || c.trim() === "")) continue;
+          const rowBrand = (dataRow[0] || "").toLowerCase().replace(/\s+/g, " ").trim();
+          if (brandName) {
+            if (rowBrand.includes(brandName.toLowerCase())) {
+              kpi.daily_ad = parseRM(dataRow[ci]);
+              break;
+            }
+          } else {
+            // No brand specified — use first data row
+            kpi.daily_ad = parseRM(dataRow[ci]);
+            break;
+          }
+        }
+        break;
+      }
+    }
+    if (kpi.daily_ad > 0) break;
   }
 
   return kpi;
