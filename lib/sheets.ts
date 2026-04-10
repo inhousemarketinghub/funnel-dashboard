@@ -497,6 +497,180 @@ function parseKPIRows(rows: string[][], brandName?: string): KPIConfig {
   return kpi;
 }
 
+// ── KPI Cell Address Discovery (for write-back) ─────────────
+
+function colToLetter(col: number): string {
+  let s = "";
+  let c = col;
+  while (c >= 0) {
+    s = String.fromCharCode((c % 26) + 65) + s;
+    c = Math.floor(c / 26) - 1;
+  }
+  return s;
+}
+
+function cellRef(row: number, col: number): string {
+  return `${colToLetter(col)}${row + 1}`;
+}
+
+export interface KPICellMap {
+  tabName: string;
+  cells: Partial<Record<
+    "sales" | "aov" | "cpa_pct" | "conv_rate" | "showup_rate" | "appt_rate" | "respond_rate" | "daily_ad",
+    string
+  >>;
+}
+
+export async function findKPICellAddresses(
+  sheetId: string,
+  brandName?: string,
+): Promise<KPICellMap | null> {
+  const tabName = await findKPITab(sheetId);
+  if (!tabName) return null;
+  const rows = await fetchSheetData(sheetId, tabName);
+
+  const cells: KPICellMap["cells"] = {};
+
+  // Determine column offset (same logic as parseKPIRows)
+  let colOffset = 3;
+  if (brandName) {
+    for (let ri = 0; ri < Math.min(5, rows.length); ri++) {
+      for (let ci = 0; ci < (rows[ri]?.length || 0); ci++) {
+        const h = (rows[ri][ci] || "").toLowerCase();
+        if (h.includes(brandName.toLowerCase()) && (h.includes("kpi") || h.includes("stimulator"))) {
+          colOffset = ci;
+          break;
+        }
+      }
+      if (colOffset !== 3) break;
+    }
+  }
+
+  // Scan rows for label matches — record cell addresses instead of values
+  for (let ri = 0; ri < rows.length; ri++) {
+    const cols = rows[ri];
+    const label = (cols[colOffset] || "").toLowerCase().trim();
+
+    if (label.includes("targeted sales") && !label.includes("total")) {
+      cells.sales = cellRef(ri, colOffset + 1);
+      if ((cols[colOffset + 2] || "").toLowerCase().includes("aov")) {
+        cells.aov = cellRef(ri, colOffset + 3);
+      }
+    } else if (label.includes("targeted cpa")) {
+      cells.cpa_pct = cellRef(ri, colOffset + 1);
+    } else if (label.includes("targeted conversion rate")) {
+      cells.conv_rate = cellRef(ri, colOffset + 1);
+    } else if (label.includes("targeted show up rate")) {
+      cells.showup_rate = cellRef(ri, colOffset + 1);
+    } else if (label.includes("targeted appointment rate")) {
+      cells.appt_rate = cellRef(ri, colOffset + 1);
+    } else if (label.includes("targeted respond rate") || label.includes("targeted visit rate")) {
+      cells.respond_rate = cellRef(ri, colOffset + 1);
+    }
+  }
+
+  // Find Daily Ad Spend cell in the separate bottom table
+  let foundDailyHeader = false;
+  for (let ri = 0; ri < rows.length && !foundDailyHeader; ri++) {
+    const row = rows[ri];
+    for (let ci = 0; ci < (row?.length || 0); ci++) {
+      const cell = (row[ci] || "").toLowerCase();
+      if (cell.includes("daily ad spend") && cell.includes("excluded")) {
+        foundDailyHeader = true;
+        for (let di = ri + 1; di < Math.min(ri + 10, rows.length); di++) {
+          const dataRow = rows[di];
+          if (!dataRow || dataRow.every((c) => !c || c.trim() === "")) continue;
+          const rowBrand = (dataRow[0] || "").toLowerCase().replace(/\s+/g, " ").trim();
+          if (brandName) {
+            if (rowBrand.includes(brandName.toLowerCase())) {
+              cells.daily_ad = cellRef(di, ci);
+              break;
+            }
+          } else {
+            cells.daily_ad = cellRef(di, ci);
+            break;
+          }
+        }
+        break;
+      }
+    }
+  }
+
+  // Fallback: if "excluded" not found, try "included" header (some sheets differ)
+  if (!cells.daily_ad) {
+    for (let ri = 0; ri < rows.length; ri++) {
+      const row = rows[ri];
+      for (let ci = 0; ci < (row?.length || 0); ci++) {
+        const cell = (row[ci] || "").toLowerCase();
+        if (cell.includes("daily ad spend") && cell.includes("included")) {
+          for (let di = ri + 1; di < Math.min(ri + 10, rows.length); di++) {
+            const dataRow = rows[di];
+            if (!dataRow || dataRow.every((c) => !c || c.trim() === "")) continue;
+            const rowBrand = (dataRow[0] || "").toLowerCase().replace(/\s+/g, " ").trim();
+            if (brandName) {
+              if (rowBrand.includes(brandName.toLowerCase())) {
+                cells.daily_ad = cellRef(di, ci);
+                break;
+              }
+            } else {
+              cells.daily_ad = cellRef(di, ci);
+              break;
+            }
+          }
+          break;
+        }
+      }
+      if (cells.daily_ad) break;
+    }
+  }
+
+  return { tabName, cells };
+}
+
+// ── KPI Write-back ───────────────────────────────────────────
+
+export async function writeKPIValues(
+  sheetId: string,
+  values: Partial<Record<string, number>>,
+  brandName?: string,
+): Promise<void> {
+  const { getSheetsClient } = await import("./google-auth");
+  const cellMap = await findKPICellAddresses(sheetId, brandName);
+  if (!cellMap) throw new Error("KPI Indicator tab not found");
+
+  const data: { range: string; values: (string | number)[][] }[] = [];
+
+  for (const [key, val] of Object.entries(values)) {
+    const cellAddr = cellMap.cells[key as keyof KPICellMap["cells"]];
+    if (!cellAddr || val == null) continue;
+
+    let formatted: string | number;
+    if (key === "sales" || key === "aov" || key === "daily_ad") {
+      formatted = `RM${val.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    } else if (key.includes("rate") || key === "cpa_pct") {
+      formatted = `${val}%`;
+    } else {
+      formatted = val;
+    }
+
+    data.push({
+      range: `'${cellMap.tabName}'!${cellAddr}`,
+      values: [[formatted]],
+    });
+  }
+
+  if (data.length === 0) return;
+
+  const sheets = getSheetsClient();
+  await sheets.spreadsheets.values.batchUpdate({
+    spreadsheetId: sheetId,
+    requestBody: {
+      valueInputOption: "USER_ENTERED",
+      data,
+    },
+  });
+}
+
 // ── Public API ─────────────────────────────────────────────────
 
 export interface PerfResult {

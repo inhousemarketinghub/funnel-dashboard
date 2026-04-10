@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -17,106 +17,81 @@ import {
 import type { KPIConfig } from "@/lib/types";
 import { toast } from "sonner";
 
-const DEFAULT_KPI: KPIConfig = {
-  sales: 0,
-  orders: 0,
-  aov: 0,
-  cpl: 0,
-  respond_rate: 0,
-  appt_rate: 0,
-  showup_rate: 0,
-  conv_rate: 0,
-  ad_spend: 0,
-  daily_ad: 0,
-  roas: 0,
-  cpa_pct: 0,
-  target_contact: 0,
-  target_appt: 0,
-  target_showup: 0,
-};
-
-function getMonthOptions() {
-  const options: { value: string; label: string }[] = [];
-  const now = new Date();
-  for (let i = -3; i <= 3; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
-    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
-    const label = d.toLocaleDateString("en-MY", {
-      year: "numeric",
-      month: "long",
-    });
-    options.push({ value, label });
-  }
-  return options;
-}
-
-function getCurrentMonth() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
-}
+// ── Editable field definitions by funnel type ────────────────
 
 interface FieldDef {
-  key: keyof KPIConfig;
+  key: string;
   label: string;
   step: string;
   prefix?: string;
   suffix?: string;
 }
 
-const SECTIONS: {
-  title: string;
-  fields: FieldDef[];
-}[] = [
-  {
-    title: "Revenue Targets",
-    fields: [
-      { key: "sales", label: "Sales", step: "100", prefix: "RM" },
-      { key: "orders", label: "Orders", step: "1" },
-      { key: "aov", label: "AOV", step: "1", prefix: "RM" },
-    ],
-  },
-  {
-    title: "Ad Performance",
-    fields: [
-      { key: "ad_spend", label: "Ad Spend", step: "100", prefix: "RM" },
-      { key: "daily_ad", label: "Daily Ad", step: "10", prefix: "RM" },
-      { key: "cpl", label: "CPL", step: "0.1", prefix: "RM" },
-      { key: "roas", label: "ROAS", step: "0.1", suffix: "x" },
-    ],
-  },
-  {
-    title: "Funnel Rates",
-    fields: [
-      { key: "respond_rate", label: "Respond Rate", step: "1", suffix: "%" },
-      { key: "appt_rate", label: "Appt Rate", step: "1", suffix: "%" },
-      { key: "showup_rate", label: "Show Up Rate", step: "1", suffix: "%" },
-      { key: "conv_rate", label: "Conv Rate", step: "1", suffix: "%" },
-      { key: "cpa_pct", label: "CPA", step: "1", suffix: "%" },
-    ],
-  },
-  {
-    title: "Pipeline Targets",
-    fields: [
-      { key: "target_contact", label: "Target Contact", step: "1" },
-      { key: "target_appt", label: "Target Appt", step: "1" },
-      { key: "target_showup", label: "Target Show Up", step: "1" },
-    ],
-  },
+const APPOINTMENT_FIELDS: FieldDef[] = [
+  { key: "sales", label: "Targeted Sales", step: "100", prefix: "RM" },
+  { key: "aov", label: "Targeted AOV", step: "1", prefix: "RM" },
+  { key: "cpa_pct", label: "Targeted CPA", step: "0.1", suffix: "%" },
+  { key: "conv_rate", label: "Targeted Conversion Rate", step: "1", suffix: "%" },
+  { key: "showup_rate", label: "Targeted Show Up Rate", step: "1", suffix: "%" },
+  { key: "appt_rate", label: "Targeted Appointment Rate", step: "1", suffix: "%" },
+  { key: "respond_rate", label: "Targeted Respond Rate", step: "1", suffix: "%" },
+  { key: "daily_ad", label: "Daily Ad Spend (Excl 8% SST)", step: "10", prefix: "RM" },
 ];
+
+const WALKIN_FIELDS: FieldDef[] = [
+  { key: "sales", label: "Targeted Sales", step: "100", prefix: "RM" },
+  { key: "aov", label: "Targeted AOV", step: "1", prefix: "RM" },
+  { key: "cpa_pct", label: "Targeted CPA", step: "0.1", suffix: "%" },
+  { key: "conv_rate", label: "Targeted Conversion Rate", step: "1", suffix: "%" },
+  { key: "respond_rate", label: "Targeted Visit Rate", step: "1", suffix: "%" },
+  { key: "daily_ad", label: "Daily Ad Spend (Excl 8% SST)", step: "10", prefix: "RM" },
+];
+
+// ── Helpers ──────────────────────────────────────────────────
+
+function fmtRM(v: number) {
+  return `RM${v.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
 
 export default function SettingsPage() {
   const { clientId } = useParams<{ clientId: string }>();
-  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth);
-  const [form, setForm] = useState<KPIConfig>({ ...DEFAULT_KPI });
+
+  // Core state
+  const [form, setForm] = useState<Record<string, number>>({});
+  const [funnelType, setFunnelType] = useState<"appointment" | "walkin">("appointment");
+  const [brands, setBrands] = useState<string[]>([]);
+  const [selectedBrand, setSelectedBrand] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  // Logo & language state (unchanged from before)
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [language, setLanguage] = useState<string>("en");
 
-  const monthOptions = getMonthOptions();
+  const fields = funnelType === "walkin" ? WALKIN_FIELDS : APPOINTMENT_FIELDS;
 
-  // Fetch logo and language on mount
+  // ── Derived values ────────────────────────────────────────
+  const derived = useMemo(() => {
+    const sales = form.sales || 0;
+    const aov = form.aov || 0;
+    const orders = aov > 0 ? Math.round(sales / aov) : 0;
+    const dailyExcl = form.daily_ad || 0;
+    const dailyIncl = dailyExcl * 1.08;
+    const now = new Date();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const monthlyAd = dailyIncl * daysInMonth;
+    const roas = monthlyAd > 0 ? sales / monthlyAd : 0;
+
+    return {
+      orders,
+      dailyIncl,
+      monthlyAd,
+      roas,
+    };
+  }, [form.sales, form.aov, form.daily_ad]);
+
+  // ── Fetch logo & language on mount ────────────────────────
   useEffect(() => {
     async function fetchClientSettings() {
       const supabase = createClient();
@@ -127,6 +102,72 @@ export default function SettingsPage() {
     fetchClientSettings();
   }, [clientId]);
 
+  // ── Fetch KPI from Google Sheet ───────────────────────────
+  useEffect(() => {
+    async function fetchKPI() {
+      setLoading(true);
+      try {
+        const params = new URLSearchParams({ clientId });
+        if (selectedBrand) params.set("brand", selectedBrand);
+
+        const res = await fetch(`/api/kpi?${params}`);
+        if (!res.ok) throw new Error("Failed to load KPI data");
+        const data = await res.json();
+
+        setFunnelType(data.funnelType || "appointment");
+        if (data.brands?.length > 0) {
+          setBrands(data.brands);
+          if (!selectedBrand) setSelectedBrand(data.brands[0]);
+        }
+
+        // Populate form with editable field values from sheet
+        const kpi = data.kpi || {};
+        const editableKeys = (data.funnelType === "walkin" ? WALKIN_FIELDS : APPOINTMENT_FIELDS).map((f) => f.key);
+        const formValues: Record<string, number> = {};
+        for (const key of editableKeys) {
+          formValues[key] = kpi[key] ?? 0;
+        }
+        setForm(formValues);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to load KPI");
+      }
+      setLoading(false);
+    }
+    fetchKPI();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientId, selectedBrand]);
+
+  // ── Save to Google Sheet + Supabase ───────────────────────
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/kpi", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clientId,
+          fields: form,
+          brand: selectedBrand || undefined,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Save failed");
+      }
+
+      toast.success("KPI synced to Google Sheet");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save");
+    }
+    setSaving(false);
+  }
+
+  function handleChange(key: string, value: string) {
+    setForm((prev) => ({ ...prev, [key]: value === "" ? 0 : Number(value) }));
+  }
+
+  // ── Logo handlers (unchanged) ─────────────────────────────
   async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -159,8 +200,6 @@ export default function SettingsPage() {
     if (!logoUrl) return;
     setUploading(true);
     const supabase = createClient();
-
-    // Extract file path from URL
     const urlParts = logoUrl.split("/logos/");
     const filePath = urlParts[urlParts.length - 1];
     if (filePath) {
@@ -186,55 +225,6 @@ export default function SettingsPage() {
     } else {
       toast.success("Language updated");
     }
-  }
-
-  useEffect(() => {
-    async function fetchConfig() {
-      setLoading(true);
-      const supabase = createClient();
-      const { data } = await supabase
-        .from("kpi_configs")
-        .select("*")
-        .eq("client_id", clientId)
-        .eq("month", selectedMonth)
-        .single();
-
-      if (data) {
-        const kpi: KPIConfig = { ...DEFAULT_KPI };
-        for (const key of Object.keys(DEFAULT_KPI) as (keyof KPIConfig)[]) {
-          if (data[key] != null) kpi[key] = Number(data[key]);
-        }
-        setForm(kpi);
-      } else {
-        setForm({ ...DEFAULT_KPI });
-      }
-      setLoading(false);
-    }
-    fetchConfig();
-  }, [clientId, selectedMonth]);
-
-  async function handleSave() {
-    setSaving(true);
-    const supabase = createClient();
-    const { error } = await supabase.from("kpi_configs").upsert(
-      {
-        client_id: clientId,
-        month: selectedMonth,
-        ...form,
-      },
-      { onConflict: "client_id,month" }
-    );
-
-    if (error) {
-      toast.error("Failed to save KPI config");
-    } else {
-      toast.success("KPI config saved");
-    }
-    setSaving(false);
-  }
-
-  function handleChange(key: keyof KPIConfig, value: string) {
-    setForm((prev) => ({ ...prev, [key]: value === "" ? 0 : Number(value) }));
   }
 
   return (
@@ -306,68 +296,91 @@ export default function SettingsPage() {
         <p className="text-[11px] text-[var(--t4)] mt-2">Language for the Performance Summary section on the dashboard.</p>
       </div>
 
-      {/* Month Selector */}
-      <div className="mb-6">
-        <Label className="text-sm text-[var(--t3)] mb-2">Month</Label>
-        <Select
-          value={selectedMonth}
-          onValueChange={(val) => { if (val) setSelectedMonth(val); }}
-        >
-          <SelectTrigger className="w-[220px] border-[var(--border)] focus-visible:ring-[var(--blue)]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {monthOptions.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>
-                {opt.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
+      {/* KPI Targets from Google Sheet */}
       {loading ? (
-        <div className="text-center text-[var(--t3)] py-12">Loading...</div>
+        <div className="text-center text-[var(--t3)] py-12">Loading KPI from Google Sheet...</div>
       ) : (
         <>
-          {/* KPI Sections */}
-          {SECTIONS.map((section) => (
-            <div
-              key={section.title}
-              className="bg-[var(--bg2)] border border-[var(--border)] rounded-[10px] p-6 mb-6"
-            >
-              <h2 className="font-bold text-[15px] tracking-tight text-[var(--t1)] dark:text-[var(--t1)] mb-4">
-                {section.title}
+          {/* Brand Selector (multi-brand only) */}
+          {brands.length > 1 && (
+            <div className="mb-6">
+              <Label className="text-sm text-[var(--t3)] mb-2">Brand</Label>
+              <Select
+                value={selectedBrand}
+                onValueChange={(val) => { if (val) setSelectedBrand(val); }}
+              >
+                <SelectTrigger className="w-[220px] border-[var(--border)] focus-visible:ring-[var(--blue)]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {brands.map((b) => (
+                    <SelectItem key={b} value={b}>{b}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Editable KPI Fields */}
+          <div className="bg-[var(--bg2)] border border-[var(--border)] rounded-[10px] p-6 mb-6">
+            <div className="flex items-center gap-3 mb-4">
+              <h2 className="font-bold text-[15px] tracking-tight text-[var(--t1)] dark:text-[var(--t1)]">
+                KPI Targets
               </h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {section.fields.map((field) => (
-                  <div key={field.key}>
-                    <Label className="text-sm text-[var(--t3)] mb-1">
-                      {field.label}
-                      {field.prefix && (
-                        <span className="text-xs text-[var(--t3)]/60 ml-1">
-                          ({field.prefix})
-                        </span>
-                      )}
-                      {field.suffix && (
-                        <span className="text-xs text-[var(--t3)]/60 ml-1">
-                          ({field.suffix})
-                        </span>
-                      )}
-                    </Label>
-                    <Input
-                      type="number"
-                      step={field.step}
-                      min="0"
-                      value={form[field.key] || ""}
-                      onChange={(e) => handleChange(field.key, e.target.value)}
-                      className="num border-[var(--border)] focus-visible:ring-[var(--blue)]"
-                    />
-                  </div>
-                ))}
+              <span className="text-[10px] font-label uppercase tracking-wider text-[var(--blue)] bg-[var(--blue)]/10 px-2 py-0.5 rounded-full">
+                Synced from Google Sheet
+              </span>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {fields.map((field) => (
+                <div key={field.key}>
+                  <Label className="text-sm text-[var(--t3)] mb-1">
+                    {field.label}
+                    {field.prefix && (
+                      <span className="text-xs text-[var(--t3)]/60 ml-1">({field.prefix})</span>
+                    )}
+                    {field.suffix && (
+                      <span className="text-xs text-[var(--t3)]/60 ml-1">({field.suffix})</span>
+                    )}
+                  </Label>
+                  <Input
+                    type="number"
+                    step={field.step}
+                    min="0"
+                    value={form[field.key] || ""}
+                    onChange={(e) => handleChange(field.key, e.target.value)}
+                    className="num border-[var(--border)] focus-visible:ring-[var(--blue)]"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Derived Values (read-only) */}
+          <div className="bg-[var(--bg2)] border border-[var(--border)] rounded-[10px] p-6 mb-6 opacity-80">
+            <h2 className="font-bold text-[15px] tracking-tight text-[var(--t1)] dark:text-[var(--t1)] mb-4">
+              Derived Values
+              <span className="text-[10px] font-label uppercase tracking-wider text-[var(--t4)] ml-2">Auto-calculated</span>
+            </h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <div className="text-[11px] text-[var(--t4)] uppercase tracking-wider mb-1">Orders</div>
+                <div className="num text-[15px] font-semibold text-[var(--t1)]">{derived.orders}</div>
+              </div>
+              <div>
+                <div className="text-[11px] text-[var(--t4)] uppercase tracking-wider mb-1">Daily Ad (Incl SST)</div>
+                <div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(derived.dailyIncl)}</div>
+              </div>
+              <div>
+                <div className="text-[11px] text-[var(--t4)] uppercase tracking-wider mb-1">Monthly Ad Spend</div>
+                <div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(derived.monthlyAd)}</div>
+              </div>
+              <div>
+                <div className="text-[11px] text-[var(--t4)] uppercase tracking-wider mb-1">ROAS</div>
+                <div className="num text-[15px] font-semibold text-[var(--t1)]">{derived.roas.toFixed(1)}x</div>
               </div>
             </div>
-          ))}
+          </div>
 
           {/* Save Button */}
           <div className="flex justify-end mb-12">
@@ -376,7 +389,7 @@ export default function SettingsPage() {
               disabled={saving}
               className="bg-[var(--blue)] hover:bg-[#153D7A] text-white px-6"
             >
-              {saving ? "Saving..." : "Save KPI Config"}
+              {saving ? "Syncing..." : "Save & Sync to Sheet"}
             </Button>
           </div>
         </>
