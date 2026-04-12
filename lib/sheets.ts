@@ -497,6 +497,148 @@ function parseKPIRows(rows: string[][], brandName?: string): KPIConfig {
   return kpi;
 }
 
+// ── Derived KPI values (blue cells) ──────────────────────────
+
+export interface DerivedKPI {
+  orders: number;
+  cp_acquisition: number;
+  cp_showup: number;
+  target_showup: number;
+  cp_visit: number;
+  target_visit: number;
+  cpl: number;
+  fb_leads: number;
+  monthly_ad_incl: number;
+  monthly_ad_excl: number;
+  daily_ad_targeted_incl: number;
+  daily_ad_targeted_excl: number;
+  cpa_pct: number;
+  roi: number;
+  daily_ad_actual_incl: number;
+  daily_ad_current_excl: number;  // The editable "Current Daily Ad Spend (Excluded 8% SST)"
+  marketing_cost: number;         // "Marketing Service Cost" from sheet (for ROI calc)
+}
+
+function parseDerivedKPIRows(rows: string[][], brandName?: string): DerivedKPI {
+  const d: DerivedKPI = {
+    orders: 0, cp_acquisition: 0, cp_showup: 0, target_showup: 0,
+    cp_visit: 0, target_visit: 0, cpl: 0, fb_leads: 0,
+    monthly_ad_incl: 0, monthly_ad_excl: 0,
+    daily_ad_targeted_incl: 0, daily_ad_targeted_excl: 0,
+    cpa_pct: 0, roi: 0, daily_ad_actual_incl: 0, daily_ad_current_excl: 0, marketing_cost: 0,
+  };
+
+  // Determine column offset (same logic as parseKPIRows)
+  let colOffset = 3;
+  if (brandName) {
+    for (let ri = 0; ri < Math.min(5, rows.length); ri++) {
+      for (let ci = 0; ci < (rows[ri]?.length || 0); ci++) {
+        const h = (rows[ri][ci] || "").toLowerCase();
+        if (h.includes(brandName.toLowerCase()) && (h.includes("kpi") || h.includes("stimulator"))) {
+          colOffset = ci;
+          break;
+        }
+      }
+      if (colOffset !== 3) break;
+    }
+  }
+
+  // Marketing Service Cost: typically in first few rows, col 0 label + col 1 value
+  for (let ri = 0; ri < Math.min(10, rows.length); ri++) {
+    const label0 = (rows[ri]?.[0] || "").toLowerCase();
+    if (label0.includes("marketing") && label0.includes("cost")) {
+      d.marketing_cost = parseRM(rows[ri]?.[1] || "");
+      break;
+    }
+  }
+
+  for (const cols of rows) {
+    const label = (cols[colOffset] || "").toLowerCase().trim();
+    const label4 = (cols[colOffset + 4] || "").toLowerCase().trim();
+
+    if (label.includes("targeted sales") && !label.includes("total")) {
+      // Orders at colOffset+5 (col 8 for default offset 3)
+      d.orders = parseInt2(cols[colOffset + 5] || "");
+    } else if (label.includes("targeted cpa")) {
+      // CP.Acquisition at colOffset+3
+      d.cp_acquisition = parseRM(cols[colOffset + 3] || "");
+    } else if (label.includes("targeted conversion rate")) {
+      // No derived values on this row
+    } else if (label.includes("targeted show up rate")) {
+      d.cp_showup = parseRM(cols[colOffset + 3] || "");
+      d.target_showup = parseInt2(cols[colOffset + 5] || "");
+    } else if (label.includes("targeted visit rate") || label.includes("targeted respond rate")) {
+      d.cp_visit = parseRM(cols[colOffset + 3] || "");
+      d.target_visit = parseInt2(cols[colOffset + 5] || "");
+    } else if (label.includes("cpl")) {
+      d.cpl = parseRM(cols[colOffset + 1] || "");
+      d.fb_leads = parseInt2(cols[colOffset + 3] || "");
+    } else if (label.includes("targeted") && label.includes("ad spend") && !label.includes("daily")) {
+      if (d.monthly_ad_incl === 0) {
+        d.monthly_ad_incl = parseRM(cols[colOffset + 1] || "");
+        d.monthly_ad_excl = parseRM(cols[colOffset + 3] || "");
+      } else {
+        d.daily_ad_targeted_incl = parseRM(cols[colOffset + 1] || "");
+        d.daily_ad_targeted_excl = parseRM(cols[colOffset + 3] || "");
+      }
+    } else if (label.includes("roas") && !label.includes("total")) {
+      d.roi = parseFloat((cols[colOffset + 3] || "").replace(/[^\d.\-]/g, "")) || 0;
+    }
+  }
+
+  // CPA% row: row after ROAS (check for standalone percentage value)
+  for (let ri = 0; ri < rows.length; ri++) {
+    const cols = rows[ri];
+    const label = (cols[colOffset] || "").toLowerCase().trim();
+    if (label.includes("roas") && !label.includes("total")) {
+      // Next row has CPA% at colOffset+1
+      const nextRow = rows[ri + 1];
+      if (nextRow) {
+        d.cpa_pct = parsePercent(nextRow[colOffset + 1] || "");
+      }
+      break;
+    }
+  }
+
+  // Daily Ad Spend table at the bottom — read both excluded (col 1) and included (col 2)
+  // Headers: [col 1] "Current Daily Ad Spend (Excluded 8% SST)" | [col 2] "Actual Daily Ad Spend (Included 8% SST)"
+  for (let ri = 0; ri < rows.length; ri++) {
+    const row = rows[ri];
+    for (let ci = 0; ci < (row?.length || 0); ci++) {
+      const cell = (row[ci] || "").toLowerCase();
+      if (cell.includes("daily ad spend") && cell.includes("excluded")) {
+        // Found "excluded" header — "included" header is at ci+1
+        for (let di = ri + 1; di < Math.min(ri + 10, rows.length); di++) {
+          const dataRow = rows[di];
+          if (!dataRow || dataRow.every((c) => !c || c.trim() === "")) continue;
+          const rowBrand = (dataRow[0] || "").toLowerCase().replace(/\s+/g, " ").trim();
+          if (brandName) {
+            if (rowBrand.includes(brandName.toLowerCase())) {
+              d.daily_ad_current_excl = parseRM(dataRow[ci]);
+              d.daily_ad_actual_incl = parseRM(dataRow[ci + 1] || "");
+              return d;
+            }
+          } else {
+            d.daily_ad_current_excl = parseRM(dataRow[ci]);
+            d.daily_ad_actual_incl = parseRM(dataRow[ci + 1] || "");
+            return d;
+          }
+        }
+        break;
+      }
+    }
+  }
+
+  return d;
+}
+
+export async function fetchDerivedKPI(sheetId: string, brandName?: string): Promise<DerivedKPI | null> {
+  const tabName = await findKPITab(sheetId);
+  if (!tabName) return null;
+  const rows = await fetchSheetData(sheetId, tabName);
+  return parseDerivedKPIRows(rows, brandName);
+}
+
 // ── KPI Cell Address Discovery (for write-back) ─────────────
 
 function colToLetter(col: number): string {
@@ -644,18 +786,14 @@ export async function writeKPIValues(
     const cellAddr = cellMap.cells[key as keyof KPICellMap["cells"]];
     if (!cellAddr || val == null) continue;
 
-    let formatted: string | number;
-    if (key === "sales" || key === "aov" || key === "daily_ad") {
-      formatted = `RM${val.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    } else if (key.includes("rate") || key === "cpa_pct") {
-      formatted = `${val}%`;
-    } else {
-      formatted = val;
-    }
+    // Write raw numbers — cell formatting in Google Sheet handles display (RM, %)
+    // Percentage cells store decimals (60% = 0.6), so divide by 100
+    const isPercent = key.includes("rate") || key === "cpa_pct";
+    const rawVal = isPercent ? val / 100 : val;
 
     data.push({
       range: `'${cellMap.tabName}'!${cellAddr}`,
-      values: [[formatted]],
+      values: [[rawVal]],
     });
   }
 

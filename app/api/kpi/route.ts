@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { getUserRole } from "@/lib/auth";
-import { fetchKPIData, writeKPIValues, detectBrandsOrdered } from "@/lib/sheets";
+import { fetchKPIData, fetchDerivedKPI, writeKPIValues, detectBrandsOrdered } from "@/lib/sheets";
 
 // GET /api/kpi?clientId=xxx&brand=yyy
 // Reads KPI values from Google Sheet for the Settings page
@@ -30,10 +30,14 @@ export async function GET(req: NextRequest) {
 
     // For single-brand, use the only brand; for multi-brand, use selected brand
     const brandName = isMultiBrand ? brandParam : brands[0] || undefined;
-    const kpi = await fetchKPIData(client.sheet_id, brandName);
+    const [kpi, derived] = await Promise.all([
+      fetchKPIData(client.sheet_id, brandName),
+      fetchDerivedKPI(client.sheet_id, brandName),
+    ]);
 
     return NextResponse.json({
       kpi: kpi || {},
+      derived: derived || {},
       funnelType: client.funnel_type,
       brands: isMultiBrand ? brands : [],
     });

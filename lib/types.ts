@@ -129,7 +129,8 @@ export interface ClientOverview {
   id: string;
   name: string;
   logo_url: string | null;
-  status: "onboarding" | "active" | "paused";
+  status: "active" | "inactive";
+  funnel_type: "appointment" | "walkin";
   metrics: {
     sales: number;
     cpl: number;

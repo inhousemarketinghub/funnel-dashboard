@@ -14,7 +14,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { KPIConfig } from "@/lib/types";
 import { toast } from "sonner";
 
 // ── Editable field definitions by funnel type ────────────────
@@ -35,7 +34,6 @@ const APPOINTMENT_FIELDS: FieldDef[] = [
   { key: "showup_rate", label: "Targeted Show Up Rate", step: "1", suffix: "%" },
   { key: "appt_rate", label: "Targeted Appointment Rate", step: "1", suffix: "%" },
   { key: "respond_rate", label: "Targeted Respond Rate", step: "1", suffix: "%" },
-  { key: "daily_ad", label: "Daily Ad Spend (Excl 8% SST)", step: "10", prefix: "RM" },
 ];
 
 const WALKIN_FIELDS: FieldDef[] = [
@@ -44,7 +42,6 @@ const WALKIN_FIELDS: FieldDef[] = [
   { key: "cpa_pct", label: "Targeted CPA", step: "0.1", suffix: "%" },
   { key: "conv_rate", label: "Targeted Conversion Rate", step: "1", suffix: "%" },
   { key: "respond_rate", label: "Targeted Visit Rate", step: "1", suffix: "%" },
-  { key: "daily_ad", label: "Daily Ad Spend (Excl 8% SST)", step: "10", prefix: "RM" },
 ];
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -53,43 +50,128 @@ function fmtRM(v: number) {
   return `RM${v.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+// ── Derived value display definition ────────────────────────
+
+interface DerivedMetric {
+  label: string;
+  key: string;
+  format: "rm" | "count" | "pct" | "number";
+  funnelFilter?: "walkin" | "appointment";
+}
+
+const DERIVED_METRICS: DerivedMetric[] = [
+  { label: "Targeted Order", key: "orders", format: "count" },
+  { label: "CPL (Incl SST)", key: "cpl", format: "rm" },
+  { label: "CP.Acquisition (Incl SST)", key: "cp_acquisition", format: "rm" },
+  { label: "FB Leads Inquiry", key: "fb_leads", format: "count" },
+  { label: "CP.Visit (Incl SST)", key: "cp_visit", format: "rm", funnelFilter: "walkin" },
+  { label: "Visit", key: "target_visit", format: "count", funnelFilter: "walkin" },
+  { label: "CP.Show Up (Incl SST)", key: "cp_showup", format: "rm", funnelFilter: "appointment" },
+  { label: "Show Up", key: "target_showup", format: "count", funnelFilter: "appointment" },
+  { label: "CP.Appointment (Incl SST)", key: "cp_appointment", format: "rm", funnelFilter: "appointment" },
+  { label: "Appointment", key: "target_appt", format: "count", funnelFilter: "appointment" },
+  { label: "CP.Contact Given (Incl SST)", key: "cp_contact", format: "rm", funnelFilter: "appointment" },
+  { label: "Contact Given", key: "target_contact", format: "count", funnelFilter: "appointment" },
+  { label: "Monthly Ad Spend (Incl SST)", key: "monthly_ad_incl", format: "rm" },
+  { label: "Monthly Ad Spend (Excl SST)", key: "monthly_ad_excl", format: "rm" },
+];
+
+function formatDerived(val: number, format: DerivedMetric["format"]) {
+  if (format === "rm") return fmtRM(val);
+  if (format === "pct") return `${val.toFixed(2)}%`;
+  if (format === "count") return String(val);
+  return val.toFixed(2);
+}
+
 export default function SettingsPage() {
   const { clientId } = useParams<{ clientId: string }>();
 
   // Core state
   const [form, setForm] = useState<Record<string, number>>({});
+  const [sheetDerived, setSheetDerived] = useState<Record<string, number>>({});
   const [funnelType, setFunnelType] = useState<"appointment" | "walkin">("appointment");
   const [brands, setBrands] = useState<string[]>([]);
   const [selectedBrand, setSelectedBrand] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // Logo & language state (unchanged from before)
+  // Logo & language state
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [language, setLanguage] = useState<string>("en");
 
   const fields = funnelType === "walkin" ? WALKIN_FIELDS : APPOINTMENT_FIELDS;
+  const visibleDerived = DERIVED_METRICS.filter(
+    (m) => !m.funnelFilter || m.funnelFilter === funnelType,
+  );
 
-  // ── Derived values ────────────────────────────────────────
+  // ── Real-time derived values from form inputs ─────────────
+  // Formula chain: Monthly Ad = Sales × CPA%, then pipeline works backwards from Orders
   const derived = useMemo(() => {
     const sales = form.sales || 0;
     const aov = form.aov || 0;
-    const orders = aov > 0 ? Math.round(sales / aov) : 0;
+    const cpaPct = (form.cpa_pct || 0) / 100;
+    const convRate = (form.conv_rate || 0) / 100;
     const dailyExcl = form.daily_ad || 0;
-    const dailyIncl = dailyExcl * 1.08;
-    const now = new Date();
-    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    const monthlyAd = dailyIncl * daysInMonth;
-    const roas = monthlyAd > 0 ? sales / monthlyAd : 0;
+
+    const orders = aov > 0 ? Math.round(sales / aov) : 0;
+
+    // Monthly Ad Spend derived from Sales × CPA%
+    const monthlyAdIncl = sales * cpaPct;
+    const monthlyAdExcl = monthlyAdIncl / 1.08;
+
+    // Daily Ad (Incl SST) from the editable current daily budget
+    const dailyAdIncl = dailyExcl * 1.08;
+
+    // Funnel pipeline: work backwards from orders
+    let pipelineEnd = 0;
+    let fbLeads = 0;
+    let apptCount = 0;
+    let contactCount = 0;
+
+    if (funnelType === "walkin") {
+      const visitRate = (form.respond_rate || 0) / 100;
+      pipelineEnd = convRate > 0 ? Math.round(orders / convRate) : 0;
+      fbLeads = visitRate > 0 ? Math.round(pipelineEnd / visitRate) : 0;
+    } else {
+      const showupRate = (form.showup_rate || 0) / 100;
+      const apptRate = (form.appt_rate || 0) / 100;
+      const respondRate = (form.respond_rate || 0) / 100;
+      const showups = convRate > 0 ? Math.round(orders / convRate) : 0;
+      const appts = showupRate > 0 ? Math.round(showups / showupRate) : 0;
+      const contacts = apptRate > 0 ? Math.round(appts / apptRate) : 0;
+      fbLeads = respondRate > 0 ? Math.round(contacts / respondRate) : 0;
+      pipelineEnd = showups;
+      apptCount = appts;
+      contactCount = contacts;
+    }
+
+    const cpl = fbLeads > 0 ? monthlyAdExcl / fbLeads : 0;
+    const cpAcquisition = orders > 0 ? monthlyAdExcl / orders : 0;
+    const cpVisit = pipelineEnd > 0 ? monthlyAdExcl / pipelineEnd : 0;
+    const cpShowup = pipelineEnd > 0 ? monthlyAdExcl / pipelineEnd : 0;
+    const cpAppointment = apptCount > 0 ? monthlyAdExcl / apptCount : 0;
+    const cpContact = contactCount > 0 ? monthlyAdExcl / contactCount : 0;
 
     return {
       orders,
-      dailyIncl,
-      monthlyAd,
-      roas,
+      cpl,
+      cp_acquisition: cpAcquisition,
+      fb_leads: fbLeads,
+      cp_visit: cpVisit,
+      target_visit: funnelType === "walkin" ? pipelineEnd : 0,
+      cp_showup: cpShowup,
+      target_showup: funnelType === "appointment" ? pipelineEnd : 0,
+      cp_appointment: cpAppointment,
+      target_appt: apptCount,
+      cp_contact: cpContact,
+      target_contact: contactCount,
+      monthly_ad_incl: monthlyAdIncl,
+      monthly_ad_excl: monthlyAdExcl,
+      daily_ad_actual_incl: dailyAdIncl,
+      daily_ad_current_excl: dailyExcl,
     };
-  }, [form.sales, form.aov, form.daily_ad]);
+  }, [form, funnelType]);
 
   // ── Fetch logo & language on mount ────────────────────────
   useEffect(() => {
@@ -120,14 +202,19 @@ export default function SettingsPage() {
           if (!selectedBrand) setSelectedBrand(data.brands[0]);
         }
 
-        // Populate form with editable field values from sheet
+        // Populate editable form fields
         const kpi = data.kpi || {};
         const editableKeys = (data.funnelType === "walkin" ? WALKIN_FIELDS : APPOINTMENT_FIELDS).map((f) => f.key);
         const formValues: Record<string, number> = {};
         for (const key of editableKeys) {
           formValues[key] = kpi[key] ?? 0;
         }
+        // Use excluded SST value from derived data for Daily Ad Spend Budget
+        const derivedData = data.derived || {};
+        formValues.daily_ad = derivedData.daily_ad_current_excl ?? kpi.daily_ad ?? 0;
         setForm(formValues);
+
+        setSheetDerived(derivedData);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Failed to load KPI");
       }
@@ -136,6 +223,17 @@ export default function SettingsPage() {
     fetchKPI();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId, selectedBrand]);
+
+  // ── Re-fetch derived values from sheet ─────────────────────
+  async function refreshDerived() {
+    const params = new URLSearchParams({ clientId });
+    if (selectedBrand) params.set("brand", selectedBrand);
+    const res = await fetch(`/api/kpi?${params}`);
+    if (res.ok) {
+      const data = await res.json();
+      setSheetDerived(data.derived || {});
+    }
+  }
 
   // ── Save to Google Sheet + Supabase ───────────────────────
   async function handleSave() {
@@ -157,6 +255,9 @@ export default function SettingsPage() {
       }
 
       toast.success("KPI synced to Google Sheet");
+
+      // Re-fetch derived values — sheet formulas recalculate after write
+      await refreshDerived();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to save");
     }
@@ -167,7 +268,7 @@ export default function SettingsPage() {
     setForm((prev) => ({ ...prev, [key]: value === "" ? 0 : Number(value) }));
   }
 
-  // ── Logo handlers (unchanged) ─────────────────────────────
+  // ── Logo handlers ─────────────────────────────────────────
   async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -296,7 +397,7 @@ export default function SettingsPage() {
         <p className="text-[11px] text-[var(--t4)] mt-2">Language for the Performance Summary section on the dashboard.</p>
       </div>
 
-      {/* KPI Targets from Google Sheet */}
+      {/* KPI Content */}
       {loading ? (
         <div className="text-center text-[var(--t3)] py-12">Loading KPI from Google Sheet...</div>
       ) : (
@@ -321,7 +422,7 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {/* Editable KPI Fields */}
+          {/* Section 1: KPI Targets (editable) */}
           <div className="bg-[var(--bg2)] border border-[var(--border)] rounded-[10px] p-6 mb-6">
             <div className="flex items-center gap-3 mb-4">
               <h2 className="font-bold text-[15px] tracking-tight text-[var(--t1)] dark:text-[var(--t1)]">
@@ -356,28 +457,52 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* Derived Values (read-only) */}
+          {/* Section 2: Derived Values (read-only, from sheet formulas) */}
           <div className="bg-[var(--bg2)] border border-[var(--border)] rounded-[10px] p-6 mb-6 opacity-80">
             <h2 className="font-bold text-[15px] tracking-tight text-[var(--t1)] dark:text-[var(--t1)] mb-4">
               Derived Values
               <span className="text-[10px] font-label uppercase tracking-wider text-[var(--t4)] ml-2">Auto-calculated</span>
             </h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {visibleDerived.map((m) => (
+                <div key={m.key}>
+                  <div className="text-[11px] text-[var(--t4)] uppercase tracking-wider mb-1">{m.label}</div>
+                  <div className="num text-[15px] font-semibold text-[var(--t1)]">
+                    {formatDerived((derived as Record<string, number>)[m.key] ?? 0, m.format)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Section 3: Daily Ad Spend Budget */}
+          <div className="bg-[var(--bg2)] border border-[var(--border)] rounded-[10px] p-6 mb-6">
+            <h2 className="font-bold text-[15px] tracking-tight text-[var(--t1)] dark:text-[var(--t1)] mb-4">
+              Daily Ad Spend Budget
+            </h2>
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <div className="text-[11px] text-[var(--t4)] uppercase tracking-wider mb-1">Orders</div>
-                <div className="num text-[15px] font-semibold text-[var(--t1)]">{derived.orders}</div>
+                <Label className="text-sm text-[var(--t3)] mb-1">
+                  Current Daily Ad Spend
+                  <span className="text-xs text-[var(--t3)]/60 ml-1">(Excluded 8% SST)</span>
+                </Label>
+                <Input
+                  type="number"
+                  step="10"
+                  min="0"
+                  value={form.daily_ad || ""}
+                  onChange={(e) => handleChange("daily_ad", e.target.value)}
+                  className="num border-[var(--border)] focus-visible:ring-[var(--blue)]"
+                />
               </div>
               <div>
-                <div className="text-[11px] text-[var(--t4)] uppercase tracking-wider mb-1">Daily Ad (Incl SST)</div>
-                <div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(derived.dailyIncl)}</div>
-              </div>
-              <div>
-                <div className="text-[11px] text-[var(--t4)] uppercase tracking-wider mb-1">Monthly Ad Spend</div>
-                <div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(derived.monthlyAd)}</div>
-              </div>
-              <div>
-                <div className="text-[11px] text-[var(--t4)] uppercase tracking-wider mb-1">ROAS</div>
-                <div className="num text-[15px] font-semibold text-[var(--t1)]">{derived.roas.toFixed(1)}x</div>
+                <div className="text-sm text-[var(--t3)] mb-1">
+                  Actual Daily Ad Spend
+                  <span className="text-xs text-[var(--t3)]/60 ml-1">(Included 8% SST)</span>
+                </div>
+                <div className="num text-[20px] font-semibold text-[var(--t1)] mt-1.5">
+                  {fmtRM(derived.daily_ad_actual_incl ?? 0)}
+                </div>
               </div>
             </div>
           </div>
