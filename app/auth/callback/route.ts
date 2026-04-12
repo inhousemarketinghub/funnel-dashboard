@@ -33,10 +33,10 @@ export async function GET(request: Request) {
             method: "POST",
             headers: { "Content-Type": "application/json" },
           });
-          return NextResponse.redirect(new URL("/clients", origin));
+          return NextResponse.redirect(new URL("/projects", origin));
         }
 
-        return NextResponse.redirect(`${origin}/clients`);
+        return NextResponse.redirect(`${origin}/projects`);
       }
     }
   }

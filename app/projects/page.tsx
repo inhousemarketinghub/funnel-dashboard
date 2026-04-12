@@ -51,7 +51,7 @@ export default async function ClientsPage() {
             )}
             {canCreate && (
               <Link
-                href="/clients/new"
+                href="/projects/new"
                 className="topbar-btn"
                 style={{ background: "var(--blue)", color: "white", borderColor: "var(--blue)" }}
               >
@@ -88,7 +88,7 @@ export default async function ClientsPage() {
                   Create your first project to start tracking performance
                 </p>
                 <Link
-                  href="/clients/new"
+                  href="/projects/new"
                   className="topbar-btn inline-flex"
                   style={{ background: "var(--blue)", color: "white", borderColor: "var(--blue)" }}
                 >

@@ -184,7 +184,7 @@ function AccessPageInner() {
       <div className="bauhaus-stripe"><div /><div /><div /><div /></div>
       <div className="max-w-3xl mx-auto p-8">
         <div className="flex items-center gap-3 mb-6">
-          <Link href="/clients" className="text-[var(--t3)] hover:text-[var(--t1)] text-[13px] transition-colors">&larr; Back</Link>
+          <Link href="/projects" className="text-[var(--t3)] hover:text-[var(--t1)] text-[13px] transition-colors">&larr; Back</Link>
           <h1 className="font-heading text-[24px] font-semibold tracking-tight text-[var(--t1)]">Manage Access</h1>
         </div>
 

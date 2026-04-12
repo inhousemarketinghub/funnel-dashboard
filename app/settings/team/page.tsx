@@ -138,7 +138,7 @@ export default function TeamPage() {
           </span>
           <div className="flex items-center gap-3">
             <Link
-              href="/clients"
+              href="/projects"
               className="topbar-btn"
             >
               Overview

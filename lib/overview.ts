@@ -18,7 +18,7 @@ export async function fetchAllClientsOverview(): Promise<{
 
   const { data: rows } = await supabase
     .from("clients")
-    .select("id, name, logo_url, sheet_id")
+    .select("id, name, logo_url, sheet_id, status, funnel_type")
     .order("created_at", { ascending: false });
 
   if (!rows || rows.length === 0) {
@@ -56,11 +56,15 @@ export async function fetchAllClientsOverview(): Promise<{
         const health: ClientOverview["health"] =
           average >= 80 ? "good" : average >= 60 ? "watch" : "alert";
 
+        const status: "active" | "inactive" = client.status === "active" ? "active" : "inactive";
+        const funnelType: "appointment" | "walkin" = client.funnel_type === "walkin" ? "walkin" : "appointment";
+
         return {
           id: client.id,
           name: client.name,
           logo_url: client.logo_url ?? null,
-          status: "active" as const,
+          status,
+          funnel_type: funnelType,
           metrics: {
             sales: metrics.sales,
             cpl: metrics.cpl,
@@ -80,12 +84,14 @@ export async function fetchAllClientsOverview(): Promise<{
           health,
         };
       } catch {
-        // Data fetch failed — include with zeroed metrics and alert health
+        const status: "active" | "inactive" = client.status === "active" ? "active" : "inactive";
+        const funnelType: "appointment" | "walkin" = client.funnel_type === "walkin" ? "walkin" : "appointment";
         return {
           id: client.id,
           name: client.name,
           logo_url: client.logo_url ?? null,
-          status: "active" as const,
+          status,
+          funnel_type: funnelType,
           metrics: { sales: 0, cpl: 0, roas: 0, cpa_pct: 0, conv_rate: 0, ad_spend: 0 },
           achievement: { sales: 0, cpl: 0, roas: 0, cpa_pct: 0, conv_rate: 0, average: 0 },
           health: "alert" as const,
@@ -95,7 +101,7 @@ export async function fetchAllClientsOverview(): Promise<{
   );
 
   const stats: OverviewStats = {
-    activeClients: clients.length,
+    activeClients: clients.filter((c) => c.status === "active").length,
     needAttention: clients.filter((c) => c.health === "alert").length,
     totalAdSpend: clients.reduce((sum, c) => sum + c.metrics.ad_spend, 0),
     totalSales: clients.reduce((sum, c) => sum + c.metrics.sales, 0),

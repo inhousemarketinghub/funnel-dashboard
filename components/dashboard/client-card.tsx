@@ -92,7 +92,7 @@ export function ClientCard({ client, isAdmin = false }: Props) {
       {isAdmin && (
         <div className="mt-2 pt-2 border-t border-[var(--border)]" onClick={(e) => e.stopPropagation()}>
           <Link
-            href={`/clients/access?project=${client.id}&name=${encodeURIComponent(client.name)}`}
+            href={`/projects/access?project=${client.id}&name=${encodeURIComponent(client.name)}`}
             className="text-[11px] text-[var(--t3)] hover:text-[var(--blue)] transition-colors"
           >
             Manage Access

@@ -6,6 +6,7 @@ import { CountUp } from "@/components/animations/count-up";
 
 interface Props {
   client: ClientOverview;
+  onToggleStatus?: (id: string, newStatus: "active" | "inactive") => void;
 }
 
 function achievementColor(pct: number): string {
@@ -25,7 +26,8 @@ function healthBadgeStyle(health: ClientOverview["health"]): { bg: string; color
   }
 }
 
-export function ClientKpiCard({ client }: Props) {
+export function ClientKpiCard({ client, onToggleStatus }: Props) {
+  const isActive = client.status === "active";
   const badge = healthBadgeStyle(client.health);
   const avg = client.achievement.average;
   const barRef = useRef<HTMLDivElement>(null);
@@ -58,9 +60,9 @@ export function ClientKpiCard({ client }: Props) {
     <Link
       href={`/${client.id}`}
       className="card-base block no-underline transition-all hover:shadow-md hover:border-[var(--blue)] hover:-translate-y-[1px] hover:scale-[1.01]"
-      style={{ transitionDuration: "150ms" }}
+      style={{ transitionDuration: "150ms", opacity: isActive ? 1 : 0.5 }}
     >
-      {/* Header: logo/initial + name + health badge */}
+      {/* Header: logo/initial + name + toggle + health badge */}
       <div className="flex items-center gap-3 mb-4">
         {client.logo_url ? (
           <img
@@ -79,6 +81,23 @@ export function ClientKpiCard({ client }: Props) {
         <span className="font-heading text-[18px] font-semibold text-[var(--t1)] truncate flex-1">
           {client.name}
         </span>
+        {onToggleStatus && (
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onToggleStatus(client.id, isActive ? "inactive" : "active");
+            }}
+            className="flex-shrink-0 w-[36px] h-[20px] rounded-full relative transition-colors cursor-pointer"
+            style={{ background: isActive ? "var(--green)" : "var(--border)" }}
+            title={isActive ? "Active" : "Inactive"}
+          >
+            <div
+              className="absolute top-[2px] w-[16px] h-[16px] rounded-full bg-white transition-transform"
+              style={{ left: isActive ? "18px" : "2px" }}
+            />
+          </button>
+        )}
         <span
           className="font-label text-[10px] font-semibold px-2 py-[3px] rounded-full flex-shrink-0"
           style={{ background: badge.bg, color: badge.color }}
