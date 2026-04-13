@@ -776,20 +776,24 @@ export async function findKPICellAddresses(
 
 // ── KPI Write-back ───────────────────────────────────────────
 
+interface WriteResult { written: { key: string; cell: string; value: number }[]; skipped: string[]; cellMap: Record<string, string> }
+
 export async function writeKPIValues(
   sheetId: string,
   values: Partial<Record<string, number>>,
   brandName?: string,
-): Promise<void> {
+): Promise<WriteResult> {
   const { getSheetsClient } = await import("./google-auth");
   const cellMap = await findKPICellAddresses(sheetId, brandName);
   if (!cellMap) throw new Error("KPI Indicator tab not found");
 
   const data: { range: string; values: (string | number)[][] }[] = [];
+  const written: WriteResult["written"] = [];
+  const skipped: string[] = [];
 
   for (const [key, val] of Object.entries(values)) {
     const cellAddr = cellMap.cells[key as keyof KPICellMap["cells"]];
-    if (!cellAddr || val == null) continue;
+    if (!cellAddr || val == null) { skipped.push(key); continue; }
 
     // Write raw numbers — cell formatting in Google Sheet handles display (RM, %)
     // Percentage cells store decimals (60% = 0.6), so divide by 100
@@ -800,12 +804,12 @@ export async function writeKPIValues(
       range: `'${cellMap.tabName}'!${cellAddr}`,
       values: [[rawVal]],
     });
+    written.push({ key, cell: cellAddr, value: rawVal as number });
   }
 
-  if (data.length === 0) {
-    console.warn("[writeKPIValues] No matching cells found. cellMap:", JSON.stringify(cellMap.cells), "keys:", Object.keys(values));
-    return;
-  }
+  const result: WriteResult = { written, skipped, cellMap: cellMap.cells as Record<string, string> };
+
+  if (data.length === 0) return result;
 
   const sheets = getSheetsClient();
   await sheets.spreadsheets.values.batchUpdate({
@@ -815,6 +819,7 @@ export async function writeKPIValues(
       data,
     },
   });
+  return result;
 }
 
 // ── Public API ─────────────────────────────────────────────────
