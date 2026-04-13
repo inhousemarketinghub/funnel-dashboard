@@ -1,45 +1,41 @@
 import { NextResponse } from "next/server";
+import { findKPICellAddresses, writeKPIValues, detectBrandsOrdered } from "@/lib/sheets";
 
-// Temporary diagnostic endpoint — DELETE after debugging
+// Temporary test endpoint — DELETE after confirming writes work
 export async function GET() {
-  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || "(missing)";
-  const rawKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY || "(missing)";
+  const sheetId = "1H2vytbxLtQRwATUiZlf07oLqJL5-jhnSPeZ-ABPANTY"; // Carress Shop
 
-  // Diagnose private key format
-  const keyLen = rawKey.length;
-  const hasLiteralBackslashN = rawKey.includes("\\n");
-  const hasRealNewline = rawKey.includes("\n") && !rawKey.includes("\\n");
-  const startsWithQuote = rawKey.startsWith('"');
-  const startsWithBegin = rawKey.startsWith("-----BEGIN");
-  const first30 = rawKey.substring(0, 30);
-  const last20 = rawKey.substring(rawKey.length - 20);
-
-  // Try to create auth with the key
-  let authResult = "not tested";
   try {
-    const { google } = await import("googleapis");
-    const processedKey = rawKey.replace(/\\n/g, "\n");
-    const auth = new google.auth.GoogleAuth({
-      credentials: { client_email: email, private_key: processedKey },
-      scopes: ["https://www.googleapis.com/auth/spreadsheets"],
-    });
-    const client = await auth.getClient();
-    authResult = "OK - authenticated successfully";
-  } catch (err) {
-    authResult = `FAILED: ${err instanceof Error ? err.message : String(err)}`;
-  }
+    const brands = await detectBrandsOrdered(sheetId);
+    const brandName = brands.length > 1 ? brands[0] : (brands[0] || undefined);
+    const cellMap = await findKPICellAddresses(sheetId, brandName);
 
-  return NextResponse.json({
-    email,
-    keyDiagnostics: {
-      length: keyLen,
-      hasLiteralBackslashN,
-      hasRealNewline,
-      startsWithQuote,
-      startsWithBegin,
-      first30,
-      last20,
-    },
-    authResult,
-  });
+    // Write daily_ad = 280
+    await writeKPIValues(sheetId, { daily_ad: 280 }, brandName);
+
+    // Read back
+    const { getSheetsClient } = await import("@/lib/google-auth");
+    const sheets = getSheetsClient();
+    const cell = cellMap?.cells.daily_ad;
+    let readBack = "N/A";
+    if (cell && cellMap) {
+      const res = await sheets.spreadsheets.values.get({
+        spreadsheetId: sheetId,
+        range: `'${cellMap.tabName}'!${cell}`,
+      });
+      readBack = res.data.values?.[0]?.[0] || "empty";
+    }
+
+    return NextResponse.json({
+      success: true,
+      brandName,
+      cellMap: cellMap?.cells || null,
+      wrote: { daily_ad: 280, cell },
+      readBack,
+    });
+  } catch (err) {
+    return NextResponse.json({
+      error: err instanceof Error ? err.message : String(err),
+    }, { status: 500 });
+  }
 }
