@@ -1,48 +1,45 @@
 import { NextResponse } from "next/server";
-import { findKPICellAddresses, writeKPIValues, detectBrandsOrdered } from "@/lib/sheets";
 
-// Temporary test endpoint — no auth, tests writeKPIValues directly on Carress Shop
-// DELETE THIS FILE after debugging
+// Temporary diagnostic endpoint — DELETE after debugging
 export async function GET() {
-  const sheetId = "1H2vytbxLtQRwATUiZlf07oLqJL5-jhnSPeZ-ABPANTY"; // Carress Shop
+  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || "(missing)";
+  const rawKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY || "(missing)";
 
+  // Diagnose private key format
+  const keyLen = rawKey.length;
+  const hasLiteralBackslashN = rawKey.includes("\\n");
+  const hasRealNewline = rawKey.includes("\n") && !rawKey.includes("\\n");
+  const startsWithQuote = rawKey.startsWith('"');
+  const startsWithBegin = rawKey.startsWith("-----BEGIN");
+  const first30 = rawKey.substring(0, 30);
+  const last20 = rawKey.substring(rawKey.length - 20);
+
+  // Try to create auth with the key
+  let authResult = "not tested";
   try {
-    // Step 1: Detect brands
-    const brands = await detectBrandsOrdered(sheetId);
-    const brandName = brands.length > 1 ? brands[0] : (brands[0] || undefined);
-
-    // Step 2: Find cell addresses
-    const cellMap = await findKPICellAddresses(sheetId, brandName);
-
-    // Step 3: Try writing daily_ad = 280
-    const testFields = { daily_ad: 280 };
-    await writeKPIValues(sheetId, testFields, brandName);
-
-    // Step 4: Read back to verify
-    const { getSheetsClient } = await import("@/lib/google-auth");
-    const sheets = getSheetsClient();
-    const dailyCell = cellMap?.cells.daily_ad;
-    let readBack = "N/A";
-    if (dailyCell && cellMap) {
-      const res = await sheets.spreadsheets.values.get({
-        spreadsheetId: sheetId,
-        range: `'${cellMap.tabName}'!${dailyCell}`,
-      });
-      readBack = res.data.values?.[0]?.[0] || "empty";
-    }
-
-    return NextResponse.json({
-      success: true,
-      brands,
-      brandName,
-      cellMap: cellMap?.cells || null,
-      testWrite: { field: "daily_ad", value: 280, cell: dailyCell },
-      readBack,
+    const { google } = await import("googleapis");
+    const processedKey = rawKey.replace(/\\n/g, "\n");
+    const auth = new google.auth.GoogleAuth({
+      credentials: { client_email: email, private_key: processedKey },
+      scopes: ["https://www.googleapis.com/auth/spreadsheets"],
     });
+    const client = await auth.getClient();
+    authResult = "OK - authenticated successfully";
   } catch (err) {
-    return NextResponse.json({
-      error: err instanceof Error ? err.message : String(err),
-      stack: err instanceof Error ? err.stack?.split("\n").slice(0, 5) : undefined,
-    }, { status: 500 });
+    authResult = `FAILED: ${err instanceof Error ? err.message : String(err)}`;
   }
+
+  return NextResponse.json({
+    email,
+    keyDiagnostics: {
+      length: keyLen,
+      hasLiteralBackslashN,
+      hasRealNewline,
+      startsWithQuote,
+      startsWithBegin,
+      first30,
+      last20,
+    },
+    authResult,
+  });
 }
