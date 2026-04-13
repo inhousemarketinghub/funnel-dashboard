@@ -669,12 +669,7 @@ export async function findKPICellAddresses(
 ): Promise<KPICellMap | null> {
   const tabName = await findKPITab(sheetId);
   if (!tabName) return null;
-  // Use no-cache fetch for write path — avoids stale data from Next.js revalidate cache
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(tabName)}?key=${API_KEY}&valueRenderOption=FORMATTED_VALUE`;
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) return null;
-  const data = await res.json();
-  const rows: string[][] = data.values || [];
+  const rows = await fetchSheetData(sheetId, tabName);
 
   const cells: KPICellMap["cells"] = {};
 
@@ -776,24 +771,20 @@ export async function findKPICellAddresses(
 
 // ── KPI Write-back ───────────────────────────────────────────
 
-interface WriteResult { written: { key: string; cell: string; value: number }[]; skipped: string[]; cellMap: Record<string, string> }
-
 export async function writeKPIValues(
   sheetId: string,
   values: Partial<Record<string, number>>,
   brandName?: string,
-): Promise<WriteResult> {
+): Promise<void> {
   const { getSheetsClient } = await import("./google-auth");
   const cellMap = await findKPICellAddresses(sheetId, brandName);
   if (!cellMap) throw new Error("KPI Indicator tab not found");
 
   const data: { range: string; values: (string | number)[][] }[] = [];
-  const written: WriteResult["written"] = [];
-  const skipped: string[] = [];
 
   for (const [key, val] of Object.entries(values)) {
     const cellAddr = cellMap.cells[key as keyof KPICellMap["cells"]];
-    if (!cellAddr || val == null) { skipped.push(key); continue; }
+    if (!cellAddr || val == null) continue;
 
     // Write raw numbers — cell formatting in Google Sheet handles display (RM, %)
     // Percentage cells store decimals (60% = 0.6), so divide by 100
@@ -804,12 +795,9 @@ export async function writeKPIValues(
       range: `'${cellMap.tabName}'!${cellAddr}`,
       values: [[rawVal]],
     });
-    written.push({ key, cell: cellAddr, value: rawVal as number });
   }
 
-  const result: WriteResult = { written, skipped, cellMap: cellMap.cells as Record<string, string> };
-
-  if (data.length === 0) return result;
+  if (data.length === 0) return;
 
   const sheets = getSheetsClient();
   await sheets.spreadsheets.values.batchUpdate({
@@ -819,7 +807,6 @@ export async function writeKPIValues(
       data,
     },
   });
-  return result;
 }
 
 // ── Public API ─────────────────────────────────────────────────

@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
     const brandName = isMultiBrand ? (brand || undefined) : (brands[0] || undefined);
 
     // Write to Google Sheet
-    const writeDebug = await writeKPIValues(client.sheet_id, fields, brandName);
+    await writeKPIValues(client.sheet_id, fields, brandName);
 
     // Compute derived values for Supabase cache
     const sales = fields.sales ?? 0;
@@ -122,7 +122,7 @@ export async function POST(req: NextRequest) {
       console.error("Supabase upsert error:", dbError);
     }
 
-    return NextResponse.json({ success: true, _debug: writeDebug });
+    return NextResponse.json({ success: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to write KPI";
     return NextResponse.json({ error: message }, { status: 500 });
