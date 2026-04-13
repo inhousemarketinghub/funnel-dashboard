@@ -249,12 +249,21 @@ export default function SettingsPage() {
         }),
       });
 
+      const resData = await res.json();
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Save failed");
+        throw new Error(resData.error || "Save failed");
       }
 
-      toast.success("KPI synced to Google Sheet");
+      // Show write details for debugging
+      const debug = resData._debug;
+      if (debug) {
+        const writtenKeys = debug.written?.map((w: { key: string; cell: string }) => `${w.key}→${w.cell}`).join(", ") || "none";
+        const skippedKeys = debug.skipped?.join(", ") || "none";
+        toast.success(`KPI synced! Written: ${writtenKeys}`);
+        if (debug.skipped?.length > 0) console.log("[Save] Skipped fields (no cell found):", skippedKeys);
+      } else {
+        toast.success("KPI synced to Google Sheet");
+      }
 
       // Re-fetch derived values — sheet formulas recalculate after write
       await refreshDerived();
