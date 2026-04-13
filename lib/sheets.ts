@@ -669,7 +669,12 @@ export async function findKPICellAddresses(
 ): Promise<KPICellMap | null> {
   const tabName = await findKPITab(sheetId);
   if (!tabName) return null;
-  const rows = await fetchSheetData(sheetId, tabName);
+  // Use no-cache fetch for write path — avoids stale data from Next.js revalidate cache
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(tabName)}?key=${API_KEY}&valueRenderOption=FORMATTED_VALUE`;
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) return null;
+  const data = await res.json();
+  const rows: string[][] = data.values || [];
 
   const cells: KPICellMap["cells"] = {};
 
@@ -797,7 +802,10 @@ export async function writeKPIValues(
     });
   }
 
-  if (data.length === 0) return;
+  if (data.length === 0) {
+    console.warn("[writeKPIValues] No matching cells found. cellMap:", JSON.stringify(cellMap.cells), "keys:", Object.keys(values));
+    return;
+  }
 
   const sheets = getSheetsClient();
   await sheets.spreadsheets.values.batchUpdate({
