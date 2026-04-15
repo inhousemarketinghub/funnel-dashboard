@@ -74,6 +74,8 @@ const DERIVED_METRICS: DerivedMetric[] = [
   { label: "Contact Given", key: "target_contact", format: "count", funnelFilter: "appointment" },
   { label: "Monthly Ad Spend (Incl SST)", key: "monthly_ad_incl", format: "rm" },
   { label: "Monthly Ad Spend (Excl SST)", key: "monthly_ad_excl", format: "rm" },
+  { label: "Targeted Daily Ad Spend (Incl SST)", key: "daily_ad_targeted_incl", format: "rm" },
+  { label: "Targeted Daily Ad Spend (Excl SST)", key: "daily_ad_targeted_excl", format: "rm" },
 ];
 
 function formatDerived(val: number, format: DerivedMetric["format"]) {
@@ -119,6 +121,12 @@ export default function SettingsPage() {
     // Monthly Ad Spend derived from Sales × CPA%
     const monthlyAdIncl = sales * cpaPct;
     const monthlyAdExcl = monthlyAdIncl / 1.08;
+
+    // Targeted Daily Ad Spend = Monthly Ad Spend / Days in month
+    const now = new Date();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const dailyAdTargetedIncl = daysInMonth > 0 ? monthlyAdIncl / daysInMonth : 0;
+    const dailyAdTargetedExcl = daysInMonth > 0 ? monthlyAdExcl / daysInMonth : 0;
 
     // Daily Ad (Incl SST) from the editable current daily budget
     const dailyAdIncl = dailyExcl * 1.08;
@@ -168,6 +176,8 @@ export default function SettingsPage() {
       target_contact: contactCount,
       monthly_ad_incl: monthlyAdIncl,
       monthly_ad_excl: monthlyAdExcl,
+      daily_ad_targeted_incl: dailyAdTargetedIncl,
+      daily_ad_targeted_excl: dailyAdTargetedExcl,
       daily_ad_actual_incl: dailyAdIncl,
       daily_ad_current_excl: dailyExcl,
     };
