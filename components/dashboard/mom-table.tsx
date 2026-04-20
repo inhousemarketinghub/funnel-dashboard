@@ -24,10 +24,14 @@ function buildRows(
   const visitRate = tm.inquiry > 0 ? (tm.contact / tm.inquiry) * 100 : 0;
   const visitRatePrev = lm.inquiry > 0 ? (lm.contact / lm.inquiry) * 100 : 0;
   const visitRateMom = visitRatePrev > 0 ? ((visitRate - visitRatePrev) / visitRatePrev) * 100 : null;
+  const tmCPL = tm.inquiry > 0 ? tm.ad_spend / tm.inquiry : 0;
+  const lmCPL = lm.inquiry > 0 ? lm.ad_spend / lm.inquiry : 0;
+  const cplMom = lmCPL > 0 ? ((tmCPL - lmCPL) / lmCPL) * 100 : null;
 
   const rows: FunnelRow[] = [
     { label: "Ad Spend", tmFmt: fmtRM(tm.ad_spend), lmFmt: fmtRM(lm.ad_spend), mom: mom.ad_spend ?? null, kpiFmt: fmtRM(kpi.ad_spend), inverted: false },
     { label: "Inquiry (PM)", tmFmt: String(tm.inquiry), lmFmt: String(lm.inquiry), mom: mom.inquiry ?? null, kpiFmt: kpi.cpl > 0 ? String(Math.round(kpi.ad_spend / kpi.cpl)) : "—", inverted: false },
+    { label: "CPL", tmFmt: fmtRM(tmCPL), lmFmt: fmtRM(lmCPL), mom: cplMom, kpiFmt: kpi.cpl > 0 ? fmtRM(kpi.cpl) : "—", inverted: true },
     { label: isWalkin ? "Visit" : "Contact", tmFmt: String(tm.contact), lmFmt: String(lm.contact), mom: mom.contact ?? null, kpiFmt: String(kpi.target_contact), inverted: false },
     { label: isWalkin ? "Visit Rate" : "Respond Rate", tmFmt: isWalkin ? `${visitRate.toFixed(1)}%` : `${tm.respond_rate.toFixed(1)}%`, lmFmt: isWalkin ? `${visitRatePrev.toFixed(1)}%` : `${lm.respond_rate.toFixed(1)}%`, mom: isWalkin ? visitRateMom : (mom.respond_rate ?? null), kpiFmt: `${kpi.respond_rate}%`, inverted: false },
   ];

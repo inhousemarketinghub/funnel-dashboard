@@ -304,17 +304,25 @@ function aggregateApptPersons(
     const person = (cols[personCol] || "").trim();
     if (!person) continue;
 
-    if (startDate && endDate) {
-      const rowDate = parseDate(cols[colMap.date]);
-      if (!rowDate || rowDate < startDate || rowDate > endDate) continue;
-    }
+    const leadDate = parseDate(cols[colMap.date]);
+    const leadInRange = !startDate || !endDate || (!!leadDate && leadDate >= startDate && leadDate <= endDate);
+
+    const purchaseDateStr = colMap.purchaseDate !== null ? (cols[colMap.purchaseDate] || "").trim() : "";
+    const purchaseDate = purchaseDateStr ? parseDate(purchaseDateStr) : null;
+    const purchaseInRange = !!purchaseDate && (!startDate || !endDate || (purchaseDate >= startDate && purchaseDate <= endDate));
+
+    if (!leadInRange && !purchaseInRange) continue;
 
     if (!map.has(person)) map.set(person, { contacts: 0, appts: 0, showUps: 0, orders: 0, sales: 0 });
     const m = map.get(person)!;
-    m.contacts++;
-    if (colMap.appointmentDate !== null && (cols[colMap.appointmentDate] || "").trim()) m.appts++;
-    if (colMap.showedUp !== null && ["yes", "true"].includes((cols[colMap.showedUp] || "").toLowerCase())) m.showUps++;
-    if (colMap.purchaseDate !== null && (cols[colMap.purchaseDate] || "").trim()) {
+
+    if (leadInRange) {
+      m.contacts++;
+      if (colMap.appointmentDate !== null && (cols[colMap.appointmentDate] || "").trim()) m.appts++;
+      if (colMap.showedUp !== null && ["yes", "true"].includes((cols[colMap.showedUp] || "").toLowerCase())) m.showUps++;
+    }
+
+    if (purchaseInRange) {
       m.orders++;
       m.sales += colMap.sales !== null ? parseRM(cols[colMap.sales]) : 0;
     }
