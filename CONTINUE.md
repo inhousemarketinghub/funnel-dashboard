@@ -3,7 +3,7 @@
 > 新 session 读这个文件即可接续工作。
 
 ## 项目位置
-`/Users/khoweijie/Documents/funnel-dashboard`
+`/Users/khoweijie/Claude/Project/funnel-dashboard`
 
 ## 已完成 ✅
 - Next.js 16 + Tailwind v4 + shadcn/ui (base-nova) + Geist 字体
