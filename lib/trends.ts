@@ -1,6 +1,6 @@
 import { fetchPerformanceData } from "./sheets";
 import { computeMetrics } from "./metrics";
-import { MONTH_NAMES, isPartialRange, type Granularity } from "./dates";
+import { MONTH_NAMES, isPartialRange, formatWeekLabel, type Granularity } from "./dates";
 import type { FunnelMetrics } from "./types";
 
 export type { Granularity };
@@ -37,6 +37,24 @@ function zeroMetrics(): FunnelMetrics {
     est_showup: 0, orders: 0, sales: 0, cpl: 0, respond_rate: 0,
     appt_rate: 0, showup_rate: 0, conv_rate: 0, aov: 0, roas: 0, cpa_pct: 0,
   };
+}
+
+export function getWeekRanges(from: Date, to: Date, now: Date = new Date()): TrendRange[] {
+  const ranges: TrendRange[] = [];
+  const cursor = new Date(from);
+  while (cursor.getTime() <= to.getTime()) {
+    const weekStart = new Date(cursor);
+    const weekEnd = new Date(cursor);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    ranges.push({
+      from: weekStart,
+      to: weekEnd,
+      label: formatWeekLabel(weekStart, weekEnd),
+      isPartial: isPartialRange(weekEnd, now),
+    });
+    cursor.setDate(cursor.getDate() + 7);
+  }
+  return ranges;
 }
 
 export function getMonthRanges(count: number, now: Date = new Date()): MonthRange[] {
