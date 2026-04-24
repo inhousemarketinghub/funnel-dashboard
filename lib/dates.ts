@@ -5,6 +5,11 @@ export interface DateRangeObj {
   to: Date;
 }
 
+export const MONTH_NAMES = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
 // ── Parsing & Formatting ────────────────────────────────────────
 
 export function parseDateParam(str: string | undefined): Date | null {
@@ -159,4 +164,14 @@ export function snapToGranularity(
 
 export function isPartialRange(to: Date, now: Date = new Date()): boolean {
   return to.getTime() > now.getTime();
+}
+
+export function formatWeekLabel(from: Date, to: Date): string {
+  const EN_DASH = "–"; // en dash (–)
+  const fromMonth = MONTH_NAMES[from.getMonth()];
+  if (from.getMonth() === to.getMonth() && from.getFullYear() === to.getFullYear()) {
+    return `${fromMonth} ${from.getDate()} ${EN_DASH} ${to.getDate()}`;
+  }
+  const toMonth = MONTH_NAMES[to.getMonth()];
+  return `${fromMonth} ${from.getDate()} ${EN_DASH} ${toMonth} ${to.getDate()}`;
 }

@@ -1,5 +1,6 @@
 import { fetchPerformanceData } from "./sheets";
 import { computeMetrics } from "./metrics";
+import { MONTH_NAMES } from "./dates";
 import type { FunnelMetrics } from "./types";
 
 export interface MonthRange {
@@ -12,8 +13,6 @@ export interface MonthlyTrendPoint {
   month: string;
   metrics: FunnelMetrics;
 }
-
-const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 export function getMonthRanges(count: number, now: Date = new Date()): MonthRange[] {
   const ranges: MonthRange[] = [];

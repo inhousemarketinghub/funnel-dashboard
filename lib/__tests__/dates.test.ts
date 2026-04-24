@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getMondayOf, getSundayOf, snapToGranularity, isPartialRange } from "../dates";
+import { getMondayOf, getSundayOf, snapToGranularity, isPartialRange, formatWeekLabel } from "../dates";
 
 describe("getMondayOf", () => {
   it("returns same date when input is Monday", () => {
@@ -100,5 +100,25 @@ describe("isPartialRange", () => {
 
   it("returns false when 'to' equals now exactly", () => {
     expect(isPartialRange(now, now)).toBe(false);
+  });
+});
+
+describe("formatWeekLabel", () => {
+  it("formats same-month week as 'Apr 14 – 20'", () => {
+    const from = new Date(2026, 3, 14);
+    const to = new Date(2026, 3, 20);
+    expect(formatWeekLabel(from, to)).toBe("Apr 14 – 20");
+  });
+
+  it("formats cross-month week as 'Mar 30 – Apr 5'", () => {
+    const from = new Date(2026, 2, 30);
+    const to = new Date(2026, 3, 5);
+    expect(formatWeekLabel(from, to)).toBe("Mar 30 – Apr 5");
+  });
+
+  it("formats year-boundary week as 'Dec 29 – Jan 4'", () => {
+    const from = new Date(2025, 11, 29);
+    const to = new Date(2026, 0, 4);
+    expect(formatWeekLabel(from, to)).toBe("Dec 29 – Jan 4");
   });
 });
