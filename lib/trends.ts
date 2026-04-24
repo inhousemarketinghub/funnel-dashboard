@@ -105,3 +105,41 @@ export async function fetchMonthlyTrends(
   }
   return results;
 }
+
+export async function fetchTrends(opts: {
+  sheetId: string;
+  granularity: Granularity;
+  from: Date;
+  to: Date;
+  brandName?: string | null;
+  now?: Date;
+}): Promise<TrendPoint[]> {
+  const now = opts.now ?? new Date();
+  const ranges = opts.granularity === "weekly"
+    ? getWeekRanges(opts.from, opts.to, now)
+    : getMonthRanges(opts.from, opts.to, now);
+
+  const results: TrendPoint[] = [];
+  let allData: import("./types").DailyMetric[] = [];
+  try {
+    const perfResult = await fetchPerformanceData(opts.sheetId, opts.brandName ?? undefined);
+    allData = perfResult.data;
+  } catch (err) {
+    console.error("fetchTrends: fetchPerformanceData failed", err);
+    for (const range of ranges) {
+      results.push({ label: range.label, isPartial: range.isPartial, metrics: zeroMetrics() });
+    }
+    return results;
+  }
+
+  for (const range of ranges) {
+    try {
+      const rows = allData.filter((r) => r.date >= range.from && r.date <= range.to);
+      const metrics = computeMetrics(rows, 0);
+      results.push({ label: range.label, isPartial: range.isPartial, metrics });
+    } catch {
+      results.push({ label: range.label, isPartial: range.isPartial, metrics: zeroMetrics() });
+    }
+  }
+  return results;
+}
