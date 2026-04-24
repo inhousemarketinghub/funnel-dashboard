@@ -47,8 +47,18 @@ export function formatRangeLabel(from: Date, to: Date): string {
 
 // ── Defaults & Previous Period ──────────────────────────────────
 
-export function getDefaultRange(): DateRangeObj {
-  const now = new Date();
+export function getDefaultRange(granularity?: Granularity, now: Date = new Date()): DateRangeObj {
+  if (granularity === "weekly") {
+    const thisSunday = getSundayOf(now);
+    const fourWeeksAgoMonday = new Date(thisSunday);
+    fourWeeksAgoMonday.setDate(thisSunday.getDate() - 27); // Sun - 27 days = Mon of week 4 back
+    return { from: fourWeeksAgoMonday, to: thisSunday };
+  }
+  if (granularity === "monthly") {
+    const from = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+    const to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return { from, to };
+  }
   return {
     from: new Date(now.getFullYear(), now.getMonth(), 1),
     to: now,

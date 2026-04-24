@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getMondayOf, getSundayOf, snapToGranularity, isPartialRange, formatWeekLabel } from "../dates";
+import { getMondayOf, getSundayOf, snapToGranularity, isPartialRange, formatWeekLabel, getDefaultRange } from "../dates";
 
 describe("getMondayOf", () => {
   it("returns same date when input is Monday", () => {
@@ -120,5 +120,27 @@ describe("formatWeekLabel", () => {
     const from = new Date(2025, 11, 29);
     const to = new Date(2026, 0, 4);
     expect(formatWeekLabel(from, to)).toBe("Dec 29 – Jan 4");
+  });
+});
+
+describe("getDefaultRange(granularity)", () => {
+  const now = new Date(2026, 3, 24); // Apr 24 2026, a Friday
+
+  it("weekly: returns last 4 weeks ending this Sunday", () => {
+    const result = getDefaultRange("weekly", now);
+    expect(result.from).toEqual(new Date(2026, 2, 30));
+    expect(result.to).toEqual(new Date(2026, 3, 26));
+  });
+
+  it("monthly: returns last 6 months ending this month's last day", () => {
+    const result = getDefaultRange("monthly", now);
+    expect(result.from).toEqual(new Date(2025, 10, 1));
+    expect(result.to).toEqual(new Date(2026, 3, 30));
+  });
+
+  it("no-arg form preserves existing behavior (1st of current month → today)", () => {
+    const result = getDefaultRange();
+    expect(result.from.getDate()).toBe(1);
+    expect(result.to.getTime()).toBeGreaterThanOrEqual(result.from.getTime());
   });
 });
