@@ -41,16 +41,24 @@ function formatYAxis(value: number, isPercent: boolean): string {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function renderDot(color: string): (props: any) => React.ReactElement {
-  return (props) => {
+  const Dot = (props: {
+    cx?: number;
+    cy?: number;
+    payload?: { isPartial?: boolean };
+    key?: React.Key | null;
+  }) => {
     const { cx, cy, payload, key } = props;
-    if (cx === undefined || cy === undefined) return <g key={key} />;
+    if (cx === undefined || cy === undefined) return <g key={key ?? undefined} />;
     if (payload?.isPartial) {
       return (
-        <circle key={key} cx={cx} cy={cy} r={4} fill="var(--bg)" stroke={color} strokeWidth={2} />
+        <circle key={key ?? undefined} cx={cx} cy={cy} r={4} fill="var(--bg)" stroke={color} strokeWidth={2} />
       );
     }
-    return <circle key={key} cx={cx} cy={cy} r={4} fill={color} />;
+    return <circle key={key ?? undefined} cx={cx} cy={cy} r={4} fill={color} />;
   };
+  Dot.displayName = "PartialAwareDot";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return Dot as (props: any) => React.ReactElement;
 }
 
 export function TrendChart({ data, selectedMetrics }: TrendChartProps) {
