@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getMondayOf, getSundayOf } from "../dates";
+import { getMondayOf, getSundayOf, snapToGranularity } from "../dates";
 
 describe("getMondayOf", () => {
   it("returns same date when input is Monday", () => {
@@ -44,5 +44,43 @@ describe("getSundayOf", () => {
     const mon = new Date(2026, 3, 20);
     const result = getSundayOf(mon);
     expect(result).toEqual(new Date(2026, 3, 26));
+  });
+});
+
+describe("snapToGranularity", () => {
+  it("snaps weekly range to Mon-Sun boundaries", () => {
+    const result = snapToGranularity(
+      { from: new Date(2026, 3, 3), to: new Date(2026, 3, 20) },
+      "weekly",
+    );
+    // Apr 3 (Fri) → previous Monday = Mar 30
+    // Apr 20 (Mon) → following Sunday = Apr 26
+    expect(result.from).toEqual(new Date(2026, 2, 30));
+    expect(result.to).toEqual(new Date(2026, 3, 26));
+  });
+
+  it("leaves already-snapped weekly range unchanged", () => {
+    const from = new Date(2026, 2, 30); // Monday
+    const to = new Date(2026, 3, 26);   // Sunday
+    const result = snapToGranularity({ from, to }, "weekly");
+    expect(result.from).toEqual(from);
+    expect(result.to).toEqual(to);
+  });
+
+  it("snaps monthly range to month start/end", () => {
+    const result = snapToGranularity(
+      { from: new Date(2025, 10, 15), to: new Date(2026, 3, 10) },
+      "monthly",
+    );
+    expect(result.from).toEqual(new Date(2025, 10, 1));
+    expect(result.to).toEqual(new Date(2026, 3, 30));
+  });
+
+  it("leaves already-snapped monthly range unchanged", () => {
+    const from = new Date(2025, 10, 1);
+    const to = new Date(2026, 3, 30);
+    const result = snapToGranularity({ from, to }, "monthly");
+    expect(result.from).toEqual(from);
+    expect(result.to).toEqual(to);
   });
 });

@@ -136,3 +136,23 @@ export function getSundayOf(d: Date): Date {
   result.setDate(d.getDate() + (day === 0 ? 0 : 7 - day));
   return result;
 }
+
+// ── Granularity & snapping ───────────────────────────────────────
+
+export type Granularity = "weekly" | "monthly";
+
+export function snapToGranularity(
+  range: DateRangeObj,
+  granularity: Granularity,
+): DateRangeObj {
+  if (granularity === "weekly") {
+    return {
+      from: getMondayOf(range.from),
+      to: getSundayOf(range.to),
+    };
+  }
+  return {
+    from: new Date(range.from.getFullYear(), range.from.getMonth(), 1),
+    to: new Date(range.to.getFullYear(), range.to.getMonth() + 1, 0),
+  };
+}
