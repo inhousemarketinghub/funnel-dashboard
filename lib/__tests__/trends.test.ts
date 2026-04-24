@@ -1,22 +1,53 @@
 import { describe, it, expect } from "vitest";
 import { getMonthRanges, getWeekRanges } from "../trends";
 
-describe("getMonthRanges", () => {
-  it("returns correct ranges for 3 months back from April 2026", () => {
-    const ranges = getMonthRanges(3, new Date(2026, 3, 8));
+describe("getMonthRanges(from, to)", () => {
+  const now = new Date(2026, 3, 24);
+
+  it("returns 3 ranges for Feb 1 – Apr 30 2026", () => {
+    const ranges = getMonthRanges(
+      new Date(2026, 1, 1),
+      new Date(2026, 3, 30),
+      now,
+    );
     expect(ranges).toHaveLength(3);
     expect(ranges[0].label).toBe("Feb 2026");
-    expect(ranges[0].from.getMonth()).toBe(1);
-    expect(ranges[1].label).toBe("Mar 2026");
+    expect(ranges[0].from).toEqual(new Date(2026, 1, 1));
+    expect(ranges[0].to).toEqual(new Date(2026, 1, 28));
     expect(ranges[2].label).toBe("Apr 2026");
-    expect(ranges[2].to.getDate()).toBe(8);
+    expect(ranges[2].from).toEqual(new Date(2026, 3, 1));
+    expect(ranges[2].to).toEqual(new Date(2026, 3, 30));
   });
 
-  it("returns 6 ranges for 6 months", () => {
-    const ranges = getMonthRanges(6, new Date(2026, 3, 15));
+  it("returns 6 ranges for Nov 1 2025 – Apr 30 2026", () => {
+    const ranges = getMonthRanges(
+      new Date(2025, 10, 1),
+      new Date(2026, 3, 30),
+      now,
+    );
     expect(ranges).toHaveLength(6);
     expect(ranges[0].label).toBe("Nov 2025");
     expect(ranges[5].label).toBe("Apr 2026");
+  });
+
+  it("marks current month as partial when monthEnd > now", () => {
+    const ranges = getMonthRanges(
+      new Date(2025, 10, 1),
+      new Date(2026, 3, 30),
+      now,
+    );
+    expect(ranges[5].isPartial).toBe(true);
+    expect(ranges[4].isPartial).toBe(false);
+  });
+
+  it("all months complete for historical range", () => {
+    const ranges = getMonthRanges(
+      new Date(2024, 0, 1),
+      new Date(2024, 5, 30),
+      now,
+    );
+    expect(ranges).toHaveLength(6);
+    expect(ranges.every((r) => !r.isPartial)).toBe(true);
   });
 });
 

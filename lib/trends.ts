@@ -19,13 +19,7 @@ export interface TrendRange {
   isPartial: boolean;
 }
 
-// Legacy types — kept until trend-chart.tsx migrates (Task D3); deleted at Task E1
-export interface MonthRange {
-  label: string;
-  from: Date;
-  to: Date;
-}
-
+// Legacy type — kept until trend-chart.tsx migrates (Task D3); deleted at Task E1
 export interface MonthlyTrendPoint {
   month: string;
   metrics: FunnelMetrics;
@@ -57,16 +51,21 @@ export function getWeekRanges(from: Date, to: Date, now: Date = new Date()): Tre
   return ranges;
 }
 
-export function getMonthRanges(count: number, now: Date = new Date()): MonthRange[] {
-  const ranges: MonthRange[] = [];
-  for (let i = count - 1; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const year = d.getFullYear();
-    const month = d.getMonth();
-    const label = `${MONTH_NAMES[month]} ${year}`;
-    const from = new Date(year, month, 1);
-    const to = i === 0 ? now : new Date(year, month + 1, 0);
-    ranges.push({ label, from, to });
+export function getMonthRanges(from: Date, to: Date, now: Date = new Date()): TrendRange[] {
+  const ranges: TrendRange[] = [];
+  const cursor = new Date(from.getFullYear(), from.getMonth(), 1);
+  const endCursor = new Date(to.getFullYear(), to.getMonth(), 1);
+  while (cursor.getTime() <= endCursor.getTime()) {
+    const monthStart = new Date(cursor);
+    const monthEnd = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
+    const label = `${MONTH_NAMES[cursor.getMonth()]} ${cursor.getFullYear()}`;
+    ranges.push({
+      from: monthStart,
+      to: monthEnd,
+      label,
+      isPartial: isPartialRange(monthEnd, now),
+    });
+    cursor.setMonth(cursor.getMonth() + 1);
   }
   return ranges;
 }
@@ -76,7 +75,10 @@ export async function fetchMonthlyTrends(
   months: number = 6,
   brandName: string | null = null,
 ): Promise<MonthlyTrendPoint[]> {
-  const ranges = getMonthRanges(months);
+  const now = new Date();
+  const from = new Date(now.getFullYear(), now.getMonth() - (months - 1), 1);
+  const to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const ranges = getMonthRanges(from, to, now);
   const results: MonthlyTrendPoint[] = [];
 
   // Fetch all data once, then filter per range
