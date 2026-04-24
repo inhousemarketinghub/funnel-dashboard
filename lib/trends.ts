@@ -19,12 +19,6 @@ export interface TrendRange {
   isPartial: boolean;
 }
 
-// Legacy type — kept until trend-chart.tsx migrates (Task D3); deleted at Task E1
-export interface MonthlyTrendPoint {
-  month: string;
-  metrics: FunnelMetrics;
-}
-
 function zeroMetrics(): FunnelMetrics {
   return {
     ad_spend: 0, inquiry: 0, contact: 0, appointment: 0, showup: 0,
@@ -68,42 +62,6 @@ export function getMonthRanges(from: Date, to: Date, now: Date = new Date()): Tr
     cursor.setMonth(cursor.getMonth() + 1);
   }
   return ranges;
-}
-
-export async function fetchMonthlyTrends(
-  sheetId: string,
-  months: number = 6,
-  brandName: string | null = null,
-): Promise<MonthlyTrendPoint[]> {
-  const now = new Date();
-  const from = new Date(now.getFullYear(), now.getMonth() - (months - 1), 1);
-  const to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  const ranges = getMonthRanges(from, to, now);
-  const results: MonthlyTrendPoint[] = [];
-
-  // Fetch all data once, then filter per range
-  let allData: import("./types").DailyMetric[] = [];
-  try {
-    const perfResult = await fetchPerformanceData(sheetId, brandName ?? undefined);
-    allData = perfResult.data;
-  } catch {
-    // Return zeros for all months if fetch fails
-    for (const range of ranges) {
-      results.push({ month: range.label, metrics: zeroMetrics() });
-    }
-    return results;
-  }
-
-  for (const range of ranges) {
-    try {
-      const rows = allData.filter((r) => r.date >= range.from && r.date <= range.to);
-      const metrics = computeMetrics(rows, 0);
-      results.push({ month: range.label, metrics });
-    } catch {
-      results.push({ month: range.label, metrics: zeroMetrics() });
-    }
-  }
-  return results;
 }
 
 export async function fetchTrends(opts: {
