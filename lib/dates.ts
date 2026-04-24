@@ -156,3 +156,7 @@ export function snapToGranularity(
     to: new Date(range.to.getFullYear(), range.to.getMonth() + 1, 0),
   };
 }
+
+export function isPartialRange(to: Date, now: Date = new Date()): boolean {
+  return to.getTime() > now.getTime();
+}

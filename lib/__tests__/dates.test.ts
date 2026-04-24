@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getMondayOf, getSundayOf, snapToGranularity } from "../dates";
+import { getMondayOf, getSundayOf, snapToGranularity, isPartialRange } from "../dates";
 
 describe("getMondayOf", () => {
   it("returns same date when input is Monday", () => {
@@ -82,5 +82,23 @@ describe("snapToGranularity", () => {
     const result = snapToGranularity({ from, to }, "monthly");
     expect(result.from).toEqual(from);
     expect(result.to).toEqual(to);
+  });
+});
+
+describe("isPartialRange", () => {
+  const now = new Date(2026, 3, 24, 14, 30); // Apr 24 2026 2:30pm
+
+  it("returns true when 'to' is in the future", () => {
+    const future = new Date(2026, 3, 26); // Apr 26, after now
+    expect(isPartialRange(future, now)).toBe(true);
+  });
+
+  it("returns false when 'to' is in the past", () => {
+    const past = new Date(2026, 3, 20);
+    expect(isPartialRange(past, now)).toBe(false);
+  });
+
+  it("returns false when 'to' equals now exactly", () => {
+    expect(isPartialRange(now, now)).toBe(false);
   });
 });
