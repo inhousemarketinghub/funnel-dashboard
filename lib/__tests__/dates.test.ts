@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getMondayOf, getSundayOf, snapToGranularity, isPartialRange, formatWeekLabel, getDefaultRange } from "../dates";
+import { getMondayOf, getSundayOf, snapToGranularity, isPartialRange, formatWeekLabel, getDefaultRange, getPresetRange, MONTHLY_PRESETS, WEEKLY_PRESETS } from "../dates";
 
 describe("getMondayOf", () => {
   it("returns same date when input is Monday", () => {
@@ -142,5 +142,46 @@ describe("getDefaultRange(granularity)", () => {
     const result = getDefaultRange();
     expect(result.from.getDate()).toBe(1);
     expect(result.to.getTime()).toBeGreaterThanOrEqual(result.from.getTime());
+  });
+});
+
+describe("Trends presets", () => {
+  const now = new Date(2026, 3, 24); // Apr 24 2026 Fri
+
+  it("MONTHLY_PRESETS exports expected values", () => {
+    expect(MONTHLY_PRESETS.map((p) => p.value)).toEqual([
+      "last-3m", "last-6m", "last-12m", "ytd",
+    ]);
+  });
+
+  it("WEEKLY_PRESETS exports expected values", () => {
+    expect(WEEKLY_PRESETS.map((p) => p.value)).toEqual([
+      "last-4w", "last-8w", "last-12w", "last-26w",
+    ]);
+  });
+
+  it("last-4w → Mar 30 – Apr 26 when now=Apr 24 2026", () => {
+    const r = getPresetRange("last-4w", now);
+    expect(r.from).toEqual(new Date(2026, 2, 30));
+    expect(r.to).toEqual(new Date(2026, 3, 26));
+  });
+
+  it("last-12w → 12 Mon-Sun weeks ending this Sunday", () => {
+    const r = getPresetRange("last-12w", now);
+    expect(r.to).toEqual(new Date(2026, 3, 26));
+    // 12 weeks = Sun - (12*7 - 1) days = Sun - 83 days = Feb 2 2026 (Monday)
+    expect(r.from).toEqual(new Date(2026, 1, 2));
+  });
+
+  it("last-6m → Nov 1 2025 – Apr 30 2026 when now=Apr 24 2026", () => {
+    const r = getPresetRange("last-6m", now);
+    expect(r.from).toEqual(new Date(2025, 10, 1));
+    expect(r.to).toEqual(new Date(2026, 3, 30));
+  });
+
+  it("ytd → Jan 1 – Apr 30 2026 when now=Apr 24 2026", () => {
+    const r = getPresetRange("ytd", now);
+    expect(r.from).toEqual(new Date(2026, 0, 1));
+    expect(r.to).toEqual(new Date(2026, 3, 30));
   });
 });

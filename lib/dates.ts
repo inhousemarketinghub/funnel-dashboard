@@ -84,17 +84,32 @@ export function resolveSearchParams(
 
 // ── Presets ──────────────────────────────────────────────────────
 
-export const DATE_PRESETS = [
+export type DatePreset = { label: string; value: string };
+
+export const DATE_PRESETS: readonly DatePreset[] = [
   { label: "This Week", value: "this-week" },
   { label: "Last Week", value: "last-week" },
   { label: "This Month", value: "this-month" },
   { label: "Last Month", value: "last-month" },
   { label: "Last 7 Days", value: "last-7" },
   { label: "Last 30 Days", value: "last-30" },
-] as const;
+];
 
-export function getPresetRange(preset: string): DateRangeObj {
-  const now = new Date();
+export const MONTHLY_PRESETS: readonly DatePreset[] = [
+  { label: "Last 3 months", value: "last-3m" },
+  { label: "Last 6 months", value: "last-6m" },
+  { label: "Last 12 months", value: "last-12m" },
+  { label: "YTD", value: "ytd" },
+];
+
+export const WEEKLY_PRESETS: readonly DatePreset[] = [
+  { label: "Last 4 weeks", value: "last-4w" },
+  { label: "Last 8 weeks", value: "last-8w" },
+  { label: "Last 12 weeks", value: "last-12w" },
+  { label: "Last 26 weeks", value: "last-26w" },
+];
+
+export function getPresetRange(preset: string, now: Date = new Date()): DateRangeObj {
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
   switch (preset) {
@@ -131,6 +146,36 @@ export function getPresetRange(preset: string): DateRangeObj {
       from.setDate(today.getDate() - 29);
       return { from, to: today };
     }
+
+    case "last-4w":
+    case "last-8w":
+    case "last-12w":
+    case "last-26w": {
+      const weeks =
+        preset === "last-4w" ? 4 :
+        preset === "last-8w" ? 8 :
+        preset === "last-12w" ? 12 : 26;
+      const thisSunday = getSundayOf(today);
+      const from = new Date(thisSunday);
+      from.setDate(thisSunday.getDate() - (weeks * 7 - 1));
+      return { from, to: thisSunday };
+    }
+
+    case "last-3m":
+    case "last-6m":
+    case "last-12m": {
+      const months = preset === "last-3m" ? 3 : preset === "last-6m" ? 6 : 12;
+      const from = new Date(now.getFullYear(), now.getMonth() - (months - 1), 1);
+      const to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      return { from, to };
+    }
+
+    case "ytd": {
+      const from = new Date(now.getFullYear(), 0, 1);
+      const to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      return { from, to };
+    }
+
     default:
       return getDefaultRange();
   }
