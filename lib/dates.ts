@@ -120,3 +120,19 @@ export function getPresetRange(preset: string): DateRangeObj {
       return getDefaultRange();
   }
 }
+
+// ── Week boundary helpers ────────────────────────────────────────
+
+export function getMondayOf(d: Date): Date {
+  const day = d.getDay(); // 0 = Sunday
+  const result = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  result.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+  return result;
+}
+
+export function getSundayOf(d: Date): Date {
+  const day = d.getDay();
+  const result = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  result.setDate(d.getDate() + (day === 0 ? 0 : 7 - day));
+  return result;
+}
