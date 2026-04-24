@@ -14,14 +14,21 @@ import {
   parseDateParam,
   getDefaultRange,
   getPreviousPeriod,
+  type DatePreset,
 } from "@/lib/dates";
 import type { DateRange } from "react-day-picker";
 
 interface Props {
   clientId: string;
+  basePath?: string;
+  presets?: readonly DatePreset[];
+  maxRange?: { weeks?: number; months?: number };
+  extraParams?: Record<string, string>;
 }
 
-export function DateRangePicker({ clientId }: Props) {
+export function DateRangePicker({ clientId, basePath, presets, maxRange, extraParams }: Props) {
+  const effectiveBasePath = basePath ?? `/${clientId}`;
+  const effectivePresets = presets ?? DATE_PRESETS;
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
@@ -61,10 +68,30 @@ export function DateRangePicker({ clientId }: Props) {
       params.set("prevFrom", formatDateParam(prevFrom));
       params.set("prevTo", formatDateParam(prevTo));
     }
+    if (extraParams) {
+      for (const [k, v] of Object.entries(extraParams)) {
+        if (v) params.set(k, v);
+      }
+    }
     startTransition(() => {
-      router.replace(`/${clientId}?${params.toString()}`);
+      router.replace(`${effectiveBasePath}?${params.toString()}`);
     });
     setOpen(false);
+  }
+
+  function checkOverLimit(from?: Date, to?: Date): boolean {
+    if (!from || !to) return false;
+    if (maxRange?.weeks) {
+      const weeks = Math.ceil((to.getTime() - from.getTime()) / (7 * 24 * 60 * 60 * 1000));
+      if (weeks > maxRange.weeks) return true;
+    }
+    if (maxRange?.months) {
+      const months =
+        (to.getFullYear() - from.getFullYear()) * 12 +
+        (to.getMonth() - from.getMonth()) + 1;
+      if (months > maxRange.months) return true;
+    }
+    return false;
   }
 
   function handlePreset(preset: string) {
@@ -89,10 +116,12 @@ export function DateRangePicker({ clientId }: Props) {
   }
 
   function handleApply() {
-    if (calRange?.from && calRange?.to) {
-      navigate(calRange.from, calRange.to, compareRange?.from, compareRange?.to);
-    }
+    if (!calRange?.from || !calRange?.to) return;
+    if (checkOverLimit(calRange.from, calRange.to)) return;
+    navigate(calRange.from, calRange.to, compareRange?.from, compareRange?.to);
   }
+
+  const overLimit = checkOverLimit(calRange?.from, calRange?.to);
 
   return (
     <div className="flex flex-col items-end gap-0.5">
@@ -140,7 +169,7 @@ export function DateRangePicker({ clientId }: Props) {
             <>
               {/* Presets */}
               <div className="flex flex-wrap gap-1 p-3 border-b border-[var(--border)]">
-                {DATE_PRESETS.map((p) => (
+                {effectivePresets.map((p) => (
                   <Button
                     key={p.value}
                     variant="ghost"
@@ -180,6 +209,12 @@ export function DateRangePicker({ clientId }: Props) {
             </>
           )}
 
+          {overLimit && (
+            <div className="px-3 py-2 text-[11px] text-red-600 border-t border-[var(--border)]">
+              Select a range ≤ {maxRange?.weeks ?? maxRange?.months} {maxRange?.weeks ? "weeks" : "months"} for performance reasons.
+            </div>
+          )}
+
           {/* Apply / Cancel bar */}
           <div className="flex items-center justify-between p-3 border-t border-[var(--border)]">
             <span className="text-[11px] text-[var(--t4)] num">
@@ -194,7 +229,7 @@ export function DateRangePicker({ clientId }: Props) {
               <Button
                 size="sm"
                 onClick={handleApply}
-                disabled={!calRange?.from || !calRange?.to}
+                disabled={!calRange?.from || !calRange?.to || overLimit}
                 className="text-xs h-7 bg-[var(--blue)] hover:bg-[#153D7A] text-white"
               >
                 Apply

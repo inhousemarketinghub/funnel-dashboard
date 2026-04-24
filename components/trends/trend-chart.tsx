@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import {
   LineChart,
   Line,
@@ -11,10 +12,10 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { METRIC_OPTIONS } from "./metric-selector";
-import type { MonthlyTrendPoint } from "@/lib/trends";
+import type { TrendPoint } from "@/lib/trends";
 
 interface TrendChartProps {
-  data: MonthlyTrendPoint[];
+  data: TrendPoint[];
   selectedMetrics: string[];
 }
 
@@ -38,6 +39,28 @@ function formatYAxis(value: number, isPercent: boolean): string {
   return `RM ${value}`;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function renderDot(color: string): (props: any) => React.ReactElement {
+  const Dot = (props: {
+    cx?: number;
+    cy?: number;
+    payload?: { isPartial?: boolean };
+    key?: React.Key | null;
+  }) => {
+    const { cx, cy, payload, key } = props;
+    if (cx === undefined || cy === undefined) return <g key={key ?? undefined} />;
+    if (payload?.isPartial) {
+      return (
+        <circle key={key ?? undefined} cx={cx} cy={cy} r={4} fill="var(--bg)" stroke={color} strokeWidth={2} />
+      );
+    }
+    return <circle key={key ?? undefined} cx={cx} cy={cy} r={4} fill={color} />;
+  };
+  Dot.displayName = "PartialAwareDot";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return Dot as (props: any) => React.ReactElement;
+}
+
 export function TrendChart({ data, selectedMetrics }: TrendChartProps) {
   if (selectedMetrics.length === 0) {
     return (
@@ -50,7 +73,10 @@ export function TrendChart({ data, selectedMetrics }: TrendChartProps) {
   }
 
   const chartData = data.map((point) => {
-    const row: Record<string, string | number> = { month: point.month };
+    const row: Record<string, string | number | boolean> = {
+      label: point.label,
+      isPartial: point.isPartial,
+    };
     for (const key of selectedMetrics) {
       row[key] = (point.metrics as unknown as Record<string, number>)[key] ?? 0;
     }
@@ -59,6 +85,9 @@ export function TrendChart({ data, selectedMetrics }: TrendChartProps) {
 
   const hasLeft = selectedMetrics.some((k) => !PERCENT_METRICS.has(k));
   const hasRight = selectedMetrics.some((k) => PERCENT_METRICS.has(k));
+  const isEmptyRange =
+    data.length > 0 &&
+    data.every((p) => Object.values(p.metrics).every((v) => v === 0));
 
   return (
     <div className="card-base">
@@ -66,7 +95,7 @@ export function TrendChart({ data, selectedMetrics }: TrendChartProps) {
         <LineChart data={chartData} margin={{ top: 8, right: hasRight ? 16 : 8, left: 8, bottom: 8 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
           <XAxis
-            dataKey="month"
+            dataKey="label"
             tick={{ fontSize: 11, fill: "var(--t3)" }}
             axisLine={{ stroke: "var(--border)" }}
             tickLine={false}
@@ -98,11 +127,13 @@ export function TrendChart({ data, selectedMetrics }: TrendChartProps) {
               borderRadius: 8,
               fontSize: 12,
             }}
+            labelFormatter={(label, payload) => {
+              const pp = payload?.[0]?.payload as { isPartial?: boolean } | undefined;
+              return pp?.isPartial ? `(incomplete) ${label}` : String(label);
+            }}
             formatter={(value, name) => [formatValue(Number(value), String(name ?? "")), String(name ?? "")]}
           />
-          <Legend
-            wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
-          />
+          <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
           {selectedMetrics.map((key) => {
             const opt = METRIC_OPTIONS.find((m) => m.key === key);
             if (!opt) return null;
@@ -116,13 +147,18 @@ export function TrendChart({ data, selectedMetrics }: TrendChartProps) {
                 name={opt.label}
                 stroke={opt.color}
                 strokeWidth={2}
-                dot={{ r: 4, fill: opt.color, strokeWidth: 0 }}
+                dot={renderDot(opt.color)}
                 activeDot={{ r: 6, fill: opt.color, strokeWidth: 0 }}
               />
             );
           })}
         </LineChart>
       </ResponsiveContainer>
+      {isEmptyRange && (
+        <div className="text-[11px] text-[var(--t3)] mt-2 text-center">
+          No data in selected range. Check the sheet or pick a different period.
+        </div>
+      )}
     </div>
   );
 }
