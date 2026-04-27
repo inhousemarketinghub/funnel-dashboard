@@ -54,29 +54,37 @@ export default async function DashboardPage({
     const { data } = await supabase.from("kpi_configs").select("*").eq("client_id", clientId).order("month", { ascending: false }).limit(1).single();
     kpiRow = data;
   }
-  // Brand detection (ordered by KPI tab)
-  const brands = await detectBrandsOrdered(client.sheet_id);
+  // Brand from URL only (don't await brands list yet — parallelize that fetch
+  // with the data fetches below). brandFromUrl is sufficient for the fetch
+  // helpers because passing undefined falls into auto-detect path inside each
+  // fetcher; passing a specific name does exact-match. selectedBrand (which
+  // also folds in single-brand auto-fallback) is computed AFTER the Promise.all.
   const brandParam = sp.brand as string | undefined;
-  // "Overall" or no selection = no brand filter (aggregate all)
-  const selectedBrand = brandParam && brandParam !== "Overall" ? brandParam : brands.length === 1 ? brands[0] : undefined;
+  const brandFromUrl = brandParam && brandParam !== "Overall" ? brandParam : undefined;
 
   let perfResult: PerfResult = { data: [], funnelType: "appointment" };
   let leadData: import("@/lib/types").Lead[] = [];
   let sheetKPI: KPIConfig | null = null;
   let personData: PersonData = { appointmentPersons: [], salesPersons: [], brandBreakdowns: {} };
+  let brands: string[] = [];
   let fetchError: string | null = null;
   try {
-    [perfResult, leadData, sheetKPI, personData] = await Promise.all([
-      fetchPerformanceData(client.sheet_id, selectedBrand),
-      fetchLeadData(client.sheet_id, selectedBrand),
-      fetchKPIData(client.sheet_id, selectedBrand),
-      fetchPersonData(client.sheet_id, reportStart, reportEnd, selectedBrand),
+    [perfResult, leadData, sheetKPI, personData, brands] = await Promise.all([
+      fetchPerformanceData(client.sheet_id, brandFromUrl),
+      fetchLeadData(client.sheet_id, brandFromUrl),
+      fetchKPIData(client.sheet_id, brandFromUrl),
+      fetchPersonData(client.sheet_id, reportStart, reportEnd, brandFromUrl),
+      detectBrandsOrdered(client.sheet_id),
     ]);
   } catch (err) {
     perfResult = { data: [], funnelType: "appointment" };
     leadData = [];
+    brands = [];
     fetchError = err instanceof Error ? err.message : "Failed to fetch Google Sheet data";
   }
+
+  // selectedBrand = explicit URL brand, OR single-brand auto-fallback
+  const selectedBrand = brandFromUrl ?? (brands.length === 1 ? brands[0] : undefined);
 
   // For Overall (multi-brand, no selectedBrand): ALWAYS sum all brand KPIs
   if (brands.length > 1 && !selectedBrand) {
