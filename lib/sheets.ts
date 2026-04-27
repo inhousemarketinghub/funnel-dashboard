@@ -842,12 +842,17 @@ export async function fetchPerformanceData(sheetId: string, brandName?: string):
       t.name.includes("@")
     );
     if (perfTabs.length > 1) {
-      // Multi-brand Overall: merge all performance tabs
+      // Multi-brand Overall: fetch all performance tabs in parallel, then merge.
+      // Previous sequential for-await meant 4 brands = 4x roundtrip latency stacked.
+      const tabResults = await Promise.all(
+        perfTabs.map(async (tab) => {
+          const rows = await fetchSheetData(sheetId, tab.name);
+          return { rows, colMap: detectPerfColumns(rows) };
+        }),
+      );
       let allData: DailyMetric[] = [];
       let funnelType: "appointment" | "walkin" = "appointment";
-      for (const tab of perfTabs) {
-        const rows = await fetchSheetData(sheetId, tab.name);
-        const colMap = detectPerfColumns(rows);
+      for (const { rows, colMap } of tabResults) {
         funnelType = detectFunnelTypeFromColumns(colMap);
         allData = allData.concat(parsePerformanceRows(rows));
       }
