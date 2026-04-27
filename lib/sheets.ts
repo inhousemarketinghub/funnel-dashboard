@@ -1,3 +1,4 @@
+import { cache } from "react";
 import type { DailyMetric, Lead, KPIConfig } from "./types";
 
 const API_KEY = process.env.GOOGLE_SHEETS_API_KEY || "";
@@ -11,7 +12,12 @@ interface SheetTab {
   gid: number;
 }
 
-export async function listSheetTabs(sheetId: string): Promise<SheetTab[]> {
+// React `cache()` dedupes calls within a single Server Component render.
+// Cross-request caching still flows through Next.js fetch with revalidate: 300.
+// Combined effect: same (sheetId) request → 1 actual API call, even if 5
+// callers ask. Critical for Dashboard where 5+ fetch helpers each used to
+// independently call listSheetTabs.
+export const listSheetTabs = cache(async (sheetId: string): Promise<SheetTab[]> => {
   const url = `${SHEETS_API}/${sheetId}?key=${API_KEY}&fields=sheets.properties`;
   const res = await fetch(url, { next: { revalidate: 300 } });
   if (!res.ok) throw new Error(`Failed to list tabs: ${res.status}`);
@@ -21,15 +27,17 @@ export async function listSheetTabs(sheetId: string): Promise<SheetTab[]> {
     hidden: s.properties.hidden || false,
     gid: s.properties.sheetId,
   }));
-}
+});
 
-export async function fetchSheetData(sheetId: string, tabName: string): Promise<string[][]> {
+// Same per-request dedup applied to tab data fetches. Same (sheetId, tabName)
+// → 1 actual API call within a render even if multiple callers ask.
+export const fetchSheetData = cache(async (sheetId: string, tabName: string): Promise<string[][]> => {
   const url = `${SHEETS_API}/${sheetId}/values/${encodeURIComponent(tabName)}?key=${API_KEY}&valueRenderOption=FORMATTED_VALUE`;
   const res = await fetch(url, { next: { revalidate: 300 } });
   if (!res.ok) throw new Error(`Failed to fetch tab "${tabName}": ${res.status}`);
   const data = await res.json();
   return data.values || [];
-}
+});
 
 // ── Tab auto-discovery ─────────────────────────────────────────
 
