@@ -68,19 +68,28 @@ export default async function DashboardPage({
   let personData: PersonData = { appointmentPersons: [], salesPersons: [], brandBreakdowns: {} };
   let brands: string[] = [];
   let fetchError: string | null = null;
+
+  // [PERF DIAG] temporary instrumentation — remove after we identify bottleneck
+  const __perfStart = Date.now();
+  const __reqId = Math.random().toString(36).slice(2, 8);
+  console.log(`[PERF ${__reqId}] start sheet=${client.sheet_id} brand=${brandFromUrl ?? "Overall"}`);
+
   try {
+    const __t = [Date.now(), Date.now(), Date.now(), Date.now(), Date.now()];
     [perfResult, leadData, sheetKPI, personData, brands] = await Promise.all([
-      fetchPerformanceData(client.sheet_id, brandFromUrl),
-      fetchLeadData(client.sheet_id, brandFromUrl),
-      fetchKPIData(client.sheet_id, brandFromUrl),
-      fetchPersonData(client.sheet_id, reportStart, reportEnd, brandFromUrl),
-      detectBrandsOrdered(client.sheet_id),
+      fetchPerformanceData(client.sheet_id, brandFromUrl).then((r) => { console.log(`[PERF ${__reqId}] fetchPerformanceData ${Date.now() - __t[0]}ms`); return r; }),
+      fetchLeadData(client.sheet_id, brandFromUrl).then((r) => { console.log(`[PERF ${__reqId}] fetchLeadData ${Date.now() - __t[1]}ms`); return r; }),
+      fetchKPIData(client.sheet_id, brandFromUrl).then((r) => { console.log(`[PERF ${__reqId}] fetchKPIData ${Date.now() - __t[2]}ms`); return r; }),
+      fetchPersonData(client.sheet_id, reportStart, reportEnd, brandFromUrl).then((r) => { console.log(`[PERF ${__reqId}] fetchPersonData ${Date.now() - __t[3]}ms`); return r; }),
+      detectBrandsOrdered(client.sheet_id).then((r) => { console.log(`[PERF ${__reqId}] detectBrandsOrdered ${Date.now() - __t[4]}ms`); return r; }),
     ]);
+    console.log(`[PERF ${__reqId}] Promise.all done ${Date.now() - __perfStart}ms`);
   } catch (err) {
     perfResult = { data: [], funnelType: "appointment" };
     leadData = [];
     brands = [];
     fetchError = err instanceof Error ? err.message : "Failed to fetch Google Sheet data";
+    console.log(`[PERF ${__reqId}] FETCH ERROR ${Date.now() - __perfStart}ms: ${fetchError}`);
   }
 
   // selectedBrand = explicit URL brand, OR single-brand auto-fallback
@@ -88,8 +97,11 @@ export default async function DashboardPage({
 
   // For Overall (multi-brand, no selectedBrand): ALWAYS sum all brand KPIs
   if (brands.length > 1 && !selectedBrand) {
+    const __ot = Date.now();
     sheetKPI = await fetchOverallKPI(client.sheet_id, brands);
+    console.log(`[PERF ${__reqId}] fetchOverallKPI(${brands.length} brands) ${Date.now() - __ot}ms`);
   }
+  console.log(`[PERF ${__reqId}] TOTAL data layer ${Date.now() - __perfStart}ms (brands=${brands.length}, perfRows=${perfResult.data.length}, leadRows=${leadData.length})`);
 
   // KPI: prefer Sheet data, fallback to Supabase, then defaults
   const kpi: KPIConfig = sheetKPI || kpiRow || {

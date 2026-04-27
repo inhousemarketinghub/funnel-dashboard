@@ -32,11 +32,15 @@ export const listSheetTabs = cache(async (sheetId: string): Promise<SheetTab[]> 
 // Same per-request dedup applied to tab data fetches. Same (sheetId, tabName)
 // → 1 actual API call within a render even if multiple callers ask.
 export const fetchSheetData = cache(async (sheetId: string, tabName: string): Promise<string[][]> => {
+  const __t = Date.now();
   const url = `${SHEETS_API}/${sheetId}/values/${encodeURIComponent(tabName)}?key=${API_KEY}&valueRenderOption=FORMATTED_VALUE`;
   const res = await fetch(url, { next: { revalidate: 300 } });
   if (!res.ok) throw new Error(`Failed to fetch tab "${tabName}": ${res.status}`);
   const data = await res.json();
-  return data.values || [];
+  const rows = data.values || [];
+  // [PERF DIAG] temporary
+  console.log(`[PERF SHEET] tab="${tabName}" ${Date.now() - __t}ms rows=${rows.length}`);
+  return rows;
 });
 
 // ── Tab auto-discovery ─────────────────────────────────────────
