@@ -32,17 +32,16 @@ export default async function DashboardPage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const __ssrStart = Date.now();
-  const __reqId = Math.random().toString(36).slice(2, 8);
-  console.log(`[SSR ${__reqId}] start`);
+  const __perf: Record<string, number> = {};
 
   const { clientId } = await params;
   const sp = await searchParams;
   const __sb1 = Date.now();
   const supabase = await createServerSupabase();
-  console.log(`[SSR ${__reqId}] createServerSupabase ${Date.now() - __sb1}ms`);
+  __perf.supabaseInit = Date.now() - __sb1;
   const __sb2 = Date.now();
   const { data: client } = await supabase.from("clients").select("*").eq("id", clientId).single();
-  console.log(`[SSR ${__reqId}] supabase clients query ${Date.now() - __sb2}ms`);
+  __perf.supabaseClients = Date.now() - __sb2;
   if (!client) return <p className="text-[#78716C] p-8">Client not found</p>;
   const clientLanguage = (client.language as "en" | "zh" | "ms") || "en";
 
@@ -63,7 +62,7 @@ export default async function DashboardPage({
     const { data } = await supabase.from("kpi_configs").select("*").eq("client_id", clientId).order("month", { ascending: false }).limit(1).single();
     kpiRow = data;
   }
-  console.log(`[SSR ${__reqId}] supabase kpi_configs query ${Date.now() - __sb3}ms`);
+  __perf.supabaseKPI = Date.now() - __sb3;
   // Brand from URL only (don't await brands list yet — parallelize that fetch
   // with the data fetches below). brandFromUrl is sufficient for the fetch
   // helpers because passing undefined falls into auto-detect path inside each
@@ -79,26 +78,24 @@ export default async function DashboardPage({
   let brands: string[] = [];
   let fetchError: string | null = null;
 
-  // [PERF DIAG] temporary instrumentation — remove after we identify bottleneck
+  // [PERF DIAG] temporary
   const __perfStart = Date.now();
-  console.log(`[PERF ${__reqId}] data layer start sheet=${client.sheet_id} brand=${brandFromUrl ?? "Overall"}`);
 
   try {
     const __t = [Date.now(), Date.now(), Date.now(), Date.now(), Date.now()];
     [perfResult, leadData, sheetKPI, personData, brands] = await Promise.all([
-      fetchPerformanceData(client.sheet_id, brandFromUrl).then((r) => { console.log(`[PERF ${__reqId}] fetchPerformanceData ${Date.now() - __t[0]}ms`); return r; }),
-      fetchLeadData(client.sheet_id, brandFromUrl).then((r) => { console.log(`[PERF ${__reqId}] fetchLeadData ${Date.now() - __t[1]}ms`); return r; }),
-      fetchKPIData(client.sheet_id, brandFromUrl).then((r) => { console.log(`[PERF ${__reqId}] fetchKPIData ${Date.now() - __t[2]}ms`); return r; }),
-      fetchPersonData(client.sheet_id, reportStart, reportEnd, brandFromUrl).then((r) => { console.log(`[PERF ${__reqId}] fetchPersonData ${Date.now() - __t[3]}ms`); return r; }),
-      detectBrandsOrdered(client.sheet_id).then((r) => { console.log(`[PERF ${__reqId}] detectBrandsOrdered ${Date.now() - __t[4]}ms`); return r; }),
+      fetchPerformanceData(client.sheet_id, brandFromUrl).then((r) => { __perf.perf = Date.now() - __t[0]; return r; }),
+      fetchLeadData(client.sheet_id, brandFromUrl).then((r) => { __perf.lead = Date.now() - __t[1]; return r; }),
+      fetchKPIData(client.sheet_id, brandFromUrl).then((r) => { __perf.kpi = Date.now() - __t[2]; return r; }),
+      fetchPersonData(client.sheet_id, reportStart, reportEnd, brandFromUrl).then((r) => { __perf.person = Date.now() - __t[3]; return r; }),
+      detectBrandsOrdered(client.sheet_id).then((r) => { __perf.brands = Date.now() - __t[4]; return r; }),
     ]);
-    console.log(`[PERF ${__reqId}] Promise.all done ${Date.now() - __perfStart}ms`);
+    __perf.promiseAll = Date.now() - __perfStart;
   } catch (err) {
     perfResult = { data: [], funnelType: "appointment" };
     leadData = [];
     brands = [];
     fetchError = err instanceof Error ? err.message : "Failed to fetch Google Sheet data";
-    console.log(`[PERF ${__reqId}] FETCH ERROR ${Date.now() - __perfStart}ms: ${fetchError}`);
   }
 
   // selectedBrand = explicit URL brand, OR single-brand auto-fallback
@@ -108,9 +105,8 @@ export default async function DashboardPage({
   if (brands.length > 1 && !selectedBrand) {
     const __ot = Date.now();
     sheetKPI = await fetchOverallKPI(client.sheet_id, brands);
-    console.log(`[PERF ${__reqId}] fetchOverallKPI(${brands.length} brands) ${Date.now() - __ot}ms`);
+    __perf.overallKPI = Date.now() - __ot;
   }
-  console.log(`[PERF ${__reqId}] TOTAL data layer ${Date.now() - __perfStart}ms (brands=${brands.length}, perfRows=${perfResult.data.length}, leadRows=${leadData.length})`);
 
   // KPI: prefer Sheet data, fallback to Supabase, then defaults
   const kpi: KPIConfig = sheetKPI || kpiRow || {
@@ -192,13 +188,41 @@ export default async function DashboardPage({
 
   const __pms = Date.now();
   const perms = await getProjectPermissions(clientId);
-  console.log(`[SSR ${__reqId}] getProjectPermissions ${Date.now() - __pms}ms`);
+  __perf.permissions = Date.now() - __pms;
   const canReport = perms.includes("view_report");
 
-  console.log(`[SSR ${__reqId}] TOTAL ${Date.now() - __ssrStart}ms`);
+  __perf.total = Date.now() - __ssrStart;
+  __perf.perfRows = perfResult.data.length;
+  __perf.leadRows = leadData.length;
+  __perf.brandCount = brands.length;
 
   return (
     <div>
+      {/* [PERF DIAG] visible timing bar — remove after diagnosis */}
+      <div style={{
+        position: "fixed",
+        bottom: 0,
+        left: 0,
+        right: 0,
+        background: "#111",
+        color: "#0f0",
+        fontFamily: "monospace",
+        fontSize: 11,
+        padding: "6px 12px",
+        zIndex: 99999,
+        whiteSpace: "nowrap",
+        overflow: "auto",
+        borderTop: "2px solid #0f0",
+      }}>
+        ⏱ TOTAL={__perf.total}ms |
+        supaInit={__perf.supabaseInit}ms |
+        supaClients={__perf.supabaseClients}ms |
+        supaKPI={__perf.supabaseKPI}ms |
+        promiseAll={__perf.promiseAll}ms (perf={__perf.perf}ms lead={__perf.lead}ms kpi={__perf.kpi}ms person={__perf.person}ms brands={__perf.brands}ms) |
+        overallKPI={__perf.overallKPI ?? "-"}ms |
+        perms={__perf.permissions}ms |
+        rows: perf={__perf.perfRows} lead={__perf.leadRows} brands={__perf.brandCount}
+      </div>
       {/* Header */}
       <div className="flex justify-between items-start mb-7">
         <div>
