@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import type { DailyMetric, Lead, KPIConfig } from "./types";
 
 const API_KEY = process.env.GOOGLE_SHEETS_API_KEY || "";
@@ -29,15 +30,28 @@ export const listSheetTabs = cache(async (sheetId: string): Promise<SheetTab[]> 
   }));
 });
 
-// Same per-request dedup applied to tab data fetches. Same (sheetId, tabName)
-// → 1 actual API call within a render even if multiple callers ask.
+// Cross-request cache for parsed sheet data. unstable_cache stores the FULL
+// parsed result (including JSON.parse output), so subsequent calls within
+// 5 minutes skip both network AND JSON parsing — critical for big sheets
+// like Lead & Sales Tracker where JSON.parse alone costs 200-400ms.
+const fetchSheetDataCached = unstable_cache(
+  async (sheetId: string, tabName: string): Promise<string[][]> => {
+    const url = `${SHEETS_API}/${sheetId}/values/${encodeURIComponent(tabName)}?key=${API_KEY}&valueRenderOption=FORMATTED_VALUE`;
+    const res = await fetch(url, { next: { revalidate: 300 } });
+    if (!res.ok) throw new Error(`Failed to fetch tab "${tabName}": ${res.status}`);
+    const data = await res.json();
+    return data.values || [];
+  },
+  ["sheet-data-v1"],
+  { revalidate: 300 },
+);
+
+// Per-request dedup wrapper. Combined with unstable_cache:
+// - Same render multiple callers → 1 Promise (React cache)
+// - Across renders within 5 min → cached result (unstable_cache)
 export const fetchSheetData = cache(async (sheetId: string, tabName: string): Promise<string[][]> => {
   const __t = Date.now();
-  const url = `${SHEETS_API}/${sheetId}/values/${encodeURIComponent(tabName)}?key=${API_KEY}&valueRenderOption=FORMATTED_VALUE`;
-  const res = await fetch(url, { next: { revalidate: 300 } });
-  if (!res.ok) throw new Error(`Failed to fetch tab "${tabName}": ${res.status}`);
-  const data = await res.json();
-  const rows = data.values || [];
+  const rows = await fetchSheetDataCached(sheetId, tabName);
   // [PERF DIAG] temporary
   console.log(`[PERF SHEET] tab="${tabName}" ${Date.now() - __t}ms rows=${rows.length}`);
   return rows;
