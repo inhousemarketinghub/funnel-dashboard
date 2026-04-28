@@ -31,10 +31,18 @@ export default async function DashboardPage({
   params: Promise<{ clientId: string }>;
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
+  const __ssrStart = Date.now();
+  const __reqId = Math.random().toString(36).slice(2, 8);
+  console.log(`[SSR ${__reqId}] start`);
+
   const { clientId } = await params;
   const sp = await searchParams;
+  const __sb1 = Date.now();
   const supabase = await createServerSupabase();
+  console.log(`[SSR ${__reqId}] createServerSupabase ${Date.now() - __sb1}ms`);
+  const __sb2 = Date.now();
   const { data: client } = await supabase.from("clients").select("*").eq("id", clientId).single();
+  console.log(`[SSR ${__reqId}] supabase clients query ${Date.now() - __sb2}ms`);
   if (!client) return <p className="text-[#78716C] p-8">Client not found</p>;
   const clientLanguage = (client.language as "en" | "zh" | "ms") || "en";
 
@@ -49,11 +57,13 @@ export default async function DashboardPage({
 
   // KPI lookup for the month containing the start of the range
   const monthStr = `${reportStart.getFullYear()}-${String(reportStart.getMonth() + 1).padStart(2, "0")}-01`;
+  const __sb3 = Date.now();
   let { data: kpiRow } = await supabase.from("kpi_configs").select("*").eq("client_id", clientId).eq("month", monthStr).single();
   if (!kpiRow) {
     const { data } = await supabase.from("kpi_configs").select("*").eq("client_id", clientId).order("month", { ascending: false }).limit(1).single();
     kpiRow = data;
   }
+  console.log(`[SSR ${__reqId}] supabase kpi_configs query ${Date.now() - __sb3}ms`);
   // Brand from URL only (don't await brands list yet — parallelize that fetch
   // with the data fetches below). brandFromUrl is sufficient for the fetch
   // helpers because passing undefined falls into auto-detect path inside each
@@ -71,8 +81,7 @@ export default async function DashboardPage({
 
   // [PERF DIAG] temporary instrumentation — remove after we identify bottleneck
   const __perfStart = Date.now();
-  const __reqId = Math.random().toString(36).slice(2, 8);
-  console.log(`[PERF ${__reqId}] start sheet=${client.sheet_id} brand=${brandFromUrl ?? "Overall"}`);
+  console.log(`[PERF ${__reqId}] data layer start sheet=${client.sheet_id} brand=${brandFromUrl ?? "Overall"}`);
 
   try {
     const __t = [Date.now(), Date.now(), Date.now(), Date.now(), Date.now()];
@@ -181,8 +190,12 @@ export default async function DashboardPage({
     { label: "CPA%", value: tm.cpa_pct ? (kpi.cpa_pct / tm.cpa_pct) * 100 : 0, target: `${kpi.cpa_pct}%`, actual: `${tm.cpa_pct.toFixed(2)}%`, prevActual: `${lm.cpa_pct.toFixed(2)}%` },
   ];
 
+  const __pms = Date.now();
   const perms = await getProjectPermissions(clientId);
+  console.log(`[SSR ${__reqId}] getProjectPermissions ${Date.now() - __pms}ms`);
   const canReport = perms.includes("view_report");
+
+  console.log(`[SSR ${__reqId}] TOTAL ${Date.now() - __ssrStart}ms`);
 
   return (
     <div>
