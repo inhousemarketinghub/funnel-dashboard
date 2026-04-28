@@ -50,11 +50,7 @@ const fetchSheetDataCached = unstable_cache(
 // - Same render multiple callers → 1 Promise (React cache)
 // - Across renders within 5 min → cached result (unstable_cache)
 export const fetchSheetData = cache(async (sheetId: string, tabName: string): Promise<string[][]> => {
-  const __t = Date.now();
-  const rows = await fetchSheetDataCached(sheetId, tabName);
-  // [PERF DIAG] temporary
-  console.log(`[PERF SHEET] tab="${tabName}" ${Date.now() - __t}ms rows=${rows.length}`);
-  return rows;
+  return fetchSheetDataCached(sheetId, tabName);
 });
 
 // ── Tab auto-discovery ─────────────────────────────────────────

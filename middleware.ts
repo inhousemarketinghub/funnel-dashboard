@@ -18,11 +18,7 @@ export async function middleware(request: NextRequest) {
     }
   );
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user
-      && !request.nextUrl.pathname.startsWith("/login")
-      && !request.nextUrl.pathname.startsWith("/auth")
-      && !request.nextUrl.pathname.startsWith("/api/perf-test") /* [PERF DIAG] temporary, remove before merge */
-  ) {
+  if (!user && !request.nextUrl.pathname.startsWith("/login") && !request.nextUrl.pathname.startsWith("/auth")) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
   return response;

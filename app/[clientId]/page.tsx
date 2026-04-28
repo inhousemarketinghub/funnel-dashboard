@@ -31,17 +31,10 @@ export default async function DashboardPage({
   params: Promise<{ clientId: string }>;
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const __ssrStart = Date.now();
-  const __perf: Record<string, number> = {};
-
   const { clientId } = await params;
   const sp = await searchParams;
-  const __sb1 = Date.now();
   const supabase = await createServerSupabase();
-  __perf.supabaseInit = Date.now() - __sb1;
-  const __sb2 = Date.now();
   const { data: client } = await supabase.from("clients").select("*").eq("id", clientId).single();
-  __perf.supabaseClients = Date.now() - __sb2;
   if (!client) return <p className="text-[#78716C] p-8">Client not found</p>;
   const clientLanguage = (client.language as "en" | "zh" | "ms") || "en";
 
@@ -56,13 +49,11 @@ export default async function DashboardPage({
 
   // KPI lookup for the month containing the start of the range
   const monthStr = `${reportStart.getFullYear()}-${String(reportStart.getMonth() + 1).padStart(2, "0")}-01`;
-  const __sb3 = Date.now();
   let { data: kpiRow } = await supabase.from("kpi_configs").select("*").eq("client_id", clientId).eq("month", monthStr).single();
   if (!kpiRow) {
     const { data } = await supabase.from("kpi_configs").select("*").eq("client_id", clientId).order("month", { ascending: false }).limit(1).single();
     kpiRow = data;
   }
-  __perf.supabaseKPI = Date.now() - __sb3;
   // Brand from URL only (don't await brands list yet — parallelize that fetch
   // with the data fetches below). brandFromUrl is sufficient for the fetch
   // helpers because passing undefined falls into auto-detect path inside each
@@ -78,19 +69,14 @@ export default async function DashboardPage({
   let brands: string[] = [];
   let fetchError: string | null = null;
 
-  // [PERF DIAG] temporary
-  const __perfStart = Date.now();
-
   try {
-    const __t = [Date.now(), Date.now(), Date.now(), Date.now(), Date.now()];
     [perfResult, leadData, sheetKPI, personData, brands] = await Promise.all([
-      fetchPerformanceData(client.sheet_id, brandFromUrl).then((r) => { __perf.perf = Date.now() - __t[0]; return r; }),
-      fetchLeadData(client.sheet_id, brandFromUrl).then((r) => { __perf.lead = Date.now() - __t[1]; return r; }),
-      fetchKPIData(client.sheet_id, brandFromUrl).then((r) => { __perf.kpi = Date.now() - __t[2]; return r; }),
-      fetchPersonData(client.sheet_id, reportStart, reportEnd, brandFromUrl).then((r) => { __perf.person = Date.now() - __t[3]; return r; }),
-      detectBrandsOrdered(client.sheet_id).then((r) => { __perf.brands = Date.now() - __t[4]; return r; }),
+      fetchPerformanceData(client.sheet_id, brandFromUrl),
+      fetchLeadData(client.sheet_id, brandFromUrl),
+      fetchKPIData(client.sheet_id, brandFromUrl),
+      fetchPersonData(client.sheet_id, reportStart, reportEnd, brandFromUrl),
+      detectBrandsOrdered(client.sheet_id),
     ]);
-    __perf.promiseAll = Date.now() - __perfStart;
   } catch (err) {
     perfResult = { data: [], funnelType: "appointment" };
     leadData = [];
@@ -103,9 +89,7 @@ export default async function DashboardPage({
 
   // For Overall (multi-brand, no selectedBrand): ALWAYS sum all brand KPIs
   if (brands.length > 1 && !selectedBrand) {
-    const __ot = Date.now();
     sheetKPI = await fetchOverallKPI(client.sheet_id, brands);
-    __perf.overallKPI = Date.now() - __ot;
   }
 
   // KPI: prefer Sheet data, fallback to Supabase, then defaults
@@ -186,43 +170,11 @@ export default async function DashboardPage({
     { label: "CPA%", value: tm.cpa_pct ? (kpi.cpa_pct / tm.cpa_pct) * 100 : 0, target: `${kpi.cpa_pct}%`, actual: `${tm.cpa_pct.toFixed(2)}%`, prevActual: `${lm.cpa_pct.toFixed(2)}%` },
   ];
 
-  const __pms = Date.now();
   const perms = await getProjectPermissions(clientId);
-  __perf.permissions = Date.now() - __pms;
   const canReport = perms.includes("view_report");
-
-  __perf.total = Date.now() - __ssrStart;
-  __perf.perfRows = perfResult.data.length;
-  __perf.leadRows = leadData.length;
-  __perf.brandCount = brands.length;
 
   return (
     <div>
-      {/* [PERF DIAG] visible timing bar — remove after diagnosis */}
-      <div style={{
-        position: "fixed",
-        bottom: 0,
-        left: 0,
-        right: 0,
-        background: "#111",
-        color: "#0f0",
-        fontFamily: "monospace",
-        fontSize: 11,
-        padding: "6px 12px",
-        zIndex: 99999,
-        whiteSpace: "nowrap",
-        overflow: "auto",
-        borderTop: "2px solid #0f0",
-      }}>
-        ⏱ TOTAL={__perf.total}ms |
-        supaInit={__perf.supabaseInit}ms |
-        supaClients={__perf.supabaseClients}ms |
-        supaKPI={__perf.supabaseKPI}ms |
-        promiseAll={__perf.promiseAll}ms (perf={__perf.perf}ms lead={__perf.lead}ms kpi={__perf.kpi}ms person={__perf.person}ms brands={__perf.brands}ms) |
-        overallKPI={__perf.overallKPI ?? "-"}ms |
-        perms={__perf.permissions}ms |
-        rows: perf={__perf.perfRows} lead={__perf.leadRows} brands={__perf.brandCount}
-      </div>
       {/* Header */}
       <div className="flex justify-between items-start mb-7">
         <div>
