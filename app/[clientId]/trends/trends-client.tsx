@@ -28,6 +28,7 @@ interface TrendsClientProps {
   range: DateRangeObj;
   compare: boolean;
   comparisonRange: DateRangeObj | null;
+  funnelType: string;
 }
 
 export function TrendsClient({
@@ -39,6 +40,7 @@ export function TrendsClient({
   range,
   compare,
   comparisonRange,
+  funnelType,
 }: TrendsClientProps) {
   const [selectedMetrics, setSelectedMetrics] = useState<string[]>(["sales", "cpl", "conv_rate"]);
   const [isPending, startTransition] = useTransition();
@@ -166,6 +168,7 @@ export function TrendsClient({
           selected={selectedMetrics}
           onChange={setSelectedMetrics}
           maxSelect={5}
+          funnelType={funnelType}
         />
       </div>
 
@@ -174,12 +177,14 @@ export function TrendsClient({
         avgComparison={bundle.avgComparison}
         selectedMetrics={selectedMetrics}
         compare={compare}
+        funnelType={funnelType}
       />
 
       <TrendChart
         data={bundle.current}
         comparison={bundle.comparison}
         selectedMetrics={selectedMetrics}
+        funnelType={funnelType}
       />
     </div>
   );

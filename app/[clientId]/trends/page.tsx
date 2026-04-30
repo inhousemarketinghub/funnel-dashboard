@@ -73,6 +73,7 @@ export default async function TrendsPage({
     comparisonFrom: comparisonRange?.from,
     comparisonTo: comparisonRange?.to,
     brandName: brand,
+    funnelType: client.funnel_type,
   });
 
   return (
@@ -85,6 +86,7 @@ export default async function TrendsPage({
       range={range}
       compare={compare}
       comparisonRange={comparisonRange}
+      funnelType={client.funnel_type ?? "appointment"}
     />
   );
 }

@@ -11,7 +11,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { METRIC_OPTIONS } from "./metric-selector";
+import { getMetricOptionsForFunnel } from "./metric-selector";
 import type { TrendPoint } from "@/lib/trends";
 import { momPct } from "@/lib/utils";
 import { INVERTED_METRICS } from "@/components/shared/mom-badge";
@@ -20,6 +20,7 @@ interface TrendChartProps {
   data: TrendPoint[];
   comparison?: TrendPoint[];
   selectedMetrics: string[];
+  funnelType?: string;
 }
 
 const CURRENCY_METRICS = new Set(["ad_spend", "sales", "orders", "cpl", "aov"]);
@@ -83,15 +84,17 @@ interface CustomTooltipProps {
   payload?: { payload: TooltipRow }[];
   selectedMetrics: string[];
   hasComparison: boolean;
+  funnelType: string;
 }
 
-function CustomTooltip({ active, payload, selectedMetrics, hasComparison }: CustomTooltipProps) {
+function CustomTooltip({ active, payload, selectedMetrics, hasComparison, funnelType }: CustomTooltipProps) {
   if (!active || !payload?.length) return null;
   const row = payload[0].payload;
   const label = row.isPartial ? `(incomplete) ${row.label}` : row.label;
   const cmpLabel = hasComparison && row.cmpLabel
     ? (row.cmpIsPartial ? `(incomplete) ${row.cmpLabel}` : row.cmpLabel)
     : null;
+  const options = getMetricOptionsForFunnel(funnelType);
 
   return (
     <div
@@ -109,7 +112,7 @@ function CustomTooltip({ active, payload, selectedMetrics, hasComparison }: Cust
         <div className="text-[10px] text-[var(--t4)] mb-2">vs {cmpLabel}</div>
       )}
       {selectedMetrics.map((key) => {
-        const opt = METRIC_OPTIONS.find((m) => m.key === key);
+        const opt = options.find((m) => m.key === key);
         if (!opt) return null;
         const cur = Number(row[key] ?? 0);
         const prev = hasComparison ? Number(row[`${key}__cmp`] ?? 0) : null;
@@ -145,8 +148,13 @@ function CustomTooltip({ active, payload, selectedMetrics, hasComparison }: Cust
   );
 }
 
-export function TrendChart({ data, comparison, selectedMetrics }: TrendChartProps) {
-  if (selectedMetrics.length === 0) {
+export function TrendChart({ data, comparison, selectedMetrics, funnelType = "appointment" }: TrendChartProps) {
+  const visibleOptions = getMetricOptionsForFunnel(funnelType);
+  const visibleKeys = new Set(visibleOptions.map((o) => o.key));
+  // Defensive: if user has stale selected metrics from a different funnel type, drop those keys.
+  const visibleSelected = selectedMetrics.filter((k) => visibleKeys.has(k));
+
+  if (visibleSelected.length === 0) {
     return (
       <div className="card-base">
         <div className="flex items-center justify-center h-[340px] text-[var(--t4)] text-[13px]">
@@ -165,7 +173,7 @@ export function TrendChart({ data, comparison, selectedMetrics }: TrendChartProp
       cmpLabel: cmp?.label ?? null,
       cmpIsPartial: cmp?.isPartial ?? false,
     };
-    for (const key of selectedMetrics) {
+    for (const key of visibleSelected) {
       row[key] = (point.metrics as unknown as Record<string, number>)[key] ?? 0;
       if (cmp) {
         row[`${key}__cmp`] = (cmp.metrics as unknown as Record<string, number>)[key] ?? 0;
@@ -174,8 +182,8 @@ export function TrendChart({ data, comparison, selectedMetrics }: TrendChartProp
     return row;
   });
 
-  const hasLeft = selectedMetrics.some((k) => !PERCENT_METRICS.has(k));
-  const hasRight = selectedMetrics.some((k) => PERCENT_METRICS.has(k));
+  const hasLeft = visibleSelected.some((k) => !PERCENT_METRICS.has(k));
+  const hasRight = visibleSelected.some((k) => PERCENT_METRICS.has(k));
   const isEmptyRange =
     data.length > 0 &&
     data.every((p) => Object.values(p.metrics).every((v) => v === 0));
@@ -213,12 +221,16 @@ export function TrendChart({ data, comparison, selectedMetrics }: TrendChartProp
           )}
           <Tooltip
             content={
-              <CustomTooltip selectedMetrics={selectedMetrics} hasComparison={hasComparison} />
+              <CustomTooltip
+                selectedMetrics={visibleSelected}
+                hasComparison={hasComparison}
+                funnelType={funnelType}
+              />
             }
           />
           <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
-          {selectedMetrics.map((key) => {
-            const opt = METRIC_OPTIONS.find((m) => m.key === key);
+          {visibleSelected.map((key) => {
+            const opt = visibleOptions.find((m) => m.key === key);
             if (!opt) return null;
             const yAxisId = PERCENT_METRICS.has(key) ? "right" : "left";
             return (
@@ -235,8 +247,8 @@ export function TrendChart({ data, comparison, selectedMetrics }: TrendChartProp
               />
             );
           })}
-          {hasComparison && selectedMetrics.map((key) => {
-            const opt = METRIC_OPTIONS.find((m) => m.key === key);
+          {hasComparison && visibleSelected.map((key) => {
+            const opt = visibleOptions.find((m) => m.key === key);
             if (!opt) return null;
             const yAxisId = PERCENT_METRICS.has(key) ? "right" : "left";
             return (

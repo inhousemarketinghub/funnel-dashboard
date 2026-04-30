@@ -24,16 +24,30 @@ export const METRIC_OPTIONS: MetricOption[] = [
   { key: "cpa_pct", label: "CPA%", group: "Backend", unit: "percent", color: "#78716C" },
 ];
 
+/**
+ * Walk-in funnels skip the appointment / show-up stage (orders convert from contact = visit).
+ * Hide appt_rate + showup_rate; rename respond_rate → "Visit Rate".
+ */
+export function getMetricOptionsForFunnel(funnelType: string): MetricOption[] {
+  const isWalkin = funnelType === "walkin";
+  if (!isWalkin) return METRIC_OPTIONS;
+  return METRIC_OPTIONS
+    .filter((opt) => opt.key !== "appt_rate" && opt.key !== "showup_rate")
+    .map((opt) => (opt.key === "respond_rate" ? { ...opt, label: "Visit Rate" } : opt));
+}
+
 const GROUPS: ("Frontend" | "Midend" | "Backend")[] = ["Frontend", "Midend", "Backend"];
 
 interface MetricSelectorProps {
   selected: string[];
   onChange: (keys: string[]) => void;
   maxSelect?: number;
+  funnelType?: string;
 }
 
-export function MetricSelector({ selected, onChange, maxSelect = 5 }: MetricSelectorProps) {
+export function MetricSelector({ selected, onChange, maxSelect = 5, funnelType = "appointment" }: MetricSelectorProps) {
   const atMax = selected.length >= maxSelect;
+  const visibleOptions = getMetricOptionsForFunnel(funnelType);
 
   function toggle(key: string) {
     if (selected.includes(key)) {
@@ -46,7 +60,7 @@ export function MetricSelector({ selected, onChange, maxSelect = 5 }: MetricSele
   return (
     <div className="flex flex-wrap gap-4">
       {GROUPS.map((group) => {
-        const options = METRIC_OPTIONS.filter((m) => m.group === group);
+        const options = visibleOptions.filter((m) => m.group === group);
         return (
           <div key={group} className="flex flex-col gap-[6px]">
             <span className="font-label text-[10px] uppercase tracking-widest text-[var(--t4)]">{group}</span>

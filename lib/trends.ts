@@ -74,11 +74,12 @@ export interface TrendBundle {
 function bucketize(
   ranges: TrendRange[],
   allData: import("./types").DailyMetric[],
+  funnelType: string,
 ): TrendPoint[] {
   return ranges.map((range) => {
     try {
       const rows = allData.filter((r) => r.date >= range.from && r.date <= range.to);
-      return { label: range.label, isPartial: range.isPartial, metrics: computeMetrics(rows, 0) };
+      return { label: range.label, isPartial: range.isPartial, metrics: computeMetrics(rows, 0, funnelType) };
     } catch {
       return { label: range.label, isPartial: range.isPartial, metrics: zeroMetrics() };
     }
@@ -89,9 +90,10 @@ function pooledAvg(
   allData: import("./types").DailyMetric[],
   from: Date,
   to: Date,
+  funnelType: string,
 ): FunnelMetrics {
   const rows = allData.filter((r) => r.date >= from && r.date <= to);
-  return computeMetrics(rows, 0);
+  return computeMetrics(rows, 0, funnelType);
 }
 
 export async function fetchTrends(opts: {
@@ -102,8 +104,10 @@ export async function fetchTrends(opts: {
   comparisonFrom?: Date;
   comparisonTo?: Date;
   brandName?: string | null;
+  funnelType?: string;
   now?: Date;
 }): Promise<TrendBundle> {
+  const funnelType = opts.funnelType ?? "appointment";
   const now = opts.now ?? new Date();
   const currentRanges = opts.granularity === "weekly"
     ? getWeekRanges(opts.from, opts.to, now)
@@ -131,13 +135,13 @@ export async function fetchTrends(opts: {
     return bundle;
   }
 
-  const current = bucketize(currentRanges, allData);
-  const avgCurrent = pooledAvg(allData, opts.from, opts.to);
+  const current = bucketize(currentRanges, allData, funnelType);
+  const avgCurrent = pooledAvg(allData, opts.from, opts.to, funnelType);
   const bundle: TrendBundle = { current, avgCurrent };
 
   if (comparisonRanges) {
-    bundle.comparison = bucketize(comparisonRanges, allData);
-    bundle.avgComparison = pooledAvg(allData, opts.comparisonFrom!, opts.comparisonTo!);
+    bundle.comparison = bucketize(comparisonRanges, allData, funnelType);
+    bundle.avgComparison = pooledAvg(allData, opts.comparisonFrom!, opts.comparisonTo!, funnelType);
   }
   return bundle;
 }

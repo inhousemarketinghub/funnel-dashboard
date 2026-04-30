@@ -4,13 +4,14 @@ import type { FunnelMetrics } from "@/lib/types";
 import { momPct } from "@/lib/utils";
 import { CountUp } from "@/components/animations/count-up";
 import { MoMBadge, INVERTED_METRICS } from "@/components/shared/mom-badge";
-import { METRIC_OPTIONS, type MetricOption } from "./metric-selector";
+import { getMetricOptionsForFunnel, type MetricOption } from "./metric-selector";
 
 interface Props {
   avgCurrent: FunnelMetrics;
   avgComparison?: FunnelMetrics;
   selectedMetrics: string[];
   compare: boolean;
+  funnelType?: string;
 }
 
 const ACCENT_COLORS = ["accent-red", "accent-blue", "accent-yellow", "accent-black", "accent-red"];
@@ -27,8 +28,8 @@ function formatStatic(value: number, opt: MetricOption): string {
   return `${cfg.prefix ?? ""}${fixed}${cfg.suffix ?? ""}`;
 }
 
-export function TrendAvgCards({ avgCurrent, avgComparison, selectedMetrics, compare }: Props) {
-  const cards = METRIC_OPTIONS.filter((opt) => selectedMetrics.includes(opt.key));
+export function TrendAvgCards({ avgCurrent, avgComparison, selectedMetrics, compare, funnelType = "appointment" }: Props) {
+  const cards = getMetricOptionsForFunnel(funnelType).filter((opt) => selectedMetrics.includes(opt.key));
   if (cards.length === 0) return null;
 
   const showComparison = compare && !!avgComparison;

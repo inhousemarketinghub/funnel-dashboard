@@ -251,3 +251,54 @@ describe("fetchTrends with comparison", () => {
     expect(vi.mocked(fetchPerformanceData).mock.calls).toHaveLength(1);
   });
 });
+
+describe("fetchTrends funnelType behaviour", () => {
+  const now = new Date(2026, 3, 24);
+
+  beforeEach(() => {
+    vi.mocked(fetchPerformanceData).mockReset();
+  });
+
+  it("walkin: conv_rate uses orders/contact (not orders/showup) so it isn't always 0", async () => {
+    // Walk-in funnel has no showup data. With default appointment formula (orders/showup),
+    // conv_rate would be 0. With walkin (orders/contact), 4/20 = 20%.
+    vi.mocked(fetchPerformanceData).mockResolvedValue({
+      data: [
+        { date: new Date(2026, 3, 14), ad_spend: 100, inquiry: 30, contact: 20, appointment: 0, showup: 0, orders: 4, sales: 800 },
+      ],
+      headers: [],
+    } as unknown as Awaited<ReturnType<typeof fetchPerformanceData>>);
+
+    const bundle = await fetchTrends({
+      sheetId: "fake",
+      granularity: "weekly",
+      from: new Date(2026, 3, 13),
+      to: new Date(2026, 3, 19),
+      funnelType: "walkin",
+      now,
+    });
+
+    expect(bundle.current[0].metrics.conv_rate).toBeCloseTo(20, 5);
+    expect(bundle.avgCurrent.conv_rate).toBeCloseTo(20, 5);
+  });
+
+  it("appointment (default): conv_rate uses orders/showup", async () => {
+    vi.mocked(fetchPerformanceData).mockResolvedValue({
+      data: [
+        { date: new Date(2026, 3, 14), ad_spend: 100, inquiry: 30, contact: 20, appointment: 10, showup: 8, orders: 4, sales: 800 },
+      ],
+      headers: [],
+    } as unknown as Awaited<ReturnType<typeof fetchPerformanceData>>);
+
+    const bundle = await fetchTrends({
+      sheetId: "fake",
+      granularity: "weekly",
+      from: new Date(2026, 3, 13),
+      to: new Date(2026, 3, 19),
+      now,
+    });
+
+    // 4/8 = 50%
+    expect(bundle.current[0].metrics.conv_rate).toBeCloseTo(50, 5);
+  });
+});
