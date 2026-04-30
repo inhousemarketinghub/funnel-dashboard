@@ -1,5 +1,6 @@
 import type { FunnelMetrics, KPIConfig, MoMResult } from "@/lib/types";
 import { fmtRM, fmtROAS } from "@/lib/utils";
+import { MoMBadge } from "@/components/shared/mom-badge";
 
 interface FunnelRow {
   label: string;
@@ -56,18 +57,6 @@ function buildRows(
   );
 
   return rows;
-}
-
-/**
- * Determine whether a MoM change is "good" or "bad".
- * For normal metrics: positive = good. For inverted metrics (CPL, CPA%): negative = good.
- */
-function momBadge(v: number | null, inverted: boolean) {
-  if (v === null) return <span className="text-[13px] text-[var(--t4)] num">N/A</span>;
-  const isGood = inverted ? v < 0 : v > 0;
-  const cls = isGood ? "chg chg-up" : "chg chg-dn";
-  const sign = v > 0 ? "+" : "";
-  return <span className={cls}>{sign}{v.toFixed(1)}%</span>;
 }
 
 const TH =
@@ -137,7 +126,7 @@ export function MoMTable({
                 {r.lmFmt}
               </td>
               <td style={{ padding: "12px 16px" }}>
-                {momBadge(r.mom, r.inverted)}
+                <MoMBadge value={r.mom} inverted={r.inverted} />
               </td>
               <td
                 className="text-[13px] text-[var(--t4)] num"

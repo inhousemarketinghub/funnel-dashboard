@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getMondayOf, getSundayOf, snapToGranularity, isPartialRange, formatWeekLabel, getDefaultRange, getPresetRange, MONTHLY_PRESETS, WEEKLY_PRESETS } from "../dates";
+import { getMondayOf, getSundayOf, snapToGranularity, isPartialRange, formatWeekLabel, getDefaultRange, getPresetRange, getPreviousPeriodByGranularity, MONTHLY_PRESETS, WEEKLY_PRESETS } from "../dates";
 
 describe("getMondayOf", () => {
   it("returns same date when input is Monday", () => {
@@ -142,6 +142,80 @@ describe("getDefaultRange(granularity)", () => {
     const result = getDefaultRange();
     expect(result.from.getDate()).toBe(1);
     expect(result.to.getTime()).toBeGreaterThanOrEqual(result.from.getTime());
+  });
+});
+
+describe("getPreviousPeriodByGranularity", () => {
+  it("weekly N=4: Mar 30 – Apr 26 → Mar 2 – Mar 29", () => {
+    const result = getPreviousPeriodByGranularity(
+      new Date(2026, 2, 30),
+      new Date(2026, 3, 26),
+      "weekly",
+    );
+    expect(result.from).toEqual(new Date(2026, 2, 2));
+    expect(result.to).toEqual(new Date(2026, 2, 29));
+  });
+
+  it("weekly N=1: Apr 20 – Apr 26 → Apr 13 – Apr 19", () => {
+    const result = getPreviousPeriodByGranularity(
+      new Date(2026, 3, 20),
+      new Date(2026, 3, 26),
+      "weekly",
+    );
+    expect(result.from).toEqual(new Date(2026, 3, 13));
+    expect(result.to).toEqual(new Date(2026, 3, 19));
+  });
+
+  it("weekly: snaps unaligned input to Mon-Sun before computing previous", () => {
+    const result = getPreviousPeriodByGranularity(
+      new Date(2026, 3, 1),  // Wed Apr 1 → Mon Mar 30
+      new Date(2026, 3, 24), // Fri Apr 24 → Sun Apr 26
+      "weekly",
+    );
+    // After snap: Mar 30 – Apr 26 (4 weeks). Previous should be Mar 2 – Mar 29.
+    expect(result.from).toEqual(new Date(2026, 2, 2));
+    expect(result.to).toEqual(new Date(2026, 2, 29));
+  });
+
+  it("monthly N=3: Feb 1 – Apr 30 2026 → Nov 1 2025 – Jan 31 2026", () => {
+    const result = getPreviousPeriodByGranularity(
+      new Date(2026, 1, 1),
+      new Date(2026, 3, 30),
+      "monthly",
+    );
+    expect(result.from).toEqual(new Date(2025, 10, 1));
+    expect(result.to).toEqual(new Date(2026, 0, 31));
+  });
+
+  it("monthly N=6 cross-year: Nov 1 2025 – Apr 30 2026 → May 1 – Oct 31 2025", () => {
+    const result = getPreviousPeriodByGranularity(
+      new Date(2025, 10, 1),
+      new Date(2026, 3, 30),
+      "monthly",
+    );
+    expect(result.from).toEqual(new Date(2025, 4, 1));
+    expect(result.to).toEqual(new Date(2025, 9, 31));
+  });
+
+  it("monthly N=1: Apr 1 – Apr 30 2026 → Mar 1 – Mar 31 2026", () => {
+    const result = getPreviousPeriodByGranularity(
+      new Date(2026, 3, 1),
+      new Date(2026, 3, 30),
+      "monthly",
+    );
+    expect(result.from).toEqual(new Date(2026, 2, 1));
+    expect(result.to).toEqual(new Date(2026, 2, 31));
+  });
+
+  it("monthly: snaps unaligned input to month boundaries before computing", () => {
+    const result = getPreviousPeriodByGranularity(
+      new Date(2026, 1, 15), // Feb 15 → Feb 1
+      new Date(2026, 3, 10), // Apr 10 → Apr 30
+      "monthly",
+    );
+    // After snap: Feb 1 – Apr 30 (3 months). Previous: Nov 1 2025 – Jan 31 2026.
+    expect(result.from).toEqual(new Date(2025, 10, 1));
+    expect(result.to).toEqual(new Date(2026, 0, 31));
   });
 });
 

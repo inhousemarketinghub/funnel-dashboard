@@ -72,6 +72,29 @@ export function getPreviousPeriod(from: Date, to: Date): DateRangeObj {
   return { from: prevFrom, to: prevTo };
 }
 
+export function getPreviousPeriodByGranularity(
+  from: Date,
+  to: Date,
+  granularity: Granularity,
+): DateRangeObj {
+  // Snap inputs to granularity boundaries — caller may pass unsnapped ranges.
+  const snapped = snapToGranularity({ from, to }, granularity);
+  if (granularity === "weekly") {
+    const days = Math.round((snapped.to.getTime() - snapped.from.getTime()) / 86400000) + 1;
+    const weeks = Math.round(days / 7);
+    const prevTo = new Date(snapped.from.getTime() - 86400000); // Sunday before
+    const prevFrom = new Date(prevTo);
+    prevFrom.setDate(prevTo.getDate() - (weeks * 7 - 1)); // Monday N weeks before prevTo
+    return { from: prevFrom, to: prevTo };
+  }
+  const months =
+    (snapped.to.getFullYear() - snapped.from.getFullYear()) * 12 +
+    (snapped.to.getMonth() - snapped.from.getMonth()) + 1;
+  const prevFrom = new Date(snapped.from.getFullYear(), snapped.from.getMonth() - months, 1);
+  const prevTo = new Date(snapped.from.getFullYear(), snapped.from.getMonth(), 0); // last day of month before `from`
+  return { from: prevFrom, to: prevTo };
+}
+
 export function resolveSearchParams(
   fromStr: string | string[] | undefined,
   toStr: string | string[] | undefined,

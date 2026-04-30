@@ -64,40 +64,84 @@ export function getMonthRanges(from: Date, to: Date, now: Date = new Date()): Tr
   return ranges;
 }
 
+export interface TrendBundle {
+  current: TrendPoint[];
+  comparison?: TrendPoint[];
+  avgCurrent: FunnelMetrics;
+  avgComparison?: FunnelMetrics;
+}
+
+function bucketize(
+  ranges: TrendRange[],
+  allData: import("./types").DailyMetric[],
+  funnelType: string,
+): TrendPoint[] {
+  return ranges.map((range) => {
+    try {
+      const rows = allData.filter((r) => r.date >= range.from && r.date <= range.to);
+      return { label: range.label, isPartial: range.isPartial, metrics: computeMetrics(rows, 0, funnelType) };
+    } catch {
+      return { label: range.label, isPartial: range.isPartial, metrics: zeroMetrics() };
+    }
+  });
+}
+
+function pooledAvg(
+  allData: import("./types").DailyMetric[],
+  from: Date,
+  to: Date,
+  funnelType: string,
+): FunnelMetrics {
+  const rows = allData.filter((r) => r.date >= from && r.date <= to);
+  return computeMetrics(rows, 0, funnelType);
+}
+
 export async function fetchTrends(opts: {
   sheetId: string;
   granularity: Granularity;
   from: Date;
   to: Date;
+  comparisonFrom?: Date;
+  comparisonTo?: Date;
   brandName?: string | null;
+  funnelType?: string;
   now?: Date;
-}): Promise<TrendPoint[]> {
+}): Promise<TrendBundle> {
+  const funnelType = opts.funnelType ?? "appointment";
   const now = opts.now ?? new Date();
-  const ranges = opts.granularity === "weekly"
+  const currentRanges = opts.granularity === "weekly"
     ? getWeekRanges(opts.from, opts.to, now)
     : getMonthRanges(opts.from, opts.to, now);
 
-  const results: TrendPoint[] = [];
+  const hasComparison = !!(opts.comparisonFrom && opts.comparisonTo);
+  const comparisonRanges = hasComparison
+    ? (opts.granularity === "weekly"
+        ? getWeekRanges(opts.comparisonFrom!, opts.comparisonTo!, now)
+        : getMonthRanges(opts.comparisonFrom!, opts.comparisonTo!, now))
+    : null;
+
   let allData: import("./types").DailyMetric[] = [];
   try {
     const perfResult = await fetchPerformanceData(opts.sheetId, opts.brandName ?? undefined);
     allData = perfResult.data;
   } catch (err) {
     console.error("fetchTrends: fetchPerformanceData failed", err);
-    for (const range of ranges) {
-      results.push({ label: range.label, isPartial: range.isPartial, metrics: zeroMetrics() });
+    const current = currentRanges.map((r) => ({ label: r.label, isPartial: r.isPartial, metrics: zeroMetrics() }));
+    const bundle: TrendBundle = { current, avgCurrent: zeroMetrics() };
+    if (comparisonRanges) {
+      bundle.comparison = comparisonRanges.map((r) => ({ label: r.label, isPartial: r.isPartial, metrics: zeroMetrics() }));
+      bundle.avgComparison = zeroMetrics();
     }
-    return results;
+    return bundle;
   }
 
-  for (const range of ranges) {
-    try {
-      const rows = allData.filter((r) => r.date >= range.from && r.date <= range.to);
-      const metrics = computeMetrics(rows, 0);
-      results.push({ label: range.label, isPartial: range.isPartial, metrics });
-    } catch {
-      results.push({ label: range.label, isPartial: range.isPartial, metrics: zeroMetrics() });
-    }
+  const current = bucketize(currentRanges, allData, funnelType);
+  const avgCurrent = pooledAvg(allData, opts.from, opts.to, funnelType);
+  const bundle: TrendBundle = { current, avgCurrent };
+
+  if (comparisonRanges) {
+    bundle.comparison = bucketize(comparisonRanges, allData, funnelType);
+    bundle.avgComparison = pooledAvg(allData, opts.comparisonFrom!, opts.comparisonTo!, funnelType);
   }
-  return results;
+  return bundle;
 }

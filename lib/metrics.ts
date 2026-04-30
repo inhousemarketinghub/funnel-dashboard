@@ -1,7 +1,11 @@
 import type { DailyMetric, FunnelMetrics, KPIConfig, MoMResult, Achievement, BudgetScenario } from "./types";
 import { pct, momPct } from "./utils";
 
-export function computeMetrics(rows: DailyMetric[], estShowUp: number): FunnelMetrics {
+export function computeMetrics(
+  rows: DailyMetric[],
+  estShowUp: number,
+  funnelType: "appointment" | "walkin" | string = "appointment",
+): FunnelMetrics {
   const sum = (fn: (r: DailyMetric) => number) => rows.reduce((a, r) => a + fn(r), 0);
 
   const ad_spend = sum((r) => r.ad_spend);
@@ -12,6 +16,12 @@ export function computeMetrics(rows: DailyMetric[], estShowUp: number): FunnelMe
   const orders = sum((r) => r.orders);
   const sales = sum((r) => r.sales);
 
+  // Walk-in funnel skips the appointment/show-up stage: orders convert from contact (= visit) directly.
+  const isWalkin = funnelType === "walkin";
+  const conv_rate = isWalkin
+    ? (contact ? pct(orders, contact) : 0)
+    : (showup ? pct(orders, showup) : 0);
+
   return {
     ad_spend, inquiry, contact, appointment, showup, orders, sales,
     est_showup: estShowUp,
@@ -19,7 +29,7 @@ export function computeMetrics(rows: DailyMetric[], estShowUp: number): FunnelMe
     respond_rate: pct(contact, inquiry),
     appt_rate: pct(appointment, contact),
     showup_rate: estShowUp ? pct(showup, estShowUp) : 0,
-    conv_rate: showup ? pct(orders, showup) : 0,
+    conv_rate,
     aov: orders ? sales / orders : 0,
     roas: ad_spend ? sales / ad_spend : 0,
     cpa_pct: sales ? pct(ad_spend, sales) : 0,
