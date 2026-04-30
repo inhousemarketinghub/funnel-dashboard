@@ -1,3 +1,5 @@
+import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import type { DailyMetric, Lead, KPIConfig } from "./types";
 
 const API_KEY = process.env.GOOGLE_SHEETS_API_KEY || "";
@@ -11,7 +13,12 @@ interface SheetTab {
   gid: number;
 }
 
-export async function listSheetTabs(sheetId: string): Promise<SheetTab[]> {
+// React `cache()` dedupes calls within a single Server Component render.
+// Cross-request caching still flows through Next.js fetch with revalidate: 300.
+// Combined effect: same (sheetId) request → 1 actual API call, even if 5
+// callers ask. Critical for Dashboard where 5+ fetch helpers each used to
+// independently call listSheetTabs.
+export const listSheetTabs = cache(async (sheetId: string): Promise<SheetTab[]> => {
   const url = `${SHEETS_API}/${sheetId}?key=${API_KEY}&fields=sheets.properties`;
   const res = await fetch(url, { next: { revalidate: 300 } });
   if (!res.ok) throw new Error(`Failed to list tabs: ${res.status}`);
@@ -21,15 +28,30 @@ export async function listSheetTabs(sheetId: string): Promise<SheetTab[]> {
     hidden: s.properties.hidden || false,
     gid: s.properties.sheetId,
   }));
-}
+});
 
-export async function fetchSheetData(sheetId: string, tabName: string): Promise<string[][]> {
-  const url = `${SHEETS_API}/${sheetId}/values/${encodeURIComponent(tabName)}?key=${API_KEY}&valueRenderOption=FORMATTED_VALUE`;
-  const res = await fetch(url, { next: { revalidate: 300 } });
-  if (!res.ok) throw new Error(`Failed to fetch tab "${tabName}": ${res.status}`);
-  const data = await res.json();
-  return data.values || [];
-}
+// Cross-request cache for parsed sheet data. unstable_cache stores the FULL
+// parsed result (including JSON.parse output), so subsequent calls within
+// 5 minutes skip both network AND JSON parsing — critical for big sheets
+// like Lead & Sales Tracker where JSON.parse alone costs 200-400ms.
+const fetchSheetDataCached = unstable_cache(
+  async (sheetId: string, tabName: string): Promise<string[][]> => {
+    const url = `${SHEETS_API}/${sheetId}/values/${encodeURIComponent(tabName)}?key=${API_KEY}&valueRenderOption=FORMATTED_VALUE`;
+    const res = await fetch(url, { next: { revalidate: 300 } });
+    if (!res.ok) throw new Error(`Failed to fetch tab "${tabName}": ${res.status}`);
+    const data = await res.json();
+    return data.values || [];
+  },
+  ["sheet-data-v1"],
+  { revalidate: 300 },
+);
+
+// Per-request dedup wrapper. Combined with unstable_cache:
+// - Same render multiple callers → 1 Promise (React cache)
+// - Across renders within 5 min → cached result (unstable_cache)
+export const fetchSheetData = cache(async (sheetId: string, tabName: string): Promise<string[][]> => {
+  return fetchSheetDataCached(sheetId, tabName);
+});
 
 // ── Tab auto-discovery ─────────────────────────────────────────
 
@@ -834,12 +856,17 @@ export async function fetchPerformanceData(sheetId: string, brandName?: string):
       t.name.includes("@")
     );
     if (perfTabs.length > 1) {
-      // Multi-brand Overall: merge all performance tabs
+      // Multi-brand Overall: fetch all performance tabs in parallel, then merge.
+      // Previous sequential for-await meant 4 brands = 4x roundtrip latency stacked.
+      const tabResults = await Promise.all(
+        perfTabs.map(async (tab) => {
+          const rows = await fetchSheetData(sheetId, tab.name);
+          return { rows, colMap: detectPerfColumns(rows) };
+        }),
+      );
       let allData: DailyMetric[] = [];
       let funnelType: "appointment" | "walkin" = "appointment";
-      for (const tab of perfTabs) {
-        const rows = await fetchSheetData(sheetId, tab.name);
-        const colMap = detectPerfColumns(rows);
+      for (const { rows, colMap } of tabResults) {
         funnelType = detectFunnelTypeFromColumns(colMap);
         allData = allData.concat(parsePerformanceRows(rows));
       }
@@ -874,18 +901,41 @@ export async function fetchPerformanceData(sheetId: string, brandName?: string):
   };
 }
 
-export async function fetchLeadData(sheetId: string, brandName?: string): Promise<Lead[]> {
+// Serialized form for unstable_cache (Date → ISO string for JSON safety)
+interface SerializedLead {
+  appointment_date: string | null;
+  showed_up: boolean;
+  sales: number;
+  purchase_date: string | null;
+}
+function serializeLead(l: Lead): SerializedLead {
+  return {
+    appointment_date: l.appointment_date ? l.appointment_date.toISOString() : null,
+    showed_up: l.showed_up,
+    sales: l.sales,
+    purchase_date: l.purchase_date ? l.purchase_date.toISOString() : null,
+  };
+}
+function deserializeLead(s: SerializedLead): Lead {
+  return {
+    appointment_date: s.appointment_date ? new Date(s.appointment_date) : null,
+    showed_up: s.showed_up,
+    sales: s.sales,
+    purchase_date: s.purchase_date ? new Date(s.purchase_date) : null,
+  };
+}
+
+// Inner: full fetch + parse + brand filter. Uses sheet-level cache (rows).
+async function fetchLeadDataInner(sheetId: string, brandName?: string): Promise<Lead[]> {
   const tabName = await findLeadSalesTab(sheetId);
   if (!tabName) throw new Error("No Lead & Sales Tracker tab found");
   const rows = await fetchSheetData(sheetId, tabName);
   const leads = parseLeadRows(rows);
 
-  // Filter by brand if brand column exists and brandName is provided
   if (brandName && rows.length > 0) {
     const header = rows[0].map((h) => (h || "").toLowerCase());
     const brandCol = header.findIndex((h) => h.includes("brand"));
     if (brandCol >= 0) {
-      // Re-parse with brand filter
       const filtered: Lead[] = [];
       const colMap = detectLeadColumns(rows[0]);
       for (let i = 1; i < rows.length; i++) {
@@ -902,8 +952,24 @@ export async function fetchLeadData(sheetId: string, brandName?: string): Promis
       return filtered;
     }
   }
-
   return leads;
+}
+
+// Cached layer: stores serialized leads (ISO string dates) keyed by (sheetId, brand).
+// 5-min TTL. Skips parseLeadRows (~700ms over 23K rows) on cache hit.
+const fetchLeadDataCached = unstable_cache(
+  async (sheetId: string, brandKey: string): Promise<SerializedLead[]> => {
+    const brandName = brandKey === "__ALL__" ? undefined : brandKey;
+    const leads = await fetchLeadDataInner(sheetId, brandName);
+    return leads.map(serializeLead);
+  },
+  ["lead-data-v2"],
+  { revalidate: 300 },
+);
+
+export async function fetchLeadData(sheetId: string, brandName?: string): Promise<Lead[]> {
+  const serialized = await fetchLeadDataCached(sheetId, brandName ?? "__ALL__");
+  return serialized.map(deserializeLead);
 }
 
 export interface BrandSalesBreakdown {
@@ -912,7 +978,8 @@ export interface BrandSalesBreakdown {
   sales: number;
 }
 
-export async function fetchPersonData(sheetId: string, startDate?: Date, endDate?: Date, brandName?: string): Promise<PersonData> {
+// Inner: full aggregation logic. PersonData has no Date fields → safe for direct caching.
+async function fetchPersonDataInner(sheetId: string, startDate?: Date, endDate?: Date, brandName?: string): Promise<PersonData> {
   const tabName = await findLeadSalesTab(sheetId);
   if (!tabName) return { appointmentPersons: [], salesPersons: [], brandBreakdowns: {} };
   const rows = await fetchSheetData(sheetId, tabName);
@@ -936,7 +1003,9 @@ export async function fetchPersonData(sheetId: string, startDate?: Date, endDate
     ? aggregateSalesPersons(filteredRows, colMap.salesPerson, colMap, startDate, endDate)
     : [];
 
-  // Brand breakdown per Sales Person (only for multi-brand sheets)
+  // Brand breakdown per Sales Person — IMPORTANT: iterates ALL rows (not filteredRows)
+  // so that each sales person's cross-brand breakdown is preserved even when the
+  // dashboard is filtered to a single brand. DO NOT change to filteredRows.
   const brandBreakdowns: Record<string, BrandSalesBreakdown[]> = {};
   if (colMap.brand !== null && colMap.salesPerson !== null) {
     for (let i = 1; i < rows.length; i++) {
@@ -966,6 +1035,26 @@ export async function fetchPersonData(sheetId: string, startDate?: Date, endDate
   }
 
   return { appointmentPersons, salesPersons, brandBreakdowns };
+}
+
+// Cached layer: keyed by (sheetId, fromIso, toIso, brand). 5-min TTL.
+// Skips parseDate × 23K rows × 3 aggregation loops on cache hit.
+// PersonData has no Date fields so direct serialization is safe.
+const fetchPersonDataCached = unstable_cache(
+  async (sheetId: string, fromIso: string, toIso: string, brandKey: string): Promise<PersonData> => {
+    const startDate = fromIso === "__NONE__" ? undefined : new Date(fromIso);
+    const endDate = toIso === "__NONE__" ? undefined : new Date(toIso);
+    const brandName = brandKey === "__ALL__" ? undefined : brandKey;
+    return fetchPersonDataInner(sheetId, startDate, endDate, brandName);
+  },
+  ["person-data-v2"],
+  { revalidate: 300 },
+);
+
+export async function fetchPersonData(sheetId: string, startDate?: Date, endDate?: Date, brandName?: string): Promise<PersonData> {
+  const fromIso = startDate ? startDate.toISOString() : "__NONE__";
+  const toIso = endDate ? endDate.toISOString() : "__NONE__";
+  return fetchPersonDataCached(sheetId, fromIso, toIso, brandName ?? "__ALL__");
 }
 
 export async function fetchKPIData(sheetId: string, brandName?: string): Promise<KPIConfig | null> {
