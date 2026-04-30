@@ -5,6 +5,7 @@ import {
   parseDateParam,
   snapToGranularity,
   getDefaultRange,
+  getPreviousPeriodByGranularity,
   type Granularity,
   type DateRangeObj,
 } from "@/lib/dates";
@@ -15,6 +16,8 @@ function resolveTrendParams(sp: { [k: string]: string | string[] | undefined }):
   granularity: Granularity;
   range: DateRangeObj;
   brand: string | null;
+  compare: boolean;
+  comparisonRange: DateRangeObj | null;
 } {
   const gRaw = Array.isArray(sp.granularity) ? sp.granularity[0] : sp.granularity;
   const granularity: Granularity = gRaw === "monthly" ? "monthly" : "weekly";
@@ -30,7 +33,20 @@ function resolveTrendParams(sp: { [k: string]: string | string[] | undefined }):
   const brandRaw = Array.isArray(sp.brand) ? sp.brand[0] : sp.brand;
   const brand = brandRaw && brandRaw !== "Overall" ? brandRaw : null;
 
-  return { granularity, range, brand };
+  const compareRaw = Array.isArray(sp.compare) ? sp.compare[0] : sp.compare;
+  const compare = compareRaw === "1" || compareRaw === "true";
+
+  let comparisonRange: DateRangeObj | null = null;
+  if (compare) {
+    const parsedPrevFrom = parseDateParam(Array.isArray(sp.prevFrom) ? sp.prevFrom[0] : sp.prevFrom);
+    const parsedPrevTo = parseDateParam(Array.isArray(sp.prevTo) ? sp.prevTo[0] : sp.prevTo);
+    const validPrev = parsedPrevFrom && parsedPrevTo && parsedPrevFrom.getTime() <= parsedPrevTo.getTime();
+    comparisonRange = validPrev
+      ? snapToGranularity({ from: parsedPrevFrom!, to: parsedPrevTo! }, granularity)
+      : getPreviousPeriodByGranularity(range.from, range.to, granularity);
+  }
+
+  return { granularity, range, brand, compare, comparisonRange };
 }
 
 export default async function TrendsPage({
@@ -47,24 +63,28 @@ export default async function TrendsPage({
   if (!client) notFound();
 
   const brands = await detectBrandsOrdered(client.sheet_id);
-  const { granularity, range, brand } = resolveTrendParams(sp);
+  const { granularity, range, brand, compare, comparisonRange } = resolveTrendParams(sp);
 
-  const trendData = await fetchTrends({
+  const bundle = await fetchTrends({
     sheetId: client.sheet_id,
     granularity,
     from: range.from,
     to: range.to,
+    comparisonFrom: comparisonRange?.from,
+    comparisonTo: comparisonRange?.to,
     brandName: brand,
   });
 
   return (
     <TrendsClient
-      data={trendData}
+      bundle={bundle}
       brands={brands}
       selectedBrand={brand}
       clientId={clientId}
       granularity={granularity}
       range={range}
+      compare={compare}
+      comparisonRange={comparisonRange}
     />
   );
 }

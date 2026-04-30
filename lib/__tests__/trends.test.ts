@@ -106,7 +106,7 @@ describe("fetchTrends", () => {
     vi.mocked(fetchPerformanceData).mockReset();
   });
 
-  it("weekly: returns 4 TrendPoints with bucketed metrics", async () => {
+  it("weekly: returns bundle.current with 4 TrendPoints + bucketed metrics", async () => {
     vi.mocked(fetchPerformanceData).mockResolvedValue({
       data: [
         { date: new Date(2026, 3, 1), ad_spend: 100, inquiry: 10, contact: 5, appointment: 3, showup: 2, orders: 1, sales: 500 },
@@ -115,7 +115,7 @@ describe("fetchTrends", () => {
       headers: [],
     } as unknown as Awaited<ReturnType<typeof fetchPerformanceData>>);
 
-    const points = await fetchTrends({
+    const bundle = await fetchTrends({
       sheetId: "fake",
       granularity: "weekly",
       from: new Date(2026, 2, 30),
@@ -123,23 +123,25 @@ describe("fetchTrends", () => {
       now,
     });
 
-    expect(points).toHaveLength(4);
-    // Apr 1 falls in week 0 (Mar 30 – Apr 5)
-    expect(points[0].label).toBe("Mar 30 – Apr 5");
-    expect(points[0].metrics.ad_spend).toBe(100);
-    // Apr 15 falls in week 2 (Apr 13 – 19)
-    expect(points[2].metrics.ad_spend).toBe(200);
-    // Apr 20 – 26 is current week (weekEnd 26 > now 24) → partial
-    expect(points[3].isPartial).toBe(true);
+    expect(bundle.current).toHaveLength(4);
+    expect(bundle.current[0].label).toBe("Mar 30 – Apr 5");
+    expect(bundle.current[0].metrics.ad_spend).toBe(100);
+    expect(bundle.current[2].metrics.ad_spend).toBe(200);
+    expect(bundle.current[3].isPartial).toBe(true);
+    expect(bundle.comparison).toBeUndefined();
+    expect(bundle.avgComparison).toBeUndefined();
+    // Pooled avg over the entire range: total ad_spend = 300, total inquiry = 30 → CPL = 10
+    expect(bundle.avgCurrent.ad_spend).toBe(300);
+    expect(bundle.avgCurrent.cpl).toBeCloseTo(10, 5);
   });
 
-  it("monthly: returns TrendPoints labeled by month", async () => {
+  it("monthly: returns bundle with month-labeled TrendPoints", async () => {
     vi.mocked(fetchPerformanceData).mockResolvedValue({
       data: [],
       headers: [],
     } as unknown as Awaited<ReturnType<typeof fetchPerformanceData>>);
 
-    const points = await fetchTrends({
+    const bundle = await fetchTrends({
       sheetId: "fake",
       granularity: "monthly",
       from: new Date(2026, 1, 1),
@@ -147,15 +149,16 @@ describe("fetchTrends", () => {
       now,
     });
 
-    expect(points).toHaveLength(3);
-    expect(points.map((p) => p.label)).toEqual(["Feb 2026", "Mar 2026", "Apr 2026"]);
-    expect(points.every((p) => p.metrics.ad_spend === 0)).toBe(true);
+    expect(bundle.current).toHaveLength(3);
+    expect(bundle.current.map((p) => p.label)).toEqual(["Feb 2026", "Mar 2026", "Apr 2026"]);
+    expect(bundle.current.every((p) => p.metrics.ad_spend === 0)).toBe(true);
+    expect(bundle.avgCurrent.ad_spend).toBe(0);
   });
 
   it("returns zero metrics for all ranges when fetch throws", async () => {
     vi.mocked(fetchPerformanceData).mockRejectedValue(new Error("boom"));
 
-    const points = await fetchTrends({
+    const bundle = await fetchTrends({
       sheetId: "fake",
       granularity: "weekly",
       from: new Date(2026, 2, 30),
@@ -163,7 +166,88 @@ describe("fetchTrends", () => {
       now,
     });
 
-    expect(points).toHaveLength(4);
-    expect(points.every((p) => p.metrics.ad_spend === 0)).toBe(true);
+    expect(bundle.current).toHaveLength(4);
+    expect(bundle.current.every((p) => p.metrics.ad_spend === 0)).toBe(true);
+    expect(bundle.avgCurrent.ad_spend).toBe(0);
+  });
+});
+
+describe("fetchTrends with comparison", () => {
+  const now = new Date(2026, 3, 24);
+
+  beforeEach(() => {
+    vi.mocked(fetchPerformanceData).mockReset();
+  });
+
+  it("returns comparison + avgComparison when comparisonFrom/To provided", async () => {
+    vi.mocked(fetchPerformanceData).mockResolvedValue({
+      data: [
+        // Current period: Apr 13 – Apr 26 (2 weeks)
+        { date: new Date(2026, 3, 14), ad_spend: 300, inquiry: 30, contact: 15, appointment: 9, showup: 6, orders: 3, sales: 1500 },
+        // Comparison period: Mar 30 – Apr 12 (2 weeks)
+        { date: new Date(2026, 2, 31), ad_spend: 100, inquiry: 10, contact: 5, appointment: 3, showup: 2, orders: 1, sales: 500 },
+      ],
+      headers: [],
+    } as unknown as Awaited<ReturnType<typeof fetchPerformanceData>>);
+
+    const bundle = await fetchTrends({
+      sheetId: "fake",
+      granularity: "weekly",
+      from: new Date(2026, 3, 13),
+      to: new Date(2026, 3, 26),
+      comparisonFrom: new Date(2026, 2, 30),
+      comparisonTo: new Date(2026, 3, 12),
+      now,
+    });
+
+    expect(bundle.current).toHaveLength(2);
+    expect(bundle.comparison).toHaveLength(2);
+    expect(bundle.comparison![0].label).toBe("Mar 30 – Apr 5");
+    expect(bundle.avgCurrent.ad_spend).toBe(300);
+    expect(bundle.avgComparison?.ad_spend).toBe(100);
+  });
+
+  it("avgCurrent uses POOLED averaging (not arithmetic mean of weekly ratios)", async () => {
+    // Week 1: ad_spend=100, inquiry=10  → CPL=10
+    // Week 2: ad_spend=900, inquiry=30  → CPL=30
+    // Arithmetic mean of weekly CPLs would be 20.
+    // POOLED CPL = total_ad_spend (1000) / total_inquiry (40) = 25  ← correct.
+    vi.mocked(fetchPerformanceData).mockResolvedValue({
+      data: [
+        { date: new Date(2026, 3, 1),  ad_spend: 100, inquiry: 10, contact: 0, appointment: 0, showup: 0, orders: 0, sales: 0 },
+        { date: new Date(2026, 3, 15), ad_spend: 900, inquiry: 30, contact: 0, appointment: 0, showup: 0, orders: 0, sales: 0 },
+      ],
+      headers: [],
+    } as unknown as Awaited<ReturnType<typeof fetchPerformanceData>>);
+
+    const bundle = await fetchTrends({
+      sheetId: "fake",
+      granularity: "weekly",
+      from: new Date(2026, 2, 30),
+      to: new Date(2026, 3, 26),
+      now,
+    });
+
+    expect(bundle.avgCurrent.cpl).toBeCloseTo(25, 5);
+    expect(bundle.avgCurrent.cpl).not.toBeCloseTo(20, 1); // not the arithmetic mean
+  });
+
+  it("calls fetchPerformanceData only once even with comparison range", async () => {
+    vi.mocked(fetchPerformanceData).mockResolvedValue({
+      data: [],
+      headers: [],
+    } as unknown as Awaited<ReturnType<typeof fetchPerformanceData>>);
+
+    await fetchTrends({
+      sheetId: "fake",
+      granularity: "weekly",
+      from: new Date(2026, 3, 13),
+      to: new Date(2026, 3, 26),
+      comparisonFrom: new Date(2026, 2, 30),
+      comparisonTo: new Date(2026, 3, 12),
+      now,
+    });
+
+    expect(vi.mocked(fetchPerformanceData).mock.calls).toHaveLength(1);
   });
 });

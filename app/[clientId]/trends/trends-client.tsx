@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { MetricSelector } from "@/components/trends/metric-selector";
 import { TrendChart } from "@/components/trends/trend-chart";
 import { GranularityToggle } from "@/components/trends/granularity-toggle";
+import { ComparisonToggle } from "@/components/trends/comparison-toggle";
+import { TrendAvgCards } from "@/components/trends/trend-avg-cards";
 import { DateRangePicker } from "@/components/dashboard/date-range-picker";
 import {
   formatRangeLabel,
@@ -15,36 +17,54 @@ import {
   type Granularity,
   type DateRangeObj,
 } from "@/lib/dates";
-import type { TrendPoint } from "@/lib/trends";
+import type { TrendBundle } from "@/lib/trends";
 
 interface TrendsClientProps {
-  data: TrendPoint[];
+  bundle: TrendBundle;
   brands: string[];
   selectedBrand: string | null;
   clientId: string;
   granularity: Granularity;
   range: DateRangeObj;
+  compare: boolean;
+  comparisonRange: DateRangeObj | null;
 }
 
 export function TrendsClient({
-  data,
+  bundle,
   brands,
   selectedBrand,
   clientId,
   granularity,
   range,
+  compare,
+  comparisonRange,
 }: TrendsClientProps) {
   const [selectedMetrics, setSelectedMetrics] = useState<string[]>(["sales", "cpl", "conv_rate"]);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
   const hasMultiBrand = brands.length > 1;
 
-  function handleBrandChange(brand: string) {
+  function buildBaseParams(): URLSearchParams {
     const params = new URLSearchParams();
     params.set("granularity", granularity);
     params.set("from", formatDateParam(range.from));
     params.set("to", formatDateParam(range.to));
+    if (selectedBrand) params.set("brand", selectedBrand);
+    if (compare) {
+      params.set("compare", "1");
+      if (comparisonRange) {
+        params.set("prevFrom", formatDateParam(comparisonRange.from));
+        params.set("prevTo", formatDateParam(comparisonRange.to));
+      }
+    }
+    return params;
+  }
+
+  function handleBrandChange(brand: string) {
+    const params = buildBaseParams();
     if (brand !== "Overall") params.set("brand", brand);
+    else params.delete("brand");
     startTransition(() => {
       router.push(`/${clientId}/trends?${params.toString()}`);
     });
@@ -57,6 +77,23 @@ export function TrendsClient({
     params.set("from", formatDateParam(defaultRange.from));
     params.set("to", formatDateParam(defaultRange.to));
     if (selectedBrand) params.set("brand", selectedBrand);
+    // Preserve compare flag; let server re-derive comparison range for new granularity.
+    if (compare) params.set("compare", "1");
+    startTransition(() => {
+      router.push(`/${clientId}/trends?${params.toString()}`);
+    });
+  }
+
+  function handleCompareChange(next: boolean) {
+    const params = new URLSearchParams();
+    params.set("granularity", granularity);
+    params.set("from", formatDateParam(range.from));
+    params.set("to", formatDateParam(range.to));
+    if (selectedBrand) params.set("brand", selectedBrand);
+    if (next) {
+      params.set("compare", "1");
+      // Don't carry prevFrom/prevTo — let server derive default from granularity.
+    }
     startTransition(() => {
       router.push(`/${clientId}/trends?${params.toString()}`);
     });
@@ -69,6 +106,10 @@ export function TrendsClient({
         (range.to.getMonth() - range.from.getMonth()) + 1;
   const unit = granularity === "weekly" ? "weeks" : "months";
 
+  const dateRangeExtraParams: Record<string, string> = { granularity };
+  if (selectedBrand) dateRangeExtraParams.brand = selectedBrand;
+  if (compare) dateRangeExtraParams.compare = "1";
+
   return (
     <div>
       <div className="flex justify-between items-start mb-7">
@@ -77,12 +118,22 @@ export function TrendsClient({
           <p className="text-[14px] text-[var(--t3)] font-light mt-[3px]">
             {granularity === "weekly" ? "Weekly" : "Monthly"} performance · {formatRangeLabel(range.from, range.to)} ({subtitleCount} {unit})
             {selectedBrand && <span className="ml-1">— {selectedBrand}</span>}
+            {compare && comparisonRange && (
+              <span className="ml-2 text-[12px] text-[var(--t4)]">
+                vs {formatRangeLabel(comparisonRange.from, comparisonRange.to)}
+              </span>
+            )}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap justify-end">
           <GranularityToggle
             value={granularity}
             onChange={handleGranularityChange}
+            pending={isPending}
+          />
+          <ComparisonToggle
+            value={compare}
+            onChange={handleCompareChange}
             pending={isPending}
           />
           <DateRangePicker
@@ -90,10 +141,7 @@ export function TrendsClient({
             basePath={`/${clientId}/trends`}
             presets={granularity === "weekly" ? WEEKLY_PRESETS : MONTHLY_PRESETS}
             maxRange={granularity === "weekly" ? { weeks: 104 } : { months: 24 }}
-            extraParams={{
-              granularity,
-              ...(selectedBrand ? { brand: selectedBrand } : {}),
-            }}
+            extraParams={dateRangeExtraParams}
           />
           {hasMultiBrand && (
             <select
@@ -121,7 +169,18 @@ export function TrendsClient({
         />
       </div>
 
-      <TrendChart data={data} selectedMetrics={selectedMetrics} />
+      <TrendAvgCards
+        avgCurrent={bundle.avgCurrent}
+        avgComparison={bundle.avgComparison}
+        selectedMetrics={selectedMetrics}
+        compare={compare}
+      />
+
+      <TrendChart
+        data={bundle.current}
+        comparison={bundle.comparison}
+        selectedMetrics={selectedMetrics}
+      />
     </div>
   );
 }
