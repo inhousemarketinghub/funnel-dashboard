@@ -21,6 +21,12 @@ function getDisplayConfig(opt: MetricOption): { prefix?: string; suffix?: string
   return { decimals: 0 };
 }
 
+function formatStatic(value: number, opt: MetricOption): string {
+  const cfg = getDisplayConfig(opt);
+  const fixed = value.toFixed(cfg.decimals).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return `${cfg.prefix ?? ""}${fixed}${cfg.suffix ?? ""}`;
+}
+
 export function TrendAvgCards({ avgCurrent, avgComparison, selectedMetrics, compare }: Props) {
   const cards = METRIC_OPTIONS.filter((opt) => selectedMetrics.includes(opt.key));
   if (cards.length === 0) return null;
@@ -50,9 +56,15 @@ export function TrendAvgCards({ avgCurrent, avgComparison, selectedMetrics, comp
                 <CountUp value={current} prefix={display.prefix} suffix={display.suffix} decimals={display.decimals} />
               </div>
               {showComparison && (
-                <div className="flex items-center gap-1.5 text-[11px]">
+                <div
+                  className="flex items-center justify-between gap-2 text-[11px] pt-2 mt-1"
+                  style={{ borderTop: "1px solid var(--border)" }}
+                >
+                  <div className="flex flex-col">
+                    <span className="text-[9px] uppercase tracking-widest text-[var(--t4)]">prev</span>
+                    <span className="num text-[12px] text-[var(--t3)]">{formatStatic(previous, opt)}</span>
+                  </div>
                   <MoMBadge value={delta} inverted={INVERTED_METRICS.has(opt.key)} />
-                  <span className="text-[var(--t4)]">vs prev</span>
                 </div>
               )}
             </div>
