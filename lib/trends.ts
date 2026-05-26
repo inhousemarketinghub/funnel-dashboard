@@ -21,7 +21,7 @@ export interface TrendRange {
 
 function zeroMetrics(): FunnelMetrics {
   return {
-    ad_spend: 0, inquiry: 0, contact: 0, appointment: 0, showup: 0,
+    ad_spend: 0, lead_funnel_spend: 0, branding_spend: 0, inquiry: 0, contact: 0, appointment: 0, showup: 0,
     est_showup: 0, orders: 0, sales: 0, cpl: 0, respond_rate: 0,
     appt_rate: 0, showup_rate: 0, conv_rate: 0, aov: 0, roas: 0, cpa_pct: 0,
   };

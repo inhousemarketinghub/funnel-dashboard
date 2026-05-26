@@ -9,6 +9,8 @@ export function computeMetrics(
   const sum = (fn: (r: DailyMetric) => number) => rows.reduce((a, r) => a + fn(r), 0);
 
   const ad_spend = sum((r) => r.ad_spend);
+  const lead_funnel_spend = sum((r) => r.lead_funnel_spend);
+  const branding_spend = sum((r) => r.branding_spend);
   const inquiry = sum((r) => r.inquiry);
   const contact = sum((r) => r.contact);
   const appointment = sum((r) => r.appointment);
@@ -22,10 +24,18 @@ export function computeMetrics(
     ? (contact ? pct(orders, contact) : 0)
     : (showup ? pct(orders, showup) : 0);
 
+  // CPL uses only the lead-generation spend (Lead Funnel), taxed at 8% SST to match
+  // the card breakdown and the sheet's "Cost Per PM (Included 8% SST)". Sheets without
+  // the Lead Funnel / Branding split fall back to the taxed total.
+  const splitExists = lead_funnel_spend + branding_spend > 0;
+  const cpl = inquiry
+    ? (splitExists ? (lead_funnel_spend * 1.08) / inquiry : ad_spend / inquiry)
+    : 0;
+
   return {
-    ad_spend, inquiry, contact, appointment, showup, orders, sales,
+    ad_spend, lead_funnel_spend, branding_spend, inquiry, contact, appointment, showup, orders, sales,
     est_showup: estShowUp,
-    cpl: inquiry ? ad_spend / inquiry : 0,
+    cpl,
     respond_rate: pct(contact, inquiry),
     appt_rate: pct(appointment, contact),
     showup_rate: estShowUp ? pct(showup, estShowUp) : 0,

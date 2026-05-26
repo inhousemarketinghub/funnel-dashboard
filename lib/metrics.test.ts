@@ -3,8 +3,8 @@ import { computeMetrics, computeMoM, computeAchievement, budgetScenario } from "
 import type { DailyMetric, KPIConfig } from "./types";
 
 const sampleRows: DailyMetric[] = [
-  { date: new Date("2026-03-01"), ad_spend: 250, inquiry: 10, contact: 5, appointment: 1, showup: 0, orders: 0, sales: 0 },
-  { date: new Date("2026-03-02"), ad_spend: 260, inquiry: 12, contact: 4, appointment: 2, showup: 1, orders: 1, sales: 40000 },
+  { date: new Date("2026-03-01"), ad_spend: 250, lead_funnel_spend: 100, branding_spend: 50, inquiry: 10, contact: 5, appointment: 1, showup: 0, orders: 0, sales: 0 },
+  { date: new Date("2026-03-02"), ad_spend: 260, lead_funnel_spend: 110, branding_spend: 50, inquiry: 12, contact: 4, appointment: 2, showup: 1, orders: 1, sales: 40000 },
 ];
 
 describe("computeMetrics", () => {
@@ -15,7 +15,10 @@ describe("computeMetrics", () => {
     expect(m.contact).toBe(9);
     expect(m.orders).toBe(1);
     expect(m.sales).toBe(40000);
-    expect(m.cpl).toBeCloseTo(510 / 22, 2);
+    expect(m.lead_funnel_spend).toBe(210);
+    expect(m.branding_spend).toBe(100);
+    // CPL = (Lead Funnel × 1.08) / leads, not taxed total / leads
+    expect(m.cpl).toBeCloseTo((210 * 1.08) / 22, 2);
     expect(m.respond_rate).toBeCloseTo(9 / 22 * 100, 1);
     expect(m.showup_rate).toBeCloseTo(1 / 3 * 100, 1);
     expect(m.roas).toBeCloseTo(40000 / 510, 1);
@@ -26,6 +29,22 @@ describe("computeMetrics", () => {
     expect(m.cpl).toBe(0);
     expect(m.roas).toBe(0);
     expect(m.aov).toBe(0);
+  });
+
+  it("CPL = 0 when Lead Funnel is 0 but Branding has spend (split exists)", () => {
+    const rows: DailyMetric[] = [
+      { date: new Date("2026-03-01"), ad_spend: 270, lead_funnel_spend: 0, branding_spend: 250, inquiry: 10, contact: 0, appointment: 0, showup: 0, orders: 0, sales: 0 },
+    ];
+    const m = computeMetrics(rows, 0);
+    expect(m.cpl).toBe(0);
+  });
+
+  it("falls back to taxed total / leads when no split columns present", () => {
+    const rows: DailyMetric[] = [
+      { date: new Date("2026-03-01"), ad_spend: 250, lead_funnel_spend: 0, branding_spend: 0, inquiry: 10, contact: 0, appointment: 0, showup: 0, orders: 0, sales: 0 },
+    ];
+    const m = computeMetrics(rows, 0);
+    expect(m.cpl).toBeCloseTo(250 / 10, 2);
   });
 });
 

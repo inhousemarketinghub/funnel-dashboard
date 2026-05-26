@@ -1,6 +1,8 @@
 export interface DailyMetric {
   date: Date;
   ad_spend: number;
+  lead_funnel_spend: number;
+  branding_spend: number;
   inquiry: number;
   contact: number;
   appointment: number;
@@ -18,6 +20,8 @@ export interface Lead {
 
 export interface FunnelMetrics {
   ad_spend: number;
+  lead_funnel_spend: number;
+  branding_spend: number;
   inquiry: number;
   contact: number;
   appointment: number;

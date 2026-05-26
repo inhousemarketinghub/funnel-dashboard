@@ -10,10 +10,20 @@ describe("parsePerformanceCSV", () => {
     const rows = parsePerformanceCSV(perfCSV);
     expect(rows).toHaveLength(2);
     expect(rows[0].ad_spend).toBe(250);
+    expect(rows[0].lead_funnel_spend).toBe(200);
+    expect(rows[0].branding_spend).toBe(50);
     expect(rows[0].inquiry).toBe(10);
     expect(rows[0].contact).toBe(5);
     expect(rows[1].sales).toBe(40000);
     expect(rows[1].showup).toBe(1);
+  });
+
+  it("defaults split spend to 0 when Lead Funnel / Branding columns absent", () => {
+    const csv = `Date,Taxed Ad Spend,PM,Contact Given,Appointment,Showed Up,Order Counts,Total Sales
+01/03/2026,RM250.00,10,5,1,0,0,0`;
+    const rows = parsePerformanceCSV(csv);
+    expect(rows[0].lead_funnel_spend).toBe(0);
+    expect(rows[0].branding_spend).toBe(0);
   });
 
   it("returns empty for empty CSV", () => {

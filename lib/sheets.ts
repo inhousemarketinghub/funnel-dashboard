@@ -125,6 +125,8 @@ export function parseCSVLine(line: string): string[] {
 interface PerfColumnMap {
   date: number;
   adSpend: number;
+  leadFunnelSpend: number | null;
+  brandingSpend: number | null;
   inquiry: number;
   contact: number;
   appointment: number | null;
@@ -157,6 +159,8 @@ function detectPerfColumns(rows: string[][]): PerfColumnMap {
   return {
     date: findCol(merged, ["date"]) ?? 0,
     adSpend: findCol(merged, ["taxed ad spend"]) ?? 1,
+    leadFunnelSpend: findCol(merged, ["lead funnel"]),
+    brandingSpend: findCol(merged, ["branding"]),
     inquiry: findCol(merged, ["pm"]) ?? 5,
     contact: findCol(merged, ["contact", "showroom", "visit"], ["rate"]) ?? 7,
     appointment: findCol(merged, ["appointment"], ["rate", "tracker"]),
@@ -182,6 +186,8 @@ function parsePerformanceRows(rows: string[][]): DailyMetric[] {
     results.push({
       date,
       ad_spend: parseRM(cols[colMap.adSpend]),
+      lead_funnel_spend: colMap.leadFunnelSpend !== null ? parseRM(cols[colMap.leadFunnelSpend]) : 0,
+      branding_spend: colMap.brandingSpend !== null ? parseRM(cols[colMap.brandingSpend]) : 0,
       inquiry: parseInt2(cols[colMap.inquiry]),
       contact: parseInt2(cols[colMap.contact]),
       appointment: colMap.appointment !== null ? parseInt2(cols[colMap.appointment]) : 0,
@@ -850,6 +856,8 @@ export async function fetchPerformanceData(sheetId: string, brandName?: string):
         if (byDate.has(key)) {
           const existing = byDate.get(key)!;
           existing.ad_spend += row.ad_spend;
+          existing.lead_funnel_spend += row.lead_funnel_spend;
+          existing.branding_spend += row.branding_spend;
           existing.inquiry += row.inquiry;
           existing.contact += row.contact;
           existing.appointment += row.appointment;
