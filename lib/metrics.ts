@@ -8,7 +8,7 @@ export function computeMetrics(
 ): FunnelMetrics {
   const sum = (fn: (r: DailyMetric) => number) => rows.reduce((a, r) => a + fn(r), 0);
 
-  const ad_spend = sum((r) => r.ad_spend);
+  const taxed_total = sum((r) => r.ad_spend);
   const lead_funnel_spend = sum((r) => r.lead_funnel_spend);
   const branding_spend = sum((r) => r.branding_spend);
   const inquiry = sum((r) => r.inquiry);
@@ -24,10 +24,14 @@ export function computeMetrics(
     ? (contact ? pct(orders, contact) : 0)
     : (showup ? pct(orders, showup) : 0);
 
-  // CPL uses only the lead-generation spend (Lead Funnel), taxed at 8% SST to match
-  // the card breakdown and the sheet's "Cost Per PM (Included 8% SST)". Sheets without
-  // the Lead Funnel / Branding split fall back to the taxed total.
+  // When the Lead Funnel / Branding split exists, derive the total from it (taxed at 8% SST)
+  // so the headline equals the breakdown exactly — avoids the per-day rounding drift in the
+  // sheet's pre-summed "Taxed Ad Spend" column. Sheets without the split keep that column.
   const splitExists = lead_funnel_spend + branding_spend > 0;
+  const ad_spend = splitExists ? (lead_funnel_spend + branding_spend) * 1.08 : taxed_total;
+
+  // CPL uses only the lead-generation spend (Lead Funnel), taxed at 8% SST to match
+  // the card breakdown and the sheet's "Cost Per PM (Included 8% SST)".
   const cpl = inquiry
     ? (splitExists ? (lead_funnel_spend * 1.08) / inquiry : ad_spend / inquiry)
     : 0;

@@ -34,6 +34,7 @@ interface CardDef {
   prefix?: string;
   suffix?: string;
   decimals?: number;
+  preLabel?: string;
   kpiLabel: string;
   achievement: number;
   expandContent?: React.ReactNode;
@@ -43,7 +44,8 @@ export function HeroCards({ metrics: tm, kpi, achievement: ach, prevMetrics: lm,
   const isWalkin = funnelType === "walkin";
   const pk = paceKpi || { sales: kpi.sales, ad_spend: kpi.ad_spend, orders: kpi.orders };
   const avgDaily = days > 0 ? tm.ad_spend / days : 0;
-  // Lead Funnel / Branding are stored pre-tax; show taxed (×1.08) so the two lines sum to the taxed headline total.
+  // Lead Funnel / Branding are stored pre-tax; show taxed (×1.08). The headline total is also derived
+  // from the split (see computeMetrics), so these two lines sum exactly to it.
   const leadFunnelTaxed = tm.lead_funnel_spend * 1.08;
   const brandingTaxed = tm.branding_spend * 1.08;
   const hasSpendSplit = tm.lead_funnel_spend + tm.branding_spend > 0;
@@ -59,8 +61,8 @@ export function HeroCards({ metrics: tm, kpi, achievement: ach, prevMetrics: lm,
     { label: "Total Sales", value: fmtRM(tm.sales), rawValue: tm.sales, prefix: "RM", decimals: 2, kpiLabel: `Pace: ${fmtRM(pk.sales)}`, achievement: ach.sales,
       expandContent: (<div className="flex gap-4"><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">Monthly Target</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(kpi.sales)}</div></div><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">Pace Target</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(pk.sales)}</div></div></div>),
     },
-    { label: "Total Ad Spend", value: fmtRM(tm.ad_spend), rawValue: tm.ad_spend, prefix: "RM", decimals: 2, kpiLabel: `Pace: ${fmtRM(pk.ad_spend)}`, achievement: ach.ad_spend,
-      expandContent: (<div className="flex gap-4 flex-wrap">{hasSpendSplit && (<><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">Lead Funnel Ad Spend</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(leadFunnelTaxed)}</div></div><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">Branding Ad Spend</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(brandingTaxed)}</div></div></>)}<div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">Monthly Target</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(kpi.ad_spend)}</div></div><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">Targeted Daily Budget</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(targetedDailyBudget)}</div></div><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">Avg. Daily</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(avgDaily)}</div></div><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">Current Daily Budget</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(kpi.daily_ad)}</div></div></div>),
+    { label: "Total Ad Spend", value: fmtRM(tm.ad_spend), rawValue: tm.ad_spend, prefix: "RM", decimals: 2, preLabel: `Monthly Target: ${fmtRM(kpi.ad_spend)}`, kpiLabel: `Pace: ${fmtRM(pk.ad_spend)}`, achievement: ach.ad_spend,
+      expandContent: (<div className="space-y-3">{hasSpendSplit && (<div className="flex gap-4 flex-wrap"><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">Lead Funnel Ad Spend</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(leadFunnelTaxed)}</div></div><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">Branding Ad Spend</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(brandingTaxed)}</div></div></div>)}<div className="flex gap-4 flex-wrap"><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">Targeted Daily Budget</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(targetedDailyBudget)}</div></div><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">Current Daily Budget</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(kpi.daily_ad)}</div></div><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">Avg. Daily</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(avgDaily)}</div></div></div></div>),
     },
     { label: "CPA%", value: `${tm.cpa_pct.toFixed(2)}%`, rawValue: tm.cpa_pct, suffix: "%", decimals: 2, kpiLabel: `Target: ${kpi.cpa_pct}%`, achievement: tm.cpa_pct > 0 ? (kpi.cpa_pct / tm.cpa_pct) * 100 : 0 },
     { label: "Orders", value: String(tm.orders), rawValue: tm.orders, kpiLabel: `Pace: ${Math.round(pk.orders)}`, achievement: ach.orders,
@@ -82,8 +84,8 @@ export function HeroCards({ metrics: tm, kpi, achievement: ach, prevMetrics: lm,
     { label: "Total Sales", value: fmtRM(tm.sales), rawValue: tm.sales, prefix: "RM", decimals: 2, kpiLabel: `Pace: ${fmtRM(pk.sales)}`, achievement: ach.sales,
       expandContent: (<div className="flex gap-4"><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">Monthly Target</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(kpi.sales)}</div></div><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">Pace Target</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(pk.sales)}</div></div></div>),
     },
-    { label: "Total Ad Spend", value: fmtRM(tm.ad_spend), rawValue: tm.ad_spend, prefix: "RM", decimals: 2, kpiLabel: `Pace: ${fmtRM(pk.ad_spend)}`, achievement: ach.ad_spend,
-      expandContent: (<div className="flex gap-4 flex-wrap">{hasSpendSplit && (<><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">Lead Funnel Ad Spend</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(leadFunnelTaxed)}</div></div><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">Branding Ad Spend</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(brandingTaxed)}</div></div></>)}<div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">Monthly Target</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(kpi.ad_spend)}</div></div><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">Targeted Daily Budget</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(targetedDailyBudget)}</div></div><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">Avg. Daily</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(avgDaily)}</div></div><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">Current Daily Budget</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(kpi.daily_ad)}</div></div></div>),
+    { label: "Total Ad Spend", value: fmtRM(tm.ad_spend), rawValue: tm.ad_spend, prefix: "RM", decimals: 2, preLabel: `Monthly Target: ${fmtRM(kpi.ad_spend)}`, kpiLabel: `Pace: ${fmtRM(pk.ad_spend)}`, achievement: ach.ad_spend,
+      expandContent: (<div className="space-y-3">{hasSpendSplit && (<div className="flex gap-4 flex-wrap"><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">Lead Funnel Ad Spend</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(leadFunnelTaxed)}</div></div><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">Branding Ad Spend</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(brandingTaxed)}</div></div></div>)}<div className="flex gap-4 flex-wrap"><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">Targeted Daily Budget</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(targetedDailyBudget)}</div></div><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">Current Daily Budget</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(kpi.daily_ad)}</div></div><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">Avg. Daily</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{fmtRM(avgDaily)}</div></div></div></div>),
     },
     { label: "CPA%", value: `${tm.cpa_pct.toFixed(2)}%`, rawValue: tm.cpa_pct, suffix: "%", decimals: 2, kpiLabel: `Target: ${kpi.cpa_pct}%`, achievement: tm.cpa_pct > 0 ? (kpi.cpa_pct / tm.cpa_pct) * 100 : 0 },
     { label: "Orders", value: String(tm.orders), rawValue: tm.orders, kpiLabel: `Pace: ${Math.round(pk.orders)}`, achievement: ach.orders,
@@ -180,6 +182,7 @@ function KPICard({ card, accent }: { card: CardDef; accent: string }) {
       >
         {status.text}
       </span>
+      {card.preLabel && <div className="text-[11px] text-[var(--t3)] mt-[5px]">{card.preLabel}</div>}
       <div className="text-[11px] text-[var(--t3)] mt-[5px]">{card.kpiLabel}</div>
 
       {card.expandContent && (

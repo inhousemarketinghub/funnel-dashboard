@@ -10,7 +10,8 @@ const sampleRows: DailyMetric[] = [
 describe("computeMetrics", () => {
   it("aggregates daily rows into funnel metrics", () => {
     const m = computeMetrics(sampleRows, 3);
-    expect(m.ad_spend).toBe(510);
+    // Total is derived from the split: (Lead Funnel + Branding) × 1.08
+    expect(m.ad_spend).toBeCloseTo((210 + 100) * 1.08, 2);
     expect(m.inquiry).toBe(22);
     expect(m.contact).toBe(9);
     expect(m.orders).toBe(1);
@@ -21,7 +22,12 @@ describe("computeMetrics", () => {
     expect(m.cpl).toBeCloseTo((210 * 1.08) / 22, 2);
     expect(m.respond_rate).toBeCloseTo(9 / 22 * 100, 1);
     expect(m.showup_rate).toBeCloseTo(1 / 3 * 100, 1);
-    expect(m.roas).toBeCloseTo(40000 / 510, 1);
+    expect(m.roas).toBeCloseTo(40000 / ((210 + 100) * 1.08), 1);
+  });
+
+  it("derived total reconciles exactly with the taxed breakdown lines", () => {
+    const m = computeMetrics(sampleRows, 3);
+    expect(m.ad_spend).toBeCloseTo(m.lead_funnel_spend * 1.08 + m.branding_spend * 1.08, 6);
   });
 
   it("handles zero denominators", () => {
@@ -53,7 +59,8 @@ describe("computeMoM", () => {
     const current = computeMetrics(sampleRows, 3);
     const previous = computeMetrics([sampleRows[0]], 1);
     const mom = computeMoM(current, previous);
-    expect(mom.ad_spend).toBeCloseTo((510 - 250) / 250 * 100, 1);
+    // Totals are derived: current (210+100)×1.08, previous (100+50)×1.08
+    expect(mom.ad_spend).toBeCloseTo((310 * 1.08 - 150 * 1.08) / (150 * 1.08) * 100, 1);
     expect(mom.inquiry).toBeCloseTo((22 - 10) / 10 * 100, 1);
   });
 });
