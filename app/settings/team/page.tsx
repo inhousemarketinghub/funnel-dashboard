@@ -7,6 +7,7 @@ import { MemberCard } from "@/components/team/member-card";
 import { InviteDialog } from "@/components/team/invite-dialog";
 import { LogoutButton } from "@/components/dashboard/logout-button";
 import type { MemberInfo, MemberRole, PendingInvitation } from "@/lib/types";
+import { teamRoleSummary } from "@/lib/team-summary";
 
 export default function TeamPage() {
   const [members, setMembers] = useState<MemberInfo[]>([]);
@@ -132,27 +133,14 @@ export default function TeamPage() {
 
       <div className="max-w-3xl mx-auto p-8">
         {/* Top nav */}
-        <div className="flex justify-between items-center mb-8">
-          <span className="font-heading text-[18px] font-semibold text-[var(--t1)]">
-            Funnel Dashboard
-          </span>
+        <div className="flex justify-end items-center mb-8">
           <div className="flex items-center gap-3">
             <Link
               href="/projects"
               className="topbar-btn"
             >
-              Overview
+              Project Overview
             </Link>
-            <span
-              className="topbar-btn"
-              style={{
-                background: "var(--t1)",
-                color: "white",
-                borderColor: "var(--t1)",
-              }}
-            >
-              Team
-            </span>
             <LogoutButton />
           </div>
         </div>
@@ -161,11 +149,14 @@ export default function TeamPage() {
         <div className="flex justify-between items-center mb-6">
           <div>
             <h1 className="font-heading text-[24px] font-semibold text-[var(--t1)]">
-              Team Members
+              Access Management
             </h1>
             <p className="text-[13px] text-[var(--t3)] mt-0.5">
               Manage your team's access and permissions
             </p>
+            {!loading && members.length > 0 && (
+              <p className="text-[12px] text-[var(--t4)] mt-1 num">{teamRoleSummary(members)}</p>
+            )}
           </div>
           <button
             onClick={() => setInviteOpen(true)}

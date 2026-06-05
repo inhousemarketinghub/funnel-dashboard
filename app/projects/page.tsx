@@ -26,7 +26,7 @@ export default async function ClientsPage() {
   const canCreate = canCreateClient(memberRole);
 
   const isOwnerOrManager = memberRole === "owner" || memberRole === "manager";
-  const title = isOwnerOrManager ? "Performance Overview" : "Your Projects";
+  const title = "Project Overview";
 
   return (
     <div className="min-h-dvh bg-[var(--bg)]" style={{ transition: "background 500ms ease" }}>
@@ -46,7 +46,7 @@ export default async function ClientsPage() {
           <div className="flex items-center gap-3">
             {isOwnerOrManager && (
               <Link href="/settings/team" className="topbar-btn">
-                Team
+                Access Management
               </Link>
             )}
             {canCreate && (
