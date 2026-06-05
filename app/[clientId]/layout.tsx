@@ -21,14 +21,14 @@ export default async function ClientLayout({ children, params }: { children: Rea
       <div className="bauhaus-stripe"><div/><div/><div/><div/></div>
       <div className="topbar">
         <div className="flex items-center gap-[14px]">
-          <Link href="/projects" className="topbar-logo" style={{ textDecoration: "none" }}>Dashboard</Link>
+          <Link href="/projects" className="topbar-logo" style={{ textDecoration: "none" }}>Project Overview</Link>
           <div className="topbar-sep" />
           {client.logo_url && (
             <img src={client.logo_url} alt="" className="w-8 h-8 rounded-[6px] object-contain bg-white p-[2px]" />
           )}
           <span className="topbar-crumb">{client.name}</span>
           <div className="topbar-sep" />
-          <Link href={`/${clientId}`} className="topbar-btn" style={{ fontSize: 12, padding: "4px 12px" }}>Dashboard</Link>
+          <Link href={`/${clientId}`} className="topbar-btn" style={{ fontSize: 12, padding: "4px 12px" }}>Summary</Link>
           <Link href={`/${clientId}/trends`} className="topbar-btn" style={{ fontSize: 12, padding: "4px 12px" }}>Trends</Link>
         </div>
         <div className="flex items-center gap-[10px]">

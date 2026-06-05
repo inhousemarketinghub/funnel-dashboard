@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import type { MemberInfo, MemberRole } from "@/lib/types";
+import { roleDescription, accessCountLabel, accessPreview } from "@/lib/team-summary";
+import { ManageAccessDialog } from "./manage-access-dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface MemberCardProps {
   member: MemberInfo;
@@ -26,199 +29,144 @@ const roleColors: Record<MemberRole, { bg: string; text: string; border: string 
   viewer: { bg: "var(--green-bg)", text: "var(--green)", border: "var(--green)" },
 };
 
-const roleBadgeStyle: Record<MemberRole, React.CSSProperties> = {
-  owner: { background: "var(--yellow-bg)", color: "var(--yellow)", border: "1px solid var(--yellow)" },
-  manager: { background: "var(--blue-bg)", color: "var(--blue)", border: "1px solid var(--blue)" },
-  viewer: { background: "var(--green-bg)", color: "var(--green)", border: "1px solid var(--green)" },
-};
-
 export function MemberCard({ member, allClients, onRoleChange, onClientChange, onRemove }: MemberCardProps) {
   const initials = getInitials(member.name, member.email);
-  const colors = roleColors[member.role];
   const [pendingRole, setPendingRole] = useState<MemberRole | null>(null);
-  const [editingClients, setEditingClients] = useState(false);
-  const [selectedClientIds, setSelectedClientIds] = useState<string[]>(member.clients.map((c) => c.id));
-  const [saving, setSaving] = useState(false);
+  const [accessOpen, setAccessOpen] = useState(false);
 
   const isOwner = member.role === "owner";
+  const displayRole = pendingRole ?? member.role;
+  const colors = roleColors[displayRole];
   const hasRoleChange = pendingRole !== null && pendingRole !== member.role;
+
   const memberClientIds = member.clients.map((c) => c.id);
-  const hasClientChange = editingClients && (
-    selectedClientIds.length !== memberClientIds.length ||
-    selectedClientIds.some((id) => !memberClientIds.includes(id))
-  );
-  const hasChanges = hasRoleChange || hasClientChange;
+  const preview = accessPreview(member.clients, 3);
 
-  function toggleClient(id: string) {
-    setSelectedClientIds((prev) =>
-      prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]
-    );
-  }
-
-  async function handleSave() {
-    setSaving(true);
-    if (hasRoleChange && pendingRole) {
-      await onRoleChange(member.id, pendingRole);
-    }
-    if (hasClientChange) {
-      await onClientChange(member.id, selectedClientIds);
-    }
+  async function saveRole() {
+    if (hasRoleChange && pendingRole) await onRoleChange(member.id, pendingRole);
     setPendingRole(null);
-    setEditingClients(false);
-    setSaving(false);
-  }
-
-  function handleCancel() {
-    setPendingRole(null);
-    setSelectedClientIds(memberClientIds);
-    setEditingClients(false);
   }
 
   return (
-    <div
-      className="card-base p-4 flex flex-col gap-3"
-      style={{ background: "var(--bg2)" }}
-    >
-      {/* Top row: avatar + name/email + role controls */}
+    <div className="card-base p-4 flex flex-col gap-3" style={{ background: "var(--bg2)" }}>
+      {/* Identity + role + overflow menu */}
       <div className="flex items-start gap-3">
         <div
           className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 font-label text-[13px] font-semibold"
-          style={{
-            background: colors.bg,
-            color: colors.text,
-            border: `1.5px solid ${colors.border}`,
-          }}
+          style={{ background: colors.bg, color: colors.text, border: `1.5px solid ${colors.border}` }}
         >
           {initials}
         </div>
 
         <div className="flex-1 min-w-0">
-          <div className="text-[14px] font-medium text-[var(--t1)] truncate">
-            {member.name ?? member.email}
-          </div>
-          {member.name && (
-            <div className="text-[12px] text-[var(--t3)] truncate">{member.email}</div>
-          )}
+          <div className="text-[14px] font-medium text-[var(--t1)] truncate">{member.name ?? member.email}</div>
+          {member.name && <div className="text-[12px] text-[var(--t3)] truncate">{member.email}</div>}
+          <div className="text-[12px] text-[var(--t4)] mt-0.5">{roleDescription(displayRole)}</div>
         </div>
 
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-1.5 flex-shrink-0">
           {isOwner ? (
             <span
               className="font-label text-[11px] px-2 py-0.5 rounded-full"
-              style={roleBadgeStyle.owner}
+              style={{ background: "var(--yellow-bg)", color: "var(--yellow)", border: "1px solid var(--yellow)" }}
             >
               Owner
             </span>
           ) : (
             <>
               <select
-                value={pendingRole ?? member.role}
+                value={displayRole}
                 onChange={(e) => setPendingRole(e.target.value as MemberRole)}
                 className="text-[12px] px-2 py-1 rounded-md border cursor-pointer outline-none"
-                style={{
-                  background: "var(--bg)",
-                  borderColor: hasRoleChange ? "var(--blue)" : "var(--border)",
-                  color: "var(--t2)",
-                }}
+                style={{ background: "var(--bg)", borderColor: hasRoleChange ? "var(--blue)" : "var(--border)", color: "var(--t2)" }}
               >
                 <option value="manager">Manager</option>
                 <option value="viewer">Viewer</option>
               </select>
-              <button
-                onClick={() => onRemove(member.id)}
-                className="text-[12px] text-[var(--t3)] hover:text-[var(--red)] transition-colors px-2 py-1"
-              >
-                Remove
-              </button>
+              <Popover>
+                <PopoverTrigger
+                  render={
+                    <button
+                      aria-label="More options"
+                      className="w-7 h-7 rounded-md flex items-center justify-center text-[var(--t3)] hover:text-[var(--t1)] hover:bg-[var(--bg3)] transition-colors cursor-pointer"
+                    >
+                      ⋯
+                    </button>
+                  }
+                />
+                <PopoverContent align="end" sideOffset={4} className="w-44 p-1">
+                  <button
+                    type="button"
+                    onClick={() => onRemove(member.id)}
+                    className="w-full text-left text-[13px] px-2.5 py-1.5 rounded-md text-[var(--red)] hover:bg-[var(--bg3)] transition-colors cursor-pointer"
+                  >
+                    Remove member
+                  </button>
+                </PopoverContent>
+              </Popover>
             </>
           )}
         </div>
       </div>
 
-      {/* Client tags */}
-      <div className="flex flex-wrap gap-1.5 items-center">
-        {isOwner ? (
-          <span
-            className="font-label text-[11px] px-2 py-0.5 rounded-full"
-            style={{ background: "var(--yellow-bg)", color: "var(--yellow)" }}
+      {/* Access summary + Manage */}
+      <div className="flex items-center justify-between gap-3 pt-3" style={{ borderTop: "1px solid var(--border)" }}>
+        <div className="min-w-0">
+          <div className="text-[12px] text-[var(--t3)]">
+            <span className="font-label uppercase tracking-wider text-[10px] text-[var(--t4)] mr-1">Access</span>
+            {isOwner ? "All clients" : accessCountLabel(member.clients.length)}
+          </div>
+          {!isOwner && member.clients.length > 0 && (
+            <div className="text-[12px] text-[var(--t4)] truncate mt-0.5">
+              {preview.names.join(" · ")}
+              {preview.more > 0 ? `  +${preview.more} more` : ""}
+            </div>
+          )}
+        </div>
+        {!isOwner && (
+          <button
+            type="button"
+            onClick={() => setAccessOpen(true)}
+            className="topbar-btn flex-shrink-0"
+            style={{ fontSize: 12, padding: "4px 12px" }}
           >
-            All clients (Owner)
-          </span>
-        ) : editingClients ? (
-          /* Editing mode: toggle buttons for each client */
-          allClients.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => toggleClient(c.id)}
-              className="font-label text-[11px] px-2 py-0.5 rounded-full transition-colors"
-              style={{
-                background: selectedClientIds.includes(c.id) ? "var(--blue-bg)" : "var(--bg3)",
-                color: selectedClientIds.includes(c.id) ? "var(--blue)" : "var(--t4)",
-                border: selectedClientIds.includes(c.id) ? "1px solid var(--blue)" : "1px solid var(--border)",
-              }}
-            >
-              {selectedClientIds.includes(c.id) ? "✓ " : ""}{c.name}
-            </button>
-          ))
-        ) : member.clients.length > 0 ? (
-          <>
-            {member.clients.map((client) => (
-              <span
-                key={client.id}
-                className="font-label text-[11px] px-2 py-0.5 rounded-full"
-                style={{ background: "var(--blue-bg)", color: "var(--blue)" }}
-              >
-                {client.name}
-              </span>
-            ))}
-            <button
-              type="button"
-              onClick={() => setEditingClients(true)}
-              className="font-label text-[11px] px-2 py-0.5 text-[var(--t4)] hover:text-[var(--blue)] transition-colors"
-            >
-              Edit
-            </button>
-          </>
-        ) : (
-          <>
-            <span className="text-[12px] text-[var(--t4)]">No clients assigned</span>
-            <button
-              type="button"
-              onClick={() => setEditingClients(true)}
-              className="font-label text-[11px] px-2 py-0.5 text-[var(--blue)]"
-            >
-              + Assign
-            </button>
-          </>
+            Manage
+          </button>
         )}
       </div>
 
-      {/* Save / Cancel bar — only shows when changes are pending */}
-      {hasChanges && (
+      {/* Role save bar — only when role is pending */}
+      {hasRoleChange && (
         <div className="flex items-center justify-between pt-2" style={{ borderTop: "1px solid var(--border)" }}>
-          <span className="text-[11px] text-[var(--t4)]">
-            {hasRoleChange && hasClientChange ? "Role + client access changed" : hasRoleChange ? "Role changed" : "Client access changed"}
-          </span>
+          <span className="text-[11px] text-[var(--t4)]">Role changed to {displayRole}</span>
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={handleCancel}
+              onClick={() => setPendingRole(null)}
               className="text-[12px] text-[var(--t3)] hover:text-[var(--t1)] transition-colors px-3 py-1"
             >
               Cancel
             </button>
             <button
               type="button"
-              onClick={handleSave}
-              disabled={saving}
-              className="text-[12px] font-medium px-4 py-1 rounded-full transition-colors"
+              onClick={saveRole}
+              className="text-[12px] font-medium px-4 py-1 rounded-full"
               style={{ background: "var(--blue)", color: "white" }}
             >
-              {saving ? "Saving..." : "Save"}
+              Save
             </button>
           </div>
         </div>
+      )}
+
+      {accessOpen && (
+        <ManageAccessDialog
+          memberLabel={member.email}
+          allClients={allClients}
+          initialSelected={memberClientIds}
+          onClose={() => setAccessOpen(false)}
+          onSave={(ids) => onClientChange(member.id, ids)}
+        />
       )}
     </div>
   );
