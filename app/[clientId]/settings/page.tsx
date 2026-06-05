@@ -15,6 +15,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { Info } from "lucide-react";
+import {
+  Tooltip,
+  TooltipProvider,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip";
+import { describeDerived } from "@/lib/derived-formulas";
+import { computeSettingsDerived, completeInputs, type CalculatorMode } from "@/lib/kpi-calculator";
 
 // ── Editable field definitions by funnel type ────────────────
 
@@ -81,8 +90,48 @@ const DERIVED_METRICS: DerivedMetric[] = [
 function formatDerived(val: number, format: DerivedMetric["format"]) {
   if (format === "rm") return fmtRM(val);
   if (format === "pct") return `${val.toFixed(2)}%`;
-  if (format === "count") return String(val);
+  if (format === "count") return String(Math.round(val));
   return val.toFixed(2);
+}
+
+// ── Calculator tabs (walk-in) ────────────────────────────────
+// Each tab solves a different unknown from the same funnel equation: the unknown
+// moves to a read-only "result", and CPL becomes an editable input instead.
+
+const CPL_FIELD: FieldDef = { key: "cpl", label: "Targeted CPL (Incl SST)", step: "0.01", prefix: "RM" };
+
+interface CalcDef {
+  mode: CalculatorMode;
+  label: string;
+  inputKeys: string[];
+  output: { key: string; label: string; format: "rm" | "pct" };
+}
+
+const WALKIN_CALCS: CalcDef[] = [
+  { mode: "cpl", label: "CPL", inputKeys: ["sales", "aov", "cpa_pct", "conv_rate", "respond_rate"],
+    output: { key: "cpl", label: "Targeted CPL (Incl SST)", format: "rm" } },
+  { mode: "visit_rate", label: "Visit Rate", inputKeys: ["sales", "aov", "cpa_pct", "conv_rate", "cpl"],
+    output: { key: "respond_rate", label: "Targeted Visit Rate", format: "pct" } },
+  { mode: "cpa", label: "CPA %", inputKeys: ["sales", "aov", "conv_rate", "respond_rate", "cpl"],
+    output: { key: "cpa_pct", label: "Targeted CPA %", format: "pct" } },
+];
+
+const APPOINTMENT_CALCS: CalcDef[] = [
+  { mode: "cpl", label: "CPL",
+    inputKeys: ["sales", "aov", "cpa_pct", "conv_rate", "showup_rate", "appt_rate", "respond_rate"],
+    output: { key: "cpl", label: "Targeted CPL (Incl SST)", format: "rm" } },
+  { mode: "appt_rate", label: "Appointment Rate",
+    inputKeys: ["sales", "aov", "cpa_pct", "conv_rate", "showup_rate", "respond_rate", "cpl"],
+    output: { key: "appt_rate", label: "Targeted Appointment Rate", format: "pct" } },
+  { mode: "cpa", label: "CPA %",
+    inputKeys: ["sales", "aov", "conv_rate", "showup_rate", "appt_rate", "respond_rate", "cpl"],
+    output: { key: "cpa_pct", label: "Targeted CPA %", format: "pct" } },
+];
+
+// Field definitions indexed by key, per funnel (respond_rate's label differs by funnel).
+function fieldMapFor(funnelType: "appointment" | "walkin"): Record<string, FieldDef> {
+  const base = funnelType === "walkin" ? WALKIN_FIELDS : APPOINTMENT_FIELDS;
+  return Object.fromEntries([...base, CPL_FIELD].map((f) => [f.key, f]));
 }
 
 export default function SettingsPage() {
@@ -102,86 +151,42 @@ export default function SettingsPage() {
   const [uploading, setUploading] = useState(false);
   const [language, setLanguage] = useState<string>("en");
 
-  const fields = funnelType === "walkin" ? WALKIN_FIELDS : APPOINTMENT_FIELDS;
-  const visibleDerived = DERIVED_METRICS.filter(
-    (m) => !m.funnelFilter || m.funnelFilter === funnelType,
+  // Active calculator tab — both funnels have CPL / rate / CPA calculators.
+  const [calcMode, setCalcMode] = useState<CalculatorMode>("cpl");
+  const calcsForFunnel = funnelType === "walkin" ? WALKIN_CALCS : APPOINTMENT_CALCS;
+  const activeCalc = calcsForFunnel.find((c) => c.mode === calcMode) ?? calcsForFunnel[0];
+
+  // Editable inputs = the active calculator's fields.
+  const fields = activeCalc.inputKeys
+    .map((k) => fieldMapFor(funnelType)[k])
+    .filter(Boolean);
+
+  // Fill in the calculator's solved unknown so the whole derived set stays consistent.
+  const completeForm = useMemo(
+    () => completeInputs(activeCalc.mode, funnelType, form),
+    [activeCalc.mode, funnelType, form],
   );
 
-  // ── Real-time derived values from form inputs ─────────────
-  // Formula chain: Monthly Ad = Sales × CPA%, then pipeline works backwards from Orders
+  // ── Real-time derived values ──────────────────────────────
+  // All formulas live in lib/kpi-calculator — full precision, no intermediate
+  // rounding, so Settings matches the Google Sheet exactly. Rounding happens
+  // only at display time (see formatDerived).
   const derived = useMemo(() => {
-    const sales = form.sales || 0;
-    const aov = form.aov || 0;
-    const cpaPct = (form.cpa_pct || 0) / 100;
-    const convRate = (form.conv_rate || 0) / 100;
-    const dailyExcl = form.daily_ad || 0;
-
-    const orders = aov > 0 ? Math.round(sales / aov) : 0;
-
-    // Monthly Ad Spend derived from Sales × CPA%
-    const monthlyAdIncl = sales * cpaPct;
-    const monthlyAdExcl = monthlyAdIncl / 1.08;
-
-    // Targeted Daily Ad Spend = Monthly Ad Spend / Days in month
     const now = new Date();
     const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    const dailyAdTargetedIncl = daysInMonth > 0 ? monthlyAdIncl / daysInMonth : 0;
-    const dailyAdTargetedExcl = daysInMonth > 0 ? monthlyAdExcl / daysInMonth : 0;
+    return computeSettingsDerived(completeForm, funnelType, daysInMonth);
+  }, [completeForm, funnelType]);
 
-    // Daily Ad (Incl SST) from the editable current daily budget
-    const dailyAdIncl = dailyExcl * 1.08;
+  // Derived grid hides CPL — it's the calculator's input or its headline result.
+  const visibleDerived = DERIVED_METRICS.filter(
+    (m) => (!m.funnelFilter || m.funnelFilter === funnelType) && m.key !== "cpl",
+  );
 
-    // Funnel pipeline: work backwards from orders
-    let pipelineEnd = 0;
-    let fbLeads = 0;
-    let apptCount = 0;
-    let contactCount = 0;
-
-    if (funnelType === "walkin") {
-      const visitRate = (form.respond_rate || 0) / 100;
-      pipelineEnd = convRate > 0 ? Math.round(orders / convRate) : 0;
-      fbLeads = visitRate > 0 ? Math.round(pipelineEnd / visitRate) : 0;
-    } else {
-      const showupRate = (form.showup_rate || 0) / 100;
-      const apptRate = (form.appt_rate || 0) / 100;
-      const respondRate = (form.respond_rate || 0) / 100;
-      const showups = convRate > 0 ? Math.round(orders / convRate) : 0;
-      const appts = showupRate > 0 ? Math.round(showups / showupRate) : 0;
-      const contacts = apptRate > 0 ? Math.round(appts / apptRate) : 0;
-      fbLeads = respondRate > 0 ? Math.round(contacts / respondRate) : 0;
-      pipelineEnd = showups;
-      apptCount = appts;
-      contactCount = contacts;
-    }
-
-    const cpl = fbLeads > 0 ? monthlyAdExcl / fbLeads : 0;
-    const cpAcquisition = orders > 0 ? monthlyAdExcl / orders : 0;
-    const cpVisit = pipelineEnd > 0 ? monthlyAdExcl / pipelineEnd : 0;
-    const cpShowup = pipelineEnd > 0 ? monthlyAdExcl / pipelineEnd : 0;
-    const cpAppointment = apptCount > 0 ? monthlyAdExcl / apptCount : 0;
-    const cpContact = contactCount > 0 ? monthlyAdExcl / contactCount : 0;
-
-    return {
-      orders,
-      cpl,
-      cp_acquisition: cpAcquisition,
-      fb_leads: fbLeads,
-      cp_visit: cpVisit,
-      target_visit: funnelType === "walkin" ? pipelineEnd : 0,
-      cp_showup: cpShowup,
-      target_showup: funnelType === "appointment" ? pipelineEnd : 0,
-      cp_appointment: cpAppointment,
-      target_appt: apptCount,
-      cp_contact: cpContact,
-      target_contact: contactCount,
-      monthly_ad_incl: monthlyAdIncl,
-      monthly_ad_excl: monthlyAdExcl,
-      daily_ad_targeted_incl: dailyAdTargetedIncl,
-      daily_ad_targeted_excl: dailyAdTargetedExcl,
-      daily_ad_actual_incl: dailyAdIncl,
-      daily_ad_current_excl: dailyExcl,
-    };
-  }, [form, funnelType]);
+  // The highlighted result for the active calculator.
+  const resultValue =
+    activeCalc.output.key === "cpl"
+      ? derived.cpl
+      : completeForm[activeCalc.output.key] ?? 0;
 
   // ── Fetch logo & language on mount ────────────────────────
   useEffect(() => {
@@ -222,6 +227,8 @@ export default function SettingsPage() {
         // Use excluded SST value from derived data for Daily Ad Spend Budget
         const derivedData = data.derived || {};
         formValues.daily_ad = derivedData.daily_ad_current_excl ?? kpi.daily_ad ?? 0;
+        // Seed CPL so the Visit Rate / CPA calculators have a sensible starting target.
+        formValues.cpl = kpi.cpl ?? derivedData.cpl ?? 0;
         setForm(formValues);
 
         setSheetDerived(derivedData);
@@ -254,7 +261,7 @@ export default function SettingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           clientId,
-          fields: form,
+          fields: completeForm,
           brand: selectedBrand || undefined,
         }),
       });
@@ -432,6 +439,27 @@ export default function SettingsPage() {
             </div>
           )}
 
+          {/* Calculator tabs */}
+          <div className="mb-6">
+            <div className="text-[11px] font-label uppercase tracking-wider text-[var(--t4)] mb-2">
+              Calculator
+            </div>
+            <div className="inline-flex gap-1 p-1 bg-[var(--sand)] rounded-[10px]">
+              {calcsForFunnel.map((c) => (
+                  <button
+                    key={c.mode}
+                    onClick={() => setCalcMode(c.mode)}
+                    className={`px-4 py-1.5 rounded-[7px] text-[13px] font-medium transition-colors cursor-pointer ${
+                      calcMode === c.mode
+                        ? "bg-[var(--bg2)] text-[var(--t1)] shadow-sm"
+                        : "text-[var(--t3)] hover:text-[var(--t1)]"
+                    }`}
+                  >
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           {/* Section 1: KPI Targets (editable) */}
           <div className="bg-[var(--bg2)] border border-[var(--border)] rounded-[10px] p-6 mb-6">
             <div className="flex items-center gap-3 mb-4">
@@ -467,22 +495,74 @@ export default function SettingsPage() {
             </div>
           </div>
 
+          {/* Calculator result */}
+          <div className="bg-[var(--blue)]/5 border border-[var(--blue)]/30 rounded-[10px] p-6 mb-6">
+            <div className="text-[11px] font-label uppercase tracking-wider text-[var(--blue)] mb-1">
+              {activeCalc.output.label} &mdash; Result
+            </div>
+              <div className="num text-[28px] font-bold text-[var(--t1)]">
+                {activeCalc.output.format === "rm"
+                  ? fmtRM(resultValue)
+                  : `${resultValue.toFixed(2)}%`}
+              </div>
+              <p className="text-[12px] text-[var(--t3)] mt-1">
+                Auto-calculated from the inputs above &mdash; this is the target that gets saved.
+              </p>
+            </div>
+
           {/* Section 2: Derived Values (read-only, from sheet formulas) */}
           <div className="bg-[var(--bg2)] border border-[var(--border)] rounded-[10px] p-6 mb-6 opacity-80">
             <h2 className="font-bold text-[15px] tracking-tight text-[var(--t1)] dark:text-[var(--t1)] mb-4">
               Derived Values
               <span className="text-[10px] font-label uppercase tracking-wider text-[var(--t4)] ml-2">Auto-calculated</span>
             </h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {visibleDerived.map((m) => (
-                <div key={m.key}>
-                  <div className="text-[11px] text-[var(--t4)] uppercase tracking-wider mb-1">{m.label}</div>
-                  <div className="num text-[15px] font-semibold text-[var(--t1)]">
-                    {formatDerived((derived as Record<string, number>)[m.key] ?? 0, m.format)}
-                  </div>
-                </div>
-              ))}
-            </div>
+            <TooltipProvider>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {visibleDerived.map((m) => {
+                  const explain = describeDerived(
+                    m.key,
+                    completeForm,
+                    funnelType,
+                    derived as Record<string, number>,
+                  );
+                  const valueText = formatDerived(
+                    (derived as Record<string, number>)[m.key] ?? 0,
+                    m.format,
+                  );
+                  return (
+                    <Tooltip key={m.key}>
+                      <TooltipTrigger
+                        render={<div className="text-left cursor-help group" />}
+                      >
+                        <div className="flex items-center gap-1 text-[11px] text-[var(--t4)] uppercase tracking-wider mb-1">
+                          {m.label}
+                          <Info className="w-3 h-3 opacity-40 group-hover:opacity-80 transition-opacity" />
+                        </div>
+                        <div className="num text-[15px] font-semibold text-[var(--t1)]">
+                          {valueText}
+                        </div>
+                      </TooltipTrigger>
+                      {explain && (
+                        <TooltipContent>
+                          <div className="font-semibold text-[13px] text-[var(--t1)] mb-1.5">
+                            {explain.title}
+                          </div>
+                          <div className="text-[12px] text-muted-foreground leading-relaxed">
+                            {explain.formula}
+                          </div>
+                          <div className="num text-[12px] text-[var(--t2)] mt-1.5">
+                            = {explain.substituted}
+                          </div>
+                          <div className="num text-[13px] font-semibold text-[var(--t1)] mt-0.5">
+                            = {explain.result}
+                          </div>
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                  );
+                })}
+              </div>
+            </TooltipProvider>
           </div>
 
           {/* Section 3: Daily Ad Spend Budget */}
