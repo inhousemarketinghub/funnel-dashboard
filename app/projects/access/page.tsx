@@ -285,7 +285,7 @@ function AccessPageInner() {
             <Button onClick={handleCancel} className="bg-[var(--bg3)] text-[var(--t2)] hover:bg-[var(--border)] px-6">
               Cancel
             </Button>
-            <Button onClick={handleSave} disabled={saving} className="bg-[var(--blue)] hover:bg-[#153D7A] text-white px-6">
+            <Button onClick={handleSave} disabled={saving} className="bg-[var(--blue)] hover:bg-[#A34D2F] text-white px-6">
               {saving ? "Saving..." : "Save Changes"}
             </Button>
           </div>

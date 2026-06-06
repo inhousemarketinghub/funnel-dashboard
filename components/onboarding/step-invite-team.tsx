@@ -102,7 +102,7 @@ export function StepInviteTeam({
           <Button
             onClick={handleAdd}
             disabled={!email.trim()}
-            className="bg-[var(--blue)] hover:bg-[#153D7A] text-white px-4 shrink-0"
+            className="bg-[var(--blue)] hover:bg-[#A34D2F] text-white px-4 shrink-0"
           >
             Add
           </Button>

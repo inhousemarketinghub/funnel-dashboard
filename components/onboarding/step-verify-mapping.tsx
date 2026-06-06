@@ -194,7 +194,7 @@ export function StepVerifyMapping({ state, setState, next, back }: Props) {
           </button>
           <Button
             onClick={handleConfirm}
-            className="bg-[var(--blue)] hover:bg-[#153D7A] text-white px-6"
+            className="bg-[var(--blue)] hover:bg-[#A34D2F] text-white px-6"
           >
             Confirm & Next →
           </Button>

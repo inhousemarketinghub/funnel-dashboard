@@ -230,7 +230,7 @@ export function DateRangePicker({ clientId, basePath, presets, maxRange, extraPa
                 size="sm"
                 onClick={handleApply}
                 disabled={!calRange?.from || !calRange?.to || overLimit}
-                className="text-xs h-7 bg-[var(--blue)] hover:bg-[#153D7A] text-white"
+                className="text-xs h-7 bg-[var(--blue)] hover:bg-[#A34D2F] text-white"
               >
                 Apply
               </Button>

@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
-import { Cormorant_Garamond, DM_Sans, Noto_Sans_SC } from "next/font/google";
+import { Cormorant_Garamond, DM_Sans, Inter } from "next/font/google";
 import "./globals.css";
 
+// Headings: Cormorant Garamond (original serif). Numbers + body: Inter.
 const heading = Cormorant_Garamond({
   weight: "600",
   subsets: ["latin"],
@@ -16,8 +17,7 @@ const label = DM_Sans({
   display: "swap",
 });
 
-const body = Noto_Sans_SC({
-  weight: ["400", "500", "600", "700"],
+const body = Inter({
   subsets: ["latin"],
   variable: "--font-body",
   display: "swap",
