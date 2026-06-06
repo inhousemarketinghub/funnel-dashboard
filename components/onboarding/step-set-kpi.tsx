@@ -136,7 +136,7 @@ export function StepSetKPI({ state, setState, next, back }: Props) {
           </button>
           <Button
             onClick={next}
-            className="bg-[var(--blue)] hover:bg-[#153D7A] text-white px-6"
+            className="bg-[var(--blue)] hover:bg-[#A34D2F] text-white px-6"
           >
             Next →
           </Button>

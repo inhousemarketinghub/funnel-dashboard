@@ -142,7 +142,7 @@ export function StepBasicInfo({ state, setState, next }: Props) {
         <Button
           onClick={next}
           disabled={!state.name.trim()}
-          className="bg-[var(--blue)] hover:bg-[#153D7A] text-white px-6"
+          className="bg-[var(--blue)] hover:bg-[#A34D2F] text-white px-6"
         >
           Next →
         </Button>

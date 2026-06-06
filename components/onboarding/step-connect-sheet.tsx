@@ -100,7 +100,7 @@ export function StepConnectSheet({ state, setState, next, back }: Props) {
           <Button
             onClick={handleScan}
             disabled={!sheetUrl.trim() || scanning}
-            className="bg-[var(--blue)] hover:bg-[#153D7A] text-white px-5 shrink-0 min-w-[90px]"
+            className="bg-[var(--blue)] hover:bg-[#A34D2F] text-white px-5 shrink-0 min-w-[90px]"
           >
             {scanning ? (
               <span className="flex items-center gap-2">
@@ -201,7 +201,7 @@ export function StepConnectSheet({ state, setState, next, back }: Props) {
         <Button
           onClick={next}
           disabled={!scanResult}
-          className="bg-[var(--blue)] hover:bg-[#153D7A] text-white px-6"
+          className="bg-[var(--blue)] hover:bg-[#A34D2F] text-white px-6"
         >
           Next →
         </Button>

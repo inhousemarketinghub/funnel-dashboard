@@ -36,20 +36,22 @@ export function SplitText({ text, parts, className = "" }: SplitTextProps) {
           span.style.transform = "translateY(8px)";
           span.style.transition = `opacity 500ms ease ${200 + charIndex * 40}ms, transform 500ms ease ${200 + charIndex * 40}ms`;
           span.textContent = ch === " " ? "\u00A0" : ch;
-          if (part.accent) span.style.color = "var(--red)";
+          if (part.accent) span.style.color = "var(--blue)";
           el.appendChild(span);
           charIndex++;
         });
       });
     } else {
-      // Simple mode: single text string
-      text.split("").forEach((ch) => {
+      // Simple mode: ink text, last word in the clay accent colour.
+      const lastSpace = text.lastIndexOf(" ");
+      text.split("").forEach((ch, i) => {
         const span = document.createElement("span");
         span.style.display = "inline-block";
         span.style.opacity = "0";
         span.style.transform = "translateY(8px)";
         span.style.transition = `opacity 500ms ease ${200 + charIndex * 40}ms, transform 500ms ease ${200 + charIndex * 40}ms`;
         span.textContent = ch === " " ? "\u00A0" : ch;
+        if (lastSpace >= 0 && i > lastSpace) span.style.color = "var(--blue)";
         el.appendChild(span);
         charIndex++;
       });

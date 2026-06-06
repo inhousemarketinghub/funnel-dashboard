@@ -602,7 +602,7 @@ export default function SettingsPage() {
             <Button
               onClick={handleSave}
               disabled={saving}
-              className="bg-[var(--blue)] hover:bg-[#153D7A] text-white px-6"
+              className="bg-[var(--blue)] hover:bg-[#A34D2F] text-white px-6"
             >
               {saving ? "Syncing..." : "Save & Sync to Sheet"}
             </Button>

@@ -8,21 +8,23 @@ export interface MetricOption {
   color: string;
 }
 
+// Muted earth-tone palette — distinct enough to overlay, harmonised with the Anthropic skin.
 export const METRIC_OPTIONS: MetricOption[] = [
   // Frontend
-  { key: "ad_spend", label: "Ad Spend", group: "Frontend", unit: "currency", color: "#1B4F9B" },
-  { key: "cpl", label: "CPL", group: "Frontend", unit: "currency", color: "#6366F1" },
+  { key: "ad_spend", label: "Ad Spend", group: "Frontend", unit: "currency", color: "#C15F3C" },
+  { key: "cpl", label: "CPL", group: "Frontend", unit: "currency", color: "#5F6BA6" },
   // Midend
-  { key: "respond_rate", label: "Respond Rate", group: "Midend", unit: "percent", color: "#D97706" },
-  { key: "appt_rate", label: "Appt Rate", group: "Midend", unit: "percent", color: "#EA580C" },
-  { key: "showup_rate", label: "Show Up Rate", group: "Midend", unit: "percent", color: "#DC2626" },
+  { key: "respond_rate", label: "Respond Rate", group: "Midend", unit: "percent", color: "#C9952F" },
+  { key: "appt_rate", label: "Appt Rate", group: "Midend", unit: "percent", color: "#B0683F" },
+  { key: "showup_rate", label: "Show Up Rate", group: "Midend", unit: "percent", color: "#A23A2C" },
   // Backend
-  { key: "sales", label: "Sales", group: "Backend", unit: "currency", color: "#16A34A" },
-  { key: "orders", label: "Orders", group: "Backend", unit: "number", color: "#0D9488" },
-  { key: "conv_rate", label: "Conv Rate", group: "Backend", unit: "percent", color: "#7C3AED" },
-  { key: "aov", label: "AOV", group: "Backend", unit: "currency", color: "#BE185D" },
-  { key: "cpa_pct", label: "CPA%", group: "Backend", unit: "percent", color: "#78716C" },
+  { key: "sales", label: "Sales", group: "Backend", unit: "currency", color: "#5E7A4F" },
+  { key: "orders", label: "Orders", group: "Backend", unit: "number", color: "#4F8077" },
+  { key: "conv_rate", label: "Conv Rate", group: "Backend", unit: "percent", color: "#7E5EA0" },
+  { key: "aov", label: "AOV", group: "Backend", unit: "currency", color: "#A65779" },
+  { key: "cpa_pct", label: "CPA%", group: "Backend", unit: "percent", color: "#8A8073" },
 ];
+
 
 /**
  * Walk-in funnels skip the appointment / show-up stage (orders convert from contact = visit).

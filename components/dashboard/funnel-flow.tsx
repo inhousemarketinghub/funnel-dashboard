@@ -4,20 +4,21 @@ import { useState, useEffect, useRef } from "react";
 import type { FunnelMetrics } from "@/lib/types";
 import { fmtRM } from "@/lib/utils";
 
+// Anthropic-style warm funnel: clay → ink, deepening as the funnel narrows.
 const APPOINTMENT_STEPS = [
-  { key: "inquiry", label: "Inquiry", colors: ["#D42B2B", "#B82424"] },
-  { key: "contact", label: "Contact", colors: ["#1B4F9B", "#164082"] },
-  { key: "appointment", label: "Appointment", colors: ["#D4960A", "#B88008"] },
-  { key: "showup", label: "Show Up", colors: ["#777777", "#5E5E5E"] },
-  { key: "orders", label: "Orders", colors: ["#444444", "#333333"] },
-  { key: "sales", label: "Sales", colors: ["#111111", "#000000"] },
+  { key: "inquiry", label: "Inquiry", colors: ["#C47A5A", "#B0684A"] },
+  { key: "contact", label: "Contact", colors: ["#C15F3C", "#A8512F"] },
+  { key: "appointment", label: "Appointment", colors: ["#A85F3E", "#8F4E30"] },
+  { key: "showup", label: "Show Up", colors: ["#856A52", "#6E5743"] },
+  { key: "orders", label: "Orders", colors: ["#514B40", "#3E3933"] },
+  { key: "sales", label: "Sales", colors: ["#20201D", "#000000"] },
 ] as const;
 
 const WALKIN_STEPS = [
-  { key: "inquiry", label: "Inquiry", colors: ["#D42B2B", "#B82424"] },
-  { key: "contact", label: "Visit", colors: ["#1B4F9B", "#164082"] },
-  { key: "orders", label: "Orders", colors: ["#D4960A", "#B88008"] },
-  { key: "sales", label: "Sales", colors: ["#111111", "#000000"] },
+  { key: "inquiry", label: "Inquiry", colors: ["#C47A5A", "#B0684A"] },
+  { key: "contact", label: "Visit", colors: ["#C15F3C", "#A8512F"] },
+  { key: "orders", label: "Orders", colors: ["#A85F3E", "#8F4E30"] },
+  { key: "sales", label: "Sales", colors: ["#20201D", "#000000"] },
 ] as const;
 
 export function FunnelFlow({ metrics, funnelType = "appointment" }: { metrics: FunnelMetrics; funnelType?: string }) {

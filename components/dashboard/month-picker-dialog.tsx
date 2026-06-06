@@ -79,7 +79,7 @@ export function MonthPickerDialog({ clientId }: { clientId: string }) {
         </div>
         <Button
           onClick={handleGenerate}
-          className="w-full mt-4 bg-[var(--blue)] hover:bg-[#153D7A] text-white"
+          className="w-full mt-4 bg-[var(--blue)] hover:bg-[#A34D2F] text-white"
         >
           Generate Report
         </Button>
