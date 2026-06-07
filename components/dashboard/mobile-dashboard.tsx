@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import type { FunnelMetrics, KPIConfig, MoMResult, InsightGroup } from "@/lib/types";
-import type { PersonData } from "@/lib/sheets";
+import type { PersonData, BrandPerformanceData } from "@/lib/sheets";
 import { FunnelFlow } from "./funnel-flow";
 import { MoMTable } from "./mom-table";
 import { KPIChart } from "./kpi-chart";
 import { PersonPerformance } from "./person-performance";
+import { BrandPerformance } from "./brand-performance";
 import { SummaryCards } from "./summary-cards";
 import { DateRangePicker } from "./date-range-picker";
 import { BrandSelector } from "./brand-selector";
@@ -38,6 +39,7 @@ interface Props {
   brands: string[];
   hasMultiBrand: boolean;
   canReport: boolean;
+  brandPerformance: BrandPerformanceData | null;
 }
 
 const TABS = [
@@ -45,6 +47,7 @@ const TABS = [
   { key: "funnel", label: "Funnel" },
   { key: "team", label: "Team" },
   { key: "targets", label: "Targets" },
+  { key: "products", label: "Products" },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
@@ -62,6 +65,7 @@ function statusText(v: number): string {
 export function MobileDashboard({
   tm, lm, kpi, mom, insights, personData, funnelType, kpiItems,
   thisRangeLabel, prevRangeLabel, clientId, brands, hasMultiBrand, canReport,
+  brandPerformance,
 }: Props) {
   const [tab, setTab] = useState<TabKey>("overview");
   const [selected, setSelected] = useState<KpiItem | null>(null);
@@ -73,8 +77,11 @@ export function MobileDashboard({
     ? Math.round(kpiItems.reduce((a, k) => a + Math.min(k.value, 150), 0) / kpiItems.length)
     : 0;
   const bannerColor = poorCount === 0 ? "var(--green)" : poorCount <= 2 ? "var(--yellow)" : "var(--red)";
+  const hasBrand = !!brandPerformance && brandPerformance.totalQty > 0;
 
-  const visibleTabs = TABS.filter((t) => t.key !== "team" || hasPerson);
+  const visibleTabs = TABS.filter(
+    (t) => (t.key !== "team" || hasPerson) && (t.key !== "products" || hasBrand),
+  );
 
   return (
     <div className="md:hidden">
@@ -198,6 +205,12 @@ export function MobileDashboard({
                 funnelType={funnelType}
               />
             </div>
+          </div>
+        )}
+
+        {tab === "products" && hasBrand && brandPerformance && (
+          <div className="card-base">
+            <BrandPerformance data={brandPerformance} />
           </div>
         )}
       </div>

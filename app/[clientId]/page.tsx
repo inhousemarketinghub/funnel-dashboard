@@ -307,6 +307,7 @@ export default async function DashboardPage({
             brands={brands.length > 1 ? ["Overall", ...brands] : brands}
             hasMultiBrand={brands.length > 1}
             canReport={canReport}
+            brandPerformance={brandPerformance}
           />
         )}
       </div>
