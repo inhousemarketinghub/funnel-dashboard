@@ -2,19 +2,19 @@ export default function DashboardLoading() {
   return (
     <div className="animate-pulse">
       {/* Header skeleton */}
-      <div className="flex justify-between items-start mb-7">
+      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start mb-7">
         <div>
-          <div className="h-8 w-64 bg-[var(--sand)] rounded-[6px] mb-2" />
-          <div className="h-4 w-40 bg-[var(--sand)] rounded-[4px]" />
+          <div className="h-8 w-64 max-w-full bg-[var(--sand)] rounded-[6px] mb-2" />
+          <div className="h-4 w-40 max-w-full bg-[var(--sand)] rounded-[4px]" />
         </div>
-        <div className="flex gap-2">
-          <div className="h-9 w-48 bg-[var(--sand)] rounded-[6px]" />
-          <div className="h-9 w-40 bg-[var(--sand)] rounded-[6px]" />
+        <div className="flex flex-wrap gap-2">
+          <div className="h-9 w-48 max-w-full bg-[var(--sand)] rounded-[6px]" />
+          <div className="h-9 w-40 max-w-full bg-[var(--sand)] rounded-[6px]" />
         </div>
       </div>
 
       {/* KPI cards skeleton */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-[10px] mb-[10px]">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-[10px] mb-[10px]">
         {Array.from({ length: 10 }).map((_, i) => (
           <div key={i} className="card-base" style={{ padding: 22 }}>
             <div className="h-3 w-16 bg-[var(--sand)] rounded-[3px] mb-3" />

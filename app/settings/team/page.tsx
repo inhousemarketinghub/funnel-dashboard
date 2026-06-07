@@ -131,7 +131,7 @@ export default function TeamPage() {
     <div className="min-h-dvh bg-[var(--bg)]" style={{ transition: "background 500ms ease" }}>
       <div className="bauhaus-stripe"><div /><div /><div /><div /></div>
 
-      <div className="max-w-3xl mx-auto p-8">
+      <div className="max-w-3xl mx-auto p-4 sm:p-8">
         {/* Top nav */}
         <div className="flex justify-end items-center mb-8">
           <div className="flex items-center gap-3">
@@ -146,7 +146,7 @@ export default function TeamPage() {
         </div>
 
         {/* Header */}
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-6">
           <div>
             <h1 className="font-heading text-[24px] font-semibold text-[var(--t1)]">
               Access Management

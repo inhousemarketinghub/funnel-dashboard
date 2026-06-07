@@ -470,7 +470,7 @@ export default function SettingsPage() {
                 Synced from Google Sheet
               </span>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               {fields.map((field) => (
                 <div key={field.key}>
                   <Label className="text-sm text-[var(--t3)] mb-1">
@@ -517,7 +517,7 @@ export default function SettingsPage() {
               <span className="text-[10px] font-label uppercase tracking-wider text-[var(--t4)] ml-2">Auto-calculated</span>
             </h2>
             <TooltipProvider>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                 {visibleDerived.map((m) => {
                   const explain = describeDerived(
                     m.key,
@@ -570,7 +570,7 @@ export default function SettingsPage() {
             <h2 className="font-bold text-[15px] tracking-tight text-[var(--t1)] dark:text-[var(--t1)] mb-4">
               Daily Ad Spend Budget
             </h2>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label className="text-sm text-[var(--t3)] mb-1">
                   Current Daily Ad Spend

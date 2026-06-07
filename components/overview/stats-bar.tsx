@@ -11,7 +11,7 @@ export function StatsBar({ stats }: Props) {
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
       {/* Active Clients */}
       <div className="card-base" style={{ borderLeft: "3px solid var(--green)" }}>
-        <div className="num text-[28px] font-semibold text-[var(--t1)]">
+        <div className="num text-[22px] sm:text-[28px] font-semibold text-[var(--t1)]">
           <CountUp value={stats.activeClients} />
         </div>
         <div className="font-label text-[11px] text-[var(--t3)] mt-1 uppercase tracking-wide">Active Projects</div>
@@ -26,7 +26,7 @@ export function StatsBar({ stats }: Props) {
         }}
       >
         <div
-          className="num text-[28px] font-semibold"
+          className="num text-[22px] sm:text-[28px] font-semibold"
           style={{ color: stats.needAttention > 0 ? "var(--red)" : "var(--t1)" }}
         >
           <CountUp value={stats.needAttention} />
@@ -36,7 +36,7 @@ export function StatsBar({ stats }: Props) {
 
       {/* Total Ad Spend */}
       <div className="card-base" style={{ borderLeft: "3px solid var(--blue)" }}>
-        <div className="num text-[28px] font-semibold text-[var(--t1)]">
+        <div className="num text-[22px] sm:text-[28px] font-semibold text-[var(--t1)]">
           <CountUp
             value={Math.round(stats.totalAdSpend / 1000)}
             prefix="RM "
@@ -48,7 +48,7 @@ export function StatsBar({ stats }: Props) {
 
       {/* Total Sales */}
       <div className="card-base" style={{ borderLeft: "3px solid var(--green)" }}>
-        <div className="num text-[28px] font-semibold" style={{ color: "var(--green)" }}>
+        <div className="num text-[22px] sm:text-[28px] font-semibold" style={{ color: "var(--green)" }}>
           <CountUp
             value={Math.round(stats.totalSales / 1000)}
             prefix="RM "

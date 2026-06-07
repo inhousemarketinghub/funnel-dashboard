@@ -32,9 +32,9 @@ export default async function ClientsPage() {
     <div className="min-h-dvh bg-[var(--bg)]" style={{ transition: "background 500ms ease" }}>
       <div className="bauhaus-stripe"><div /><div /><div /><div /></div>
 
-      <div className="max-w-7xl mx-auto p-8">
+      <div className="max-w-7xl mx-auto p-4 sm:p-8">
         {/* Header */}
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center mb-8">
           <div>
             <SplitText text={title} />
             <p className="text-[13px] text-[var(--t3)] mt-1">
@@ -43,7 +43,7 @@ export default async function ClientsPage() {
                 : "Select a project to view performance"}
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             {isOwnerOrManager && (
               <Link href="/settings/team" className="topbar-btn">
                 Access Management
@@ -58,7 +58,7 @@ export default async function ClientsPage() {
                 + New Client
               </Link>
             )}
-            <span className="text-[11px] text-[var(--t4)] num">{email}</span>
+            <span className="topbar-email text-[11px] text-[var(--t4)] num">{email}</span>
             <LogoutButton />
           </div>
         </div>
