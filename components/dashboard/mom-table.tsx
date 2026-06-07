@@ -84,7 +84,7 @@ export function MoMTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full" style={{ borderCollapse: "collapse" }}>
+      <table className="w-full mom-table" style={{ borderCollapse: "collapse" }}>
         <thead>
           <tr>
             <th className={TH} style={{ padding: "10px 16px" }}>

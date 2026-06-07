@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useId } from "react";
 import type { FunnelMetrics } from "@/lib/types";
 import { fmtRM } from "@/lib/utils";
 
@@ -24,6 +24,9 @@ const WALKIN_STEPS = [
 export function FunnelFlow({ metrics, funnelType = "appointment" }: { metrics: FunnelMetrics; funnelType?: string }) {
   const STEPS = funnelType === "walkin" ? WALKIN_STEPS : APPOINTMENT_STEPS;
   const ref = useRef<HTMLDivElement>(null);
+  // Unique per instance so the desktop + mobile funnels don't share gradient ids
+  // (duplicate ids made the second funnel reference the hidden first one → no fill).
+  const uid = useId().replace(/:/g, "");
   const [visible, setVisible] = useState(false);
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
@@ -87,7 +90,7 @@ export function FunnelFlow({ metrics, funnelType = "appointment" }: { metrics: F
   }
 
   return (
-    <div ref={ref} className="flex gap-4 items-start">
+    <div ref={ref} className="flex gap-3 sm:gap-4 items-start">
       {/* Left labels */}
       <div className="flex flex-col" style={{ paddingTop: 8 }}>
         {STEPS.map((step, i) => {
@@ -130,10 +133,10 @@ export function FunnelFlow({ metrics, funnelType = "appointment" }: { metrics: F
 
       {/* 3D SVG Funnel */}
       <div className="relative flex-shrink-0">
-        <svg width={svgW} height={svgH} viewBox={`0 0 ${svgW} ${svgH}`}>
+        <svg width={svgW} height={svgH} viewBox={`0 0 ${svgW} ${svgH}`} className="w-[150px] sm:w-[220px] h-auto">
           <defs>
             {STEPS.map((step, i) => (
-              <linearGradient key={`grad-${i}`} id={`funnelGrad${i}`} x1="0" y1="0" x2="1" y2="0">
+              <linearGradient key={`grad-${i}`} id={`${uid}-grad-${i}`} x1="0" y1="0" x2="1" y2="0">
                 <stop offset="0%" stopColor={step.colors[1]} />
                 <stop offset="50%" stopColor={step.colors[0]} />
                 <stop offset="100%" stopColor={step.colors[1]} />
@@ -173,7 +176,7 @@ export function FunnelFlow({ metrics, funnelType = "appointment" }: { metrics: F
                 {/* Side walls */}
                 <path
                   d={wallPath}
-                  fill={`url(#funnelGrad${i})`}
+                  fill={`url(#${uid}-grad-${i})`}
                   style={{
                     filter: isHovered ? "brightness(1.15)" : "brightness(1)",
                     transition: "filter 200ms ease",

@@ -1043,3 +1043,162 @@ export function countEstShowUp(leads: Lead[], start: Date, end: Date): number {
     l.appointment_date && l.appointment_date >= start && l.appointment_date <= end
   ).length;
 }
+
+// ── Brand Performance (Order Items tab) ────────────────────────
+// Only the 2990's sheet has an "Order Items" tab: one row per SKU sold, so a
+// single order can split across products/brands. Joined back to the main
+// Lead & Sales Tracker by Order No. for purchase-date filtering.
+
+export interface BrandPerformanceSlice {
+  name: string;
+  qty: number;
+  sales: number;
+}
+
+export interface BrandPerformanceData {
+  byBrand: BrandPerformanceSlice[];
+  byProduct: BrandPerformanceSlice[];
+  totalQty: number;
+  totalSales: number;
+}
+
+interface OrderItemColumnMap {
+  orderNo: number;
+  brand: number;
+  product: number;
+  qty: number;
+  sales: number;
+}
+
+function detectOrderItemColumns(header: string[]): OrderItemColumnMap {
+  const h = header.map((v) => (v || "").toLowerCase().replace(/\n/g, " "));
+  const find = (keywords: string[], fallback: number) => {
+    const idx = h.findIndex((v) => keywords.some((kw) => v.includes(kw)));
+    return idx >= 0 ? idx : fallback;
+  };
+  return {
+    orderNo: find(["order"], 0),         // A
+    brand: find(["brand"], 1),           // B
+    product: find(["product"], 2),       // C
+    qty: find(["qty", "quantity"], 4),   // E
+    sales: find(["sales", "amount"], 5), // F
+  };
+}
+
+/** Pure aggregator: group Order Items rows by brand and by product, summing qty + sales */
+export function aggregateOrderItems(rows: string[][]): BrandPerformanceData {
+  if (rows.length < 2) return { byBrand: [], byProduct: [], totalQty: 0, totalSales: 0 };
+  const col = detectOrderItemColumns(rows[0]);
+  const brandMap = new Map<string, { qty: number; sales: number }>();
+  const productMap = new Map<string, { qty: number; sales: number }>();
+  let totalQty = 0;
+  let totalSales = 0;
+
+  for (let i = 1; i < rows.length; i++) {
+    const cols = rows[i];
+    if (!cols) continue;
+    const brand = (cols[col.brand] || "").trim();
+    const product = (cols[col.product] || "").trim();
+    const qty = parseInt2(cols[col.qty]);
+    const sales = parseRM(cols[col.sales]);
+    if (!brand && !product) continue;       // skip blank rows
+    if (qty === 0 && sales === 0) continue;  // skip rows with no quantity/value
+
+    if (brand) {
+      const b = brandMap.get(brand) || { qty: 0, sales: 0 };
+      b.qty += qty; b.sales += sales; brandMap.set(brand, b);
+    }
+    if (product) {
+      const p = productMap.get(product) || { qty: 0, sales: 0 };
+      p.qty += qty; p.sales += sales; productMap.set(product, p);
+    }
+    totalQty += qty;
+    totalSales += sales;
+  }
+
+  const toSlices = (m: Map<string, { qty: number; sales: number }>): BrandPerformanceSlice[] =>
+    Array.from(m.entries())
+      .map(([name, v]) => ({ name, qty: v.qty, sales: v.sales }))
+      .sort((a, b) => b.sales - a.sales);
+
+  return { byBrand: toSlices(brandMap), byProduct: toSlices(productMap), totalQty, totalSales };
+}
+
+/** Build Order No. → Purchase Date map from the main Lead & Sales Tracker rows */
+export function buildOrderDateMap(rows: string[][]): Map<string, Date | null> {
+  const map = new Map<string, Date | null>();
+  if (rows.length < 2) return map;
+  const header = rows[0].map((v) => (v || "").toLowerCase().replace(/\n/g, " "));
+  // Order No. column: header has "order" + (no/number/#); fallback to col P (15)
+  let orderCol = header.findIndex(
+    (v) => v.includes("order") && (v.includes("no") || v.includes("number") || v.includes("#")),
+  );
+  if (orderCol < 0) orderCol = 15;
+  // Purchase Date: reuse lead column detection; fallback to col O (14)
+  const colMap = detectLeadColumns(rows[0]);
+  const purchaseCol = colMap.purchaseDate !== null ? colMap.purchaseDate : 14;
+
+  for (let i = 1; i < rows.length; i++) {
+    const cols = rows[i];
+    const orderNo = (cols[orderCol] || "").trim();
+    if (!orderNo) continue;
+    if (!map.has(orderNo)) map.set(orderNo, parseDate(cols[purchaseCol]));
+  }
+  return map;
+}
+
+/** Pure filter: keep only Order Items rows whose order's purchase date is within [start, end] */
+export function filterOrderItemsByDate(
+  rows: string[][],
+  orderDates: Map<string, Date | null>,
+  start?: Date,
+  end?: Date,
+): string[][] {
+  if (!start || !end || rows.length < 2) return rows;
+  const col = detectOrderItemColumns(rows[0]);
+  const filtered: string[][] = [rows[0]];
+  for (let i = 1; i < rows.length; i++) {
+    const orderNo = (rows[i]?.[col.orderNo] || "").trim();
+    const pd = orderDates.get(orderNo);
+    if (pd && pd >= start && pd <= end) filtered.push(rows[i]);
+  }
+  return filtered;
+}
+
+async function findOrderItemsTab(sheetId: string): Promise<string | null> {
+  return findTab(sheetId, ["order items"]);
+}
+
+/**
+ * Fetch + aggregate Brand Performance from the "Order Items" tab.
+ * Returns null when the tab is absent (most clients) or on any fetch error —
+ * the dashboard simply hides the section instead of erroring.
+ */
+export async function fetchBrandPerformance(
+  sheetId: string,
+  startDate?: Date,
+  endDate?: Date,
+): Promise<BrandPerformanceData | null> {
+  try {
+    const tabName = await findOrderItemsTab(sheetId);
+    if (!tabName) return null;
+    const rows = await fetchSheetData(sheetId, tabName);
+    if (rows.length < 2) return null;
+
+    let dataRows = rows;
+    if (startDate && endDate) {
+      const leadTab = await findLeadSalesTab(sheetId);
+      if (leadTab) {
+        // Only Purchase Date (col O) + Order No. (col P) are needed for the join.
+        // The full Lead & Sales Tracker tab can be several MB (over Next's 2MB fetch
+        // cache limit → uncacheable + slow); reading just these two columns stays tiny.
+        const leadRows = await fetchSheetData(sheetId, `'${leadTab}'!O:P`);
+        const orderDates = buildOrderDateMap(leadRows);
+        dataRows = filterOrderItemsByDate(rows, orderDates, startDate, endDate);
+      }
+    }
+    return aggregateOrderItems(dataRows);
+  } catch {
+    return null;
+  }
+}

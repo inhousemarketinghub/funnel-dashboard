@@ -1,7 +1,7 @@
 import { createServerSupabase } from "@/lib/supabase/server";
 import { getProjectPermissions } from "@/lib/auth";
-import { fetchPerformanceData, fetchLeadData, countEstShowUp, fetchKPIData, fetchPersonData, detectBrandsOrdered, fetchOverallKPI } from "@/lib/sheets";
-import type { PersonData, PerfResult } from "@/lib/sheets";
+import { fetchPerformanceData, fetchLeadData, countEstShowUp, fetchKPIData, fetchPersonData, detectBrandsOrdered, fetchOverallKPI, fetchBrandPerformance } from "@/lib/sheets";
+import type { PersonData, PerfResult, BrandPerformanceData } from "@/lib/sheets";
 import { BrandSelector } from "@/components/dashboard/brand-selector";
 import { computeMetrics, computeMoM, computeAchievement } from "@/lib/metrics";
 import { fmtRM, fmtROAS } from "@/lib/utils";
@@ -10,6 +10,7 @@ import { HeroCards } from "@/components/dashboard/hero-cards";
 import { FunnelFlow } from "@/components/dashboard/funnel-flow";
 import { KPIChart } from "@/components/dashboard/kpi-chart";
 import { PersonPerformance } from "@/components/dashboard/person-performance";
+import { BrandPerformance } from "@/components/dashboard/brand-performance";
 import { MoMTable } from "@/components/dashboard/mom-table";
 import { DateRangePicker } from "@/components/dashboard/date-range-picker";
 import { SplitText } from "@/components/animations/split-text";
@@ -21,6 +22,7 @@ import { Stagger } from "@/components/animations/stagger";
 import type { KPIConfig } from "@/lib/types";
 import { generateInsights } from "@/lib/insights";
 import { SummaryCards } from "@/components/dashboard/summary-cards";
+import { MobileDashboard } from "@/components/dashboard/mobile-dashboard";
 import { Suspense } from "react";
 import Link from "next/link";
 
@@ -64,13 +66,16 @@ export default async function DashboardPage({
   let leadData: import("@/lib/types").Lead[] = [];
   let sheetKPI: KPIConfig | null = null;
   let personData: PersonData = { appointmentPersons: [], salesPersons: [], brandBreakdowns: {} };
+  // Brand Performance follows the date range only (not the brand selector); resilient to absent tab.
+  let brandPerformance: BrandPerformanceData | null = null;
   let fetchError: string | null = null;
   try {
-    [perfResult, leadData, sheetKPI, personData] = await Promise.all([
+    [perfResult, leadData, sheetKPI, personData, brandPerformance] = await Promise.all([
       fetchPerformanceData(client.sheet_id, selectedBrand),
       fetchLeadData(client.sheet_id, selectedBrand),
       fetchKPIData(client.sheet_id, selectedBrand),
       fetchPersonData(client.sheet_id, reportStart, reportEnd, selectedBrand),
+      fetchBrandPerformance(client.sheet_id, reportStart, reportEnd),
     ]);
   } catch (err) {
     perfResult = { data: [], funnelType: "appointment" };
@@ -166,8 +171,10 @@ export default async function DashboardPage({
 
   return (
     <div>
+      {/* ───────── Desktop layout (md and up) — unchanged ───────── */}
+      <div className="hidden md:block">
       {/* Header */}
-      <div className="flex justify-between items-start mb-7">
+      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start mb-7">
         <div>
           <SplitText text="Performance Overview" />
           <div className="flex items-center gap-3 mt-[3px]">
@@ -261,7 +268,48 @@ export default async function DashboardPage({
           </div>
         </CardReveal>
       )}
+
+      {/* Brand Performance — product/brand split from the Order Items tab */}
+      {brandPerformance && brandPerformance.totalQty > 0 && (
+        <CardReveal delay={580} className="mt-[10px]">
+          <div className="card-base">
+            <div className="font-label text-[11px] uppercase tracking-widest text-[var(--t3)] mb-1">Products</div>
+            <BlurText>
+              <div className="text-[14px] font-semibold text-[var(--t1)] mb-4">Brand Performance</div>
+            </BlurText>
+            <BrandPerformance data={brandPerformance} />
+          </div>
+        </CardReveal>
+      )}
       </>}
+      </div>
+
+      {/* ───────── Mobile layout (below md) — app-style tabs + tiles ───────── */}
+      <div className="md:hidden">
+        {fetchError ? (
+          <div className="mt-4 rounded-[10px] border border-[var(--red)] bg-[var(--red-bg)] p-6 text-center">
+            <p className="text-[15px] font-medium text-[var(--red)] mb-1">Unable to load data</p>
+            <p className="text-[13px] text-[var(--red)]/70">{fetchError}</p>
+          </div>
+        ) : (
+          <MobileDashboard
+            tm={tm}
+            lm={lm}
+            kpi={kpi}
+            mom={mom}
+            insights={insights}
+            personData={personData}
+            funnelType={detectedFunnelType || "appointment"}
+            kpiItems={kpiItems}
+            thisRangeLabel={thisRangeLabel}
+            prevRangeLabel={prevRangeLabel}
+            clientId={clientId}
+            brands={brands.length > 1 ? ["Overall", ...brands] : brands}
+            hasMultiBrand={brands.length > 1}
+            canReport={canReport}
+          />
+        )}
+      </div>
     </div>
   );
 }

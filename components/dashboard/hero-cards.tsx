@@ -124,10 +124,12 @@ export function HeroCards({ metrics: tm, kpi, achievement: ach, prevMetrics: lm,
     : [cards[0], cards[3], cards[9], cards[4], cards[2]]; // Total Sales (0), Orders (3), Conv Rate (9), AOV (4), CPA% (2)
 
   function gridCols(count: number): string {
+    // Phones (<640px): 1 column so the 28px headline numbers never get clipped.
+    // Then step up: 2 cols @sm, 3 @md, full row @lg.
     if (count === 1) return "grid-cols-1 md:grid-cols-2";
-    if (count === 2) return "grid-cols-2";
-    if (count === 3) return "grid-cols-2 md:grid-cols-3";
-    return "grid-cols-2 md:grid-cols-3 lg:grid-cols-5";
+    if (count === 2) return "grid-cols-1 sm:grid-cols-2";
+    if (count === 3) return "grid-cols-1 sm:grid-cols-2 md:grid-cols-3";
+    return "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5";
   }
 
   function renderGroup(label: string, groupCards: CardDef[], startIndex: number) {

@@ -223,6 +223,21 @@
   .c3, .c4, .c5, .c6 { grid-column: span 12; }
 }
 
+/* ── Mobile responsive overrides (≤768px) ── */
+/* The desktop topbar is hidden below md (see MobileNav); mobile gets a fully
+   separate dashboard layout (see MobileDashboard). These are the few shared
+   tweaks that still apply to components reused inside the mobile layout. */
+@media (max-width: 768px) {
+  /* Cards breathe better with less padding on small screens */
+  .card-base, .card-deep { padding: 18px; }
+
+  /* MoM table: tighter cells so the horizontal scroll is shorter (overrides inline padding) */
+  .mom-table th, .mom-table td { padding: 8px 10px !important; }
+}
+
+/* Hide the horizontal scrollbar on chip / tab strips (Chrome / Safari) */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
 /* ── Card styles (Broadcast-inspired: no border, subtle bg) ── */
 .card-base {
   background: var(--bg2);
