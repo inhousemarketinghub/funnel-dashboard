@@ -57,9 +57,9 @@ export default async function ReportPage({
     const prevR = filterRange(perfData, prevStart, prevEnd);
     const esu = countEstShowUp(leadData, reportStart, reportEnd);
     const esuP = countEstShowUp(leadData, prevStart, prevEnd);
-    const tm = computeMetrics(thisR, esu);
-    const lm = computeMetrics(prevR, esuP);
-    return { tm, lm, mom: computeMoM(tm, lm), ach: computeAchievement(tm, kpi), weeks: computeWeeklyBreakdown(thisR), kpi };
+    const tm = computeMetrics(thisR, esu, ft);
+    const lm = computeMetrics(prevR, esuP, ft);
+    return { tm, lm, mom: computeMoM(tm, lm), ach: computeAchievement(tm, kpi), weeks: computeWeeklyBreakdown(thisR, ft), kpi };
   }
 
   const overall = computeAll(overallPerf.data, overallLead, kpi0);

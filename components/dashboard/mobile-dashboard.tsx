@@ -22,6 +22,7 @@ export interface KpiItem {
   actual: string;
   prevActual?: string;
   monthlyTarget?: string;
+  breakdown?: { label: string; value: string }[]; // underlying counts, shown in the tap-detail sheet
 }
 
 interface Props {
@@ -242,6 +243,21 @@ export function MobileDashboard({
               {selected.monthlyTarget && <div>{selected.monthlyTarget}</div>}
               {selected.prevActual && <div>Previous: {selected.prevActual}</div>}
             </div>
+            {selected.breakdown && selected.breakdown.length > 0 && (
+              <div
+                className="mt-5 flex flex-wrap gap-x-8 gap-y-4"
+                style={{ borderTop: "1px solid var(--border)", paddingTop: 16 }}
+              >
+                {selected.breakdown.map((b) => (
+                  <div key={b.label}>
+                    <div className="font-label mb-1 text-[10px] uppercase tracking-wider text-[var(--t4)]">
+                      {b.label}
+                    </div>
+                    <div className="num text-[16px] font-semibold text-[var(--t1)]">{b.value}</div>
+                  </div>
+                ))}
+              </div>
+            )}
             <button
               onClick={() => setSelected(null)}
               className="mt-6 w-full rounded-[12px] py-3 text-[13px] font-medium"
