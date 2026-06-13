@@ -102,8 +102,8 @@ export default async function DashboardPage({
   const estSU = countEstShowUp(leadData, reportStart, reportEnd);
   const estSUPrev = countEstShowUp(leadData, prevStart, prevEnd);
 
-  const tm = computeMetrics(thisRangeRows, estSU);
-  const lm = computeMetrics(prevRangeRows, estSUPrev);
+  const tm = computeMetrics(thisRangeRows, estSU, detectedFunnelType);
+  const lm = computeMetrics(prevRangeRows, estSUPrev, detectedFunnelType);
   const mom = computeMoM(tm, lm);
   const ach = computeAchievement(tm, kpi);
 
@@ -139,22 +139,55 @@ export default async function DashboardPage({
   const walkinConvRate = tm.contact > 0 ? (tm.orders / tm.contact) * 100 : 0;
   const walkinConvRatePrev = lm.contact > 0 ? (lm.orders / lm.contact) * 100 : 0;
 
+  // Quantity breakdowns shown when a mobile tile is tapped — mirrors the desktop Hero Card expand.
+  const leadFunnelTaxed = tm.lead_funnel_spend * 1.08;
+  const brandingTaxed = tm.branding_spend * 1.08;
+  const hasSpendSplit = tm.lead_funnel_spend + tm.branding_spend > 0;
+  const targetedDailyBudget = daysInMonth > 0 ? kpi.ad_spend / daysInMonth : 0;
+  const avgDailySpend = rangeDays > 0 ? tm.ad_spend / rangeDays : 0;
+
   const kpiItems = [
     { label: "Sales", value: paceAchSales, target: `Pace: ${fmtRM(paceSales)}`, actual: fmtRM(tm.sales), prevActual: fmtRM(lm.sales), monthlyTarget: `Monthly: ${fmtRM(kpi.sales)}` },
-    { label: "Ad Spend", value: paceAchAdSpend, target: `Pace: ${fmtRM(paceAdSpend)}`, actual: fmtRM(tm.ad_spend), prevActual: fmtRM(lm.ad_spend), monthlyTarget: `Monthly: ${fmtRM(kpi.ad_spend)}` },
+    { label: "Ad Spend", value: paceAchAdSpend, target: `Pace: ${fmtRM(paceAdSpend)}`, actual: fmtRM(tm.ad_spend), prevActual: fmtRM(lm.ad_spend), monthlyTarget: `Monthly: ${fmtRM(kpi.ad_spend)}`,
+      breakdown: [
+        ...(hasSpendSplit ? [
+          { label: "Lead Funnel Ad Spend", value: fmtRM(leadFunnelTaxed) },
+          { label: "Branding Ad Spend", value: fmtRM(brandingTaxed) },
+        ] : []),
+        { label: "Targeted Daily Budget", value: fmtRM(targetedDailyBudget) },
+        { label: "Current Daily Budget", value: fmtRM(kpi.daily_ad) },
+        { label: "Avg. Daily", value: fmtRM(avgDailySpend) },
+      ],
+    },
     { label: "Orders", value: paceAchOrders, target: `Pace: ${Math.round(paceOrders)}`, actual: String(tm.orders), prevActual: String(lm.orders), monthlyTarget: `Monthly: ${kpi.orders}` },
     { label: "AOV", value: ach.aov, target: fmtRM(kpi.aov), actual: fmtRM(tm.aov), prevActual: fmtRM(lm.aov) },
-    { label: "CPL", value: ach.cpl, target: fmtRM(kpi.cpl), actual: fmtRM(tm.cpl), prevActual: fmtRM(lm.cpl) },
+    { label: "CPL", value: ach.cpl, target: fmtRM(kpi.cpl), actual: fmtRM(tm.cpl), prevActual: fmtRM(lm.cpl),
+      breakdown: [{ label: "Inquiry (PM)", value: String(tm.inquiry) }],
+    },
     {
       label: isWalkin ? "Visit Rate" : "Respond Rate",
       value: isWalkin ? (kpi.respond_rate > 0 ? (walkinVisitRate / kpi.respond_rate) * 100 : 0) : ach.respond_rate,
       target: `${kpi.respond_rate}%`,
       actual: isWalkin ? `${walkinVisitRate.toFixed(1)}%` : `${tm.respond_rate.toFixed(1)}%`,
       prevActual: isWalkin ? `${walkinVisitRatePrev.toFixed(1)}%` : `${lm.respond_rate.toFixed(1)}%`,
+      breakdown: [
+        { label: isWalkin ? "Visit" : "Contact Given", value: String(tm.contact) },
+        { label: "Inquiry", value: String(tm.inquiry) },
+      ],
     },
     ...(!isWalkin ? [
-      { label: "Appt Rate", value: ach.appt_rate, target: `${kpi.appt_rate}%`, actual: `${tm.appt_rate.toFixed(1)}%`, prevActual: `${lm.appt_rate.toFixed(1)}%` },
-      { label: "Show Up Rate", value: ach.showup_rate, target: `${kpi.showup_rate}%`, actual: `${tm.showup_rate.toFixed(1)}%`, prevActual: `${lm.showup_rate.toFixed(1)}%` },
+      { label: "Appt Rate", value: ach.appt_rate, target: `${kpi.appt_rate}%`, actual: `${tm.appt_rate.toFixed(1)}%`, prevActual: `${lm.appt_rate.toFixed(1)}%`,
+        breakdown: [
+          { label: "Appointment", value: String(tm.appointment) },
+          { label: "Contact Given", value: String(tm.contact) },
+        ],
+      },
+      { label: "Show Up Rate", value: ach.showup_rate, target: `${kpi.showup_rate}%`, actual: `${tm.showup_rate.toFixed(1)}%`, prevActual: `${lm.showup_rate.toFixed(1)}%`,
+        breakdown: [
+          { label: "Show Up", value: String(tm.showup) },
+          { label: "Est. Show Up", value: String(tm.est_showup) },
+        ],
+      },
     ] : []),
     {
       label: "Conv Rate",
@@ -162,6 +195,10 @@ export default async function DashboardPage({
       target: `${kpi.conv_rate}%`,
       actual: isWalkin ? `${walkinConvRate.toFixed(1)}%` : `${tm.conv_rate.toFixed(1)}%`,
       prevActual: isWalkin ? `${walkinConvRatePrev.toFixed(1)}%` : `${lm.conv_rate.toFixed(1)}%`,
+      breakdown: [
+        { label: "Orders", value: String(tm.orders) },
+        { label: isWalkin ? "Visit" : "Show Up", value: isWalkin ? String(tm.contact) : String(tm.showup) },
+      ],
     },
     { label: "CPA%", value: tm.cpa_pct ? (kpi.cpa_pct / tm.cpa_pct) * 100 : 0, target: `${kpi.cpa_pct}%`, actual: `${tm.cpa_pct.toFixed(2)}%`, prevActual: `${lm.cpa_pct.toFixed(2)}%` },
   ];

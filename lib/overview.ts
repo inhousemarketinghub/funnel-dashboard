@@ -43,7 +43,11 @@ export async function fetchAllClientsOverview(): Promise<{
           (r) => r.date >= start && r.date <= end
         );
 
-        const metrics = computeMetrics(monthData, 0);
+        const metrics = computeMetrics(
+          monthData,
+          0,
+          client.funnel_type === "walkin" ? "walkin" : "appointment",
+        );
 
         const achievement = kpi
           ? computeAchievement(metrics, kpi)

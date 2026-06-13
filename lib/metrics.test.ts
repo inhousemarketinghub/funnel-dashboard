@@ -91,3 +91,31 @@ describe("budgetScenario", () => {
     expect(sc.sales).toBeGreaterThan(0);
   });
 });
+
+describe("conv_rate by funnel type", () => {
+  // Walk-in funnels skip the appointment/show-up stage, so showup is always 0.
+  // The conversion rate must come off Visit (contact), or it collapses to 0%.
+  const walkinRows: DailyMetric[] = [
+    { date: new Date("2026-03-01"), ad_spend: 200, lead_funnel_spend: 100, branding_spend: 0, inquiry: 50, contact: 20, appointment: 0, showup: 0, orders: 6, sales: 30000 },
+  ];
+
+  it("walk-in conv_rate = orders / visit (contact)", () => {
+    const m = computeMetrics(walkinRows, 0, "walkin");
+    expect(m.conv_rate).toBeCloseTo((6 / 20) * 100, 1); // 30%
+  });
+
+  it("regression: omitting funnelType collapses walk-in conv_rate to 0% (the funnel bug)", () => {
+    // Defaulting to "appointment" divides orders by showup (0) → 0%. This is exactly
+    // what the dashboard funnel showed before the fix.
+    const m = computeMetrics(walkinRows, 0);
+    expect(m.conv_rate).toBe(0);
+  });
+
+  it("appointment conv_rate = orders / show-up", () => {
+    const apptRows: DailyMetric[] = [
+      { date: new Date("2026-03-01"), ad_spend: 200, lead_funnel_spend: 100, branding_spend: 0, inquiry: 50, contact: 20, appointment: 10, showup: 8, orders: 4, sales: 20000 },
+    ];
+    const m = computeMetrics(apptRows, 0, "appointment");
+    expect(m.conv_rate).toBeCloseTo((4 / 8) * 100, 1); // 50%
+  });
+});

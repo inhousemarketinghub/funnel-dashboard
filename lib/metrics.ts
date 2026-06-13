@@ -95,10 +95,13 @@ export function budgetScenario(
   return { spend, inquiry, new_contact, new_appt, pipeline, show_up, orders, sales, roas, cpa_pct, gap };
 }
 
-export function computeWeeklyBreakdown(rows: DailyMetric[]): FunnelMetrics[] {
+export function computeWeeklyBreakdown(
+  rows: DailyMetric[],
+  funnelType: "appointment" | "walkin" | string = "appointment",
+): FunnelMetrics[] {
   const w1 = rows.filter((r) => r.date.getDate() >= 1 && r.date.getDate() <= 7);
   const w2 = rows.filter((r) => r.date.getDate() >= 8 && r.date.getDate() <= 14);
   const w3 = rows.filter((r) => r.date.getDate() >= 15 && r.date.getDate() <= 21);
   const w4 = rows.filter((r) => r.date.getDate() >= 22);
-  return [w1, w2, w3, w4].map((w) => computeMetrics(w, 0));
+  return [w1, w2, w3, w4].map((w) => computeMetrics(w, 0, funnelType));
 }

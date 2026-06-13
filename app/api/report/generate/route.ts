@@ -42,8 +42,8 @@ export async function POST(request: NextRequest) {
   const estSU = countEstShowUp(leadData, reportStart, reportEnd);
   const estSUPrev = countEstShowUp(leadData, prevStart, prevEnd);
 
-  const tm = computeMetrics(thisRangeRows, estSU);
-  const lm = computeMetrics(prevRangeRows, estSUPrev);
+  const tm = computeMetrics(thisRangeRows, estSU, perfResult.funnelType);
+  const lm = computeMetrics(prevRangeRows, estSUPrev, perfResult.funnelType);
   const mom = computeMoM(tm, lm);
   const ach = computeAchievement(tm, kpi);
 
