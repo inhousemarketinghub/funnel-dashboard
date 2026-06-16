@@ -6,6 +6,7 @@ import { fetchAllClientsOverview } from "@/lib/overview";
 import { OverviewShell } from "@/components/overview/overview-shell";
 import { ClientKpiCard } from "@/components/overview/client-kpi-card";
 import { SplitText } from "@/components/animations/split-text";
+import { ThemeToggle } from "@/components/dashboard/theme-toggle";
 import { LogoutButton } from "@/components/dashboard/logout-button";
 
 export default async function ClientsPage() {
@@ -44,6 +45,9 @@ export default async function ClientsPage() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
+            {/* Mounting ThemeToggle here also runs its theme-init effect, so a
+                direct load of this post-login landing page honors the saved theme. */}
+            <ThemeToggle />
             {isOwnerOrManager && (
               <Link href="/settings/team" className="topbar-btn">
                 Access Management
