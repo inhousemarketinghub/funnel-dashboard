@@ -302,7 +302,11 @@ export default function SettingsPage() {
     }
 
     const { data: urlData } = supabase.storage.from("logos").getPublicUrl(path);
-    const publicUrl = urlData.publicUrl;
+    // We re-use the same storage path (`${clientId}.${ext}`) with upsert, so overwriting
+    // returns a byte-identical URL — the browser/CDN keeps serving the cached old image.
+    // A fresh ?v= per upload busts that cache everywhere the logo renders (this preview,
+    // the topbar, dashboard cards, mobile nav).
+    const publicUrl = `${urlData.publicUrl}?v=${Date.now()}`;
 
     const { error: updateErr } = await supabase.from("clients").update({ logo_url: publicUrl }).eq("id", clientId);
     if (updateErr) {
@@ -319,7 +323,9 @@ export default function SettingsPage() {
     setUploading(true);
     const supabase = createClient();
     const urlParts = logoUrl.split("/logos/");
-    const filePath = urlParts[urlParts.length - 1];
+    // Drop any ?v= cache-buster before deriving the storage object name, otherwise
+    // remove() targets a path that doesn't exist and the file is orphaned.
+    const filePath = urlParts[urlParts.length - 1]?.split("?")[0];
     if (filePath) {
       await supabase.storage.from("logos").remove([filePath]);
     }
