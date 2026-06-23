@@ -13,7 +13,7 @@ interface SheetTab {
 
 export async function listSheetTabs(sheetId: string): Promise<SheetTab[]> {
   const url = `${SHEETS_API}/${sheetId}?key=${API_KEY}&fields=sheets.properties`;
-  const res = await fetch(url, { next: { revalidate: 300 } });
+  const res = await fetch(url, { next: { revalidate: 300, tags: [`sheet:${sheetId}`] } });
   if (!res.ok) throw new Error(`Failed to list tabs: ${res.status}`);
   const data = await res.json();
   return (data.sheets || []).map((s: { properties: { title: string; hidden?: boolean; sheetId: number } }) => ({
@@ -25,10 +25,32 @@ export async function listSheetTabs(sheetId: string): Promise<SheetTab[]> {
 
 export async function fetchSheetData(sheetId: string, tabName: string): Promise<string[][]> {
   const url = `${SHEETS_API}/${sheetId}/values/${encodeURIComponent(tabName)}?key=${API_KEY}&valueRenderOption=FORMATTED_VALUE`;
-  const res = await fetch(url, { next: { revalidate: 300 } });
+  const res = await fetch(url, { next: { revalidate: 300, tags: [`sheet:${sheetId}`] } });
   if (!res.ok) throw new Error(`Failed to fetch tab "${tabName}": ${res.status}`);
   const data = await res.json();
   return data.values || [];
+}
+
+/**
+ * Timestamp (epoch ms) at which this sheet's cached data was last pulled from
+ * Google. Reads the upstream `Date` response header from a fetch that carries
+ * the same `sheet:${sheetId}` cache tag as the data fetches above — so it stays
+ * frozen with the cache and refreshes together when the tag is invalidated by
+ * the refresh button (updateTag). Returns null if unavailable; the UI then
+ * simply omits the "last updated" label rather than erroring.
+ */
+export async function getDataFetchedAt(sheetId: string): Promise<number | null> {
+  try {
+    const url = `${SHEETS_API}/${sheetId}?key=${API_KEY}&fields=spreadsheetId`;
+    const res = await fetch(url, { next: { revalidate: 300, tags: [`sheet:${sheetId}`] } });
+    if (!res.ok) return null;
+    const dateHeader = res.headers.get("date");
+    if (!dateHeader) return null;
+    const t = Date.parse(dateHeader);
+    return Number.isNaN(t) ? null : t;
+  } catch {
+    return null;
+  }
 }
 
 // ── Tab auto-discovery ─────────────────────────────────────────

@@ -12,6 +12,7 @@ import { SummaryCards } from "./summary-cards";
 import { DateRangePicker } from "./date-range-picker";
 import { BrandSelector } from "./brand-selector";
 import { MonthPickerDialog } from "./month-picker-dialog";
+import { RefreshButton } from "./refresh-button";
 import { Stagger } from "@/components/animations/stagger";
 
 // Matches the kpiItems shape built in app/[clientId]/page.tsx (and KPIChart's).
@@ -41,6 +42,8 @@ interface Props {
   hasMultiBrand: boolean;
   canReport: boolean;
   brandPerformance: BrandPerformanceData | null;
+  sheetId: string;
+  fetchedAtLabel: string | null;
 }
 
 const TABS = [
@@ -66,7 +69,7 @@ function statusText(v: number): string {
 export function MobileDashboard({
   tm, lm, kpi, mom, insights, personData, funnelType, kpiItems,
   thisRangeLabel, prevRangeLabel, clientId, brands, hasMultiBrand, canReport,
-  brandPerformance,
+  brandPerformance, sheetId, fetchedAtLabel,
 }: Props) {
   const [tab, setTab] = useState<TabKey>("overview");
   const [selected, setSelected] = useState<KpiItem | null>(null);
@@ -93,6 +96,7 @@ export function MobileDashboard({
           {hasMultiBrand && <BrandSelector clientId={clientId} brands={brands} />}
           {canReport && <MonthPickerDialog clientId={clientId} />}
           <DateRangePicker clientId={clientId} />
+          <RefreshButton sheetId={sheetId} fetchedAtLabel={fetchedAtLabel} />
         </div>
       </div>
 

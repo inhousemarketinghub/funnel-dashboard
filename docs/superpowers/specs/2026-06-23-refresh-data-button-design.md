@@ -35,10 +35,14 @@ Dashboard 为了打开快,会把 Google Sheet 的数据缓存 5 分钟。改了�
 ```
 [用户点击 🔄]
    → 调用 Server Action refreshSheet(sheetId)
-       → revalidateTag(`sheet:${sheetId}`)   // 让该表所有缓存 fetch 失效
-   → router.refresh()                          // 重新渲染服务端组件 → fetch 重新打 Google
+       → updateTag(`sheet:${sheetId}`)   // 立即作废该表所有缓存 fetch(read-your-own-writes)
+   → router.refresh()                      // 重新渲染服务端组件 → fetch 重新打 Google
    → 新数据 + 新的 fetchedAt 时间戳返回前端
 ```
+
+> **Next.js 16 API 决策(已查 node_modules 文档)**:用 `updateTag` 而非 `revalidateTag`。
+> - `revalidateTag(tag)` 单参数已废弃;`revalidateTag(tag, 'max')` 是 stale-while-revalidate(先返回旧数据,后台换新)→ 用户点一次仍会先看到旧值,需刷两次。
+> - `updateTag(tag)` 只能在 Server Action 调用(本场景正是),立即作废、下次请求阻塞等待新数据 → 点一次即见最新值。这正是 read-your-own-writes 推荐用法。
 
 ### 组件 / 改动单元
 
@@ -50,9 +54,9 @@ Dashboard 为了打开快,会把 Google Sheet 的数据缓存 5 分钟。改了�
 2. **`app/[clientId]/actions.ts`(新增,server action)**
    ```ts
    "use server";
-   import { revalidateTag } from "next/cache";
+   import { updateTag } from "next/cache";
    export async function refreshSheet(sheetId: string) {
-     revalidateTag(`sheet:${sheetId}`);
+     updateTag(`sheet:${sheetId}`);
    }
    ```
 
