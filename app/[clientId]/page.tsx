@@ -1,6 +1,6 @@
 import { createServerSupabase } from "@/lib/supabase/server";
 import { getProjectPermissions } from "@/lib/auth";
-import { fetchPerformanceData, fetchLeadData, countEstShowUp, fetchKPIData, fetchPersonData, detectBrandsOrdered, fetchOverallKPI, fetchBrandPerformance } from "@/lib/sheets";
+import { fetchPerformanceData, fetchLeadData, countEstShowUp, fetchKPIData, fetchPersonData, detectBrandsOrdered, fetchOverallKPI, fetchBrandPerformance, getDataFetchedAt } from "@/lib/sheets";
 import type { PersonData, PerfResult, BrandPerformanceData } from "@/lib/sheets";
 import { BrandSelector } from "@/components/dashboard/brand-selector";
 import { computeMetrics, computeMoM, computeAchievement } from "@/lib/metrics";
@@ -10,6 +10,7 @@ import { HeroCards } from "@/components/dashboard/hero-cards";
 import { FunnelFlow } from "@/components/dashboard/funnel-flow";
 import { KPIChart } from "@/components/dashboard/kpi-chart";
 import { PersonPerformance } from "@/components/dashboard/person-performance";
+import { RefreshButton } from "@/components/dashboard/refresh-button";
 import { BrandPerformance } from "@/components/dashboard/brand-performance";
 import { MoMTable } from "@/components/dashboard/mom-table";
 import { DateRangePicker } from "@/components/dashboard/date-range-picker";
@@ -68,14 +69,17 @@ export default async function DashboardPage({
   let personData: PersonData = { appointmentPersons: [], salesPersons: [], brandBreakdowns: {} };
   // Brand Performance follows the date range only (not the brand selector); resilient to absent tab.
   let brandPerformance: BrandPerformanceData | null = null;
+  // When the cached sheet data was last pulled from Google (for the refresh button label).
+  let fetchedAt: number | null = null;
   let fetchError: string | null = null;
   try {
-    [perfResult, leadData, sheetKPI, personData, brandPerformance] = await Promise.all([
+    [perfResult, leadData, sheetKPI, personData, brandPerformance, fetchedAt] = await Promise.all([
       fetchPerformanceData(client.sheet_id, selectedBrand),
       fetchLeadData(client.sheet_id, selectedBrand),
       fetchKPIData(client.sheet_id, selectedBrand),
       fetchPersonData(client.sheet_id, reportStart, reportEnd, selectedBrand),
       fetchBrandPerformance(client.sheet_id, reportStart, reportEnd),
+      getDataFetchedAt(client.sheet_id),
     ]);
   } catch (err) {
     perfResult = { data: [], funnelType: "appointment" };
@@ -94,6 +98,14 @@ export default async function DashboardPage({
     appt_rate: 33, showup_rate: 90, conv_rate: 25, ad_spend: 7500,
     daily_ad: 250, roas: 40, cpa_pct: 2.5, target_contact: 80, target_appt: 27, target_showup: 24,
   };
+
+  // Format the data-pull time as Malaysia time on the server (deterministic, no
+  // client/server timezone mismatch) for the refresh button's "数据更新于" label.
+  const fetchedAtLabel = fetchedAt
+    ? new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Asia/Kuala_Lumpur", hour: "2-digit", minute: "2-digit", hour12: false,
+      }).format(new Date(fetchedAt))
+    : null;
 
   const perfData = perfResult.data;
   const detectedFunnelType = perfResult.funnelType;
@@ -228,6 +240,7 @@ export default async function DashboardPage({
           <Suspense>
             <DateRangePicker clientId={clientId} />
           </Suspense>
+          <RefreshButton sheetId={client.sheet_id} fetchedAtLabel={fetchedAtLabel} />
         </div>
       </div>
 
@@ -345,6 +358,8 @@ export default async function DashboardPage({
             hasMultiBrand={brands.length > 1}
             canReport={canReport}
             brandPerformance={brandPerformance}
+            sheetId={client.sheet_id}
+            fetchedAtLabel={fetchedAtLabel}
           />
         )}
       </div>
