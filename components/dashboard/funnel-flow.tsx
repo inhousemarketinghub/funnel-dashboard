@@ -3,25 +3,27 @@
 import { useState, useEffect, useRef, useId } from "react";
 import type { FunnelMetrics } from "@/lib/types";
 import { fmtRM } from "@/lib/utils";
+import { t, type Lang } from "@/lib/i18n";
 
 // Anthropic-style warm funnel: clay → ink, deepening as the funnel narrows.
+// labelKey indexes into lib/i18n so stage names switch with the language.
 const APPOINTMENT_STEPS = [
-  { key: "inquiry", label: "Inquiry", colors: ["#C47A5A", "#B0684A"] },
-  { key: "contact", label: "Contact", colors: ["#C15F3C", "#A8512F"] },
-  { key: "appointment", label: "Appointment", colors: ["#A85F3E", "#8F4E30"] },
-  { key: "showup", label: "Show Up", colors: ["#856A52", "#6E5743"] },
-  { key: "orders", label: "Orders", colors: ["#514B40", "#3E3933"] },
-  { key: "sales", label: "Sales", colors: ["#20201D", "#000000"] },
+  { key: "inquiry", labelKey: "inquiry", colors: ["#C47A5A", "#B0684A"] },
+  { key: "contact", labelKey: "contact", colors: ["#C15F3C", "#A8512F"] },
+  { key: "appointment", labelKey: "appointment", colors: ["#A85F3E", "#8F4E30"] },
+  { key: "showup", labelKey: "showUp", colors: ["#856A52", "#6E5743"] },
+  { key: "orders", labelKey: "orders", colors: ["#514B40", "#3E3933"] },
+  { key: "sales", labelKey: "sales", colors: ["#20201D", "#000000"] },
 ] as const;
 
 const WALKIN_STEPS = [
-  { key: "inquiry", label: "Inquiry", colors: ["#C47A5A", "#B0684A"] },
-  { key: "contact", label: "Visit", colors: ["#C15F3C", "#A8512F"] },
-  { key: "orders", label: "Orders", colors: ["#A85F3E", "#8F4E30"] },
-  { key: "sales", label: "Sales", colors: ["#20201D", "#000000"] },
+  { key: "inquiry", labelKey: "inquiry", colors: ["#C47A5A", "#B0684A"] },
+  { key: "contact", labelKey: "visit", colors: ["#C15F3C", "#A8512F"] },
+  { key: "orders", labelKey: "orders", colors: ["#A85F3E", "#8F4E30"] },
+  { key: "sales", labelKey: "sales", colors: ["#20201D", "#000000"] },
 ] as const;
 
-export function FunnelFlow({ metrics, funnelType = "appointment" }: { metrics: FunnelMetrics; funnelType?: string }) {
+export function FunnelFlow({ metrics, funnelType = "appointment", lang = "en" }: { metrics: FunnelMetrics; funnelType?: string; lang?: Lang }) {
   const STEPS = funnelType === "walkin" ? WALKIN_STEPS : APPOINTMENT_STEPS;
   const ref = useRef<HTMLDivElement>(null);
   // Unique per instance so the desktop + mobile funnels don't share gradient ids
@@ -115,7 +117,7 @@ export function FunnelFlow({ metrics, funnelType = "appointment" }: { metrics: F
               />
               <div>
                 <div className={`font-label text-[10px] uppercase tracking-wider ${isHovered ? "text-[var(--t1)]" : "text-[var(--t3)]"} transition-colors`}>
-                  {step.label}
+                  {t(lang, step.labelKey)}
                 </div>
                 <div className="flex items-baseline gap-1">
                   <span className={`num text-[14px] font-semibold ${isHovered ? "text-[var(--t1)]" : "text-[var(--t2)]"} transition-colors`}>
@@ -210,7 +212,7 @@ export function FunnelFlow({ metrics, funnelType = "appointment" }: { metrics: F
                     pointerEvents: "none",
                   }}
                 >
-                  {step.label.toUpperCase()}
+                  {t(lang, step.labelKey).toUpperCase()}
                 </text>
               </g>
             );
@@ -239,7 +241,7 @@ export function FunnelFlow({ metrics, funnelType = "appointment" }: { metrics: F
               whiteSpace: "nowrap",
             }}
           >
-            {STEPS[hoveredIdx].label}: {formatValue(hoveredIdx, values[hoveredIdx])}
+            {t(lang, STEPS[hoveredIdx].labelKey)}: {formatValue(hoveredIdx, values[hoveredIdx])}
             {rates[hoveredIdx] !== null && ` (${rates[hoveredIdx]!.toFixed(1)}%)`}
           </div>
         )}

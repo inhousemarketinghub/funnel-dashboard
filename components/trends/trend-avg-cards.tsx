@@ -4,7 +4,8 @@ import type { FunnelMetrics } from "@/lib/types";
 import { momPct } from "@/lib/utils";
 import { CountUp } from "@/components/animations/count-up";
 import { MoMBadge, INVERTED_METRICS } from "@/components/shared/mom-badge";
-import { getMetricOptionsForFunnel, type MetricOption } from "./metric-selector";
+import { getMetricOptionsForFunnel, metricLabel, type MetricOption } from "./metric-selector";
+import { t, type Lang } from "@/lib/i18n";
 
 interface Props {
   avgCurrent: FunnelMetrics;
@@ -12,6 +13,7 @@ interface Props {
   selectedMetrics: string[];
   compare: boolean;
   funnelType?: string;
+  lang?: Lang;
 }
 
 const ACCENT_COLORS = ["accent-red", "accent-blue", "accent-yellow", "accent-black", "accent-red"];
@@ -28,7 +30,7 @@ function formatStatic(value: number, opt: MetricOption): string {
   return `${cfg.prefix ?? ""}${fixed}${cfg.suffix ?? ""}`;
 }
 
-export function TrendAvgCards({ avgCurrent, avgComparison, selectedMetrics, compare, funnelType = "appointment" }: Props) {
+export function TrendAvgCards({ avgCurrent, avgComparison, selectedMetrics, compare, funnelType = "appointment", lang = "en" }: Props) {
   const cards = getMetricOptionsForFunnel(funnelType).filter((opt) => selectedMetrics.includes(opt.key));
   if (cards.length === 0) return null;
 
@@ -37,7 +39,7 @@ export function TrendAvgCards({ avgCurrent, avgComparison, selectedMetrics, comp
   return (
     <div className="card-base mb-4 p-4">
       <div className="font-label text-[11px] uppercase text-[var(--t3)] mb-3" style={{ letterSpacing: "0.2em" }}>
-        Period Average
+        {t(lang, "periodAverage")}
       </div>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         {cards.map((opt, i) => {
@@ -51,7 +53,7 @@ export function TrendAvgCards({ avgCurrent, avgComparison, selectedMetrics, comp
           return (
             <div key={opt.key} className={`card-base accent-top ${accent}`}>
               <div className="font-label text-[10px] uppercase tracking-widest text-[var(--t3)] mb-1">
-                Avg {opt.label}
+                {t(lang, "avgPrefix")} {metricLabel(opt.key, lang, funnelType)}
               </div>
               <div className="text-[22px] font-bold tracking-tight text-[var(--t1)] leading-none mb-2 num">
                 <CountUp value={current} prefix={display.prefix} suffix={display.suffix} decimals={display.decimals} />
@@ -62,7 +64,7 @@ export function TrendAvgCards({ avgCurrent, avgComparison, selectedMetrics, comp
                   style={{ borderTop: "1px solid var(--border)" }}
                 >
                   <div className="flex flex-col">
-                    <span className="text-[9px] uppercase tracking-widest text-[var(--t4)]">prev</span>
+                    <span className="text-[9px] uppercase tracking-widest text-[var(--t4)]">{t(lang, "prev")}</span>
                     <span className="num text-[12px] text-[var(--t3)]">{formatStatic(previous, opt)}</span>
                   </div>
                   <MoMBadge value={delta} inverted={INVERTED_METRICS.has(opt.key)} />

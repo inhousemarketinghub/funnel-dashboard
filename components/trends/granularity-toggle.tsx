@@ -1,17 +1,19 @@
 "use client";
 
 import type { Granularity } from "@/lib/dates";
+import { t, type Lang } from "@/lib/i18n";
 
 interface Props {
   value: Granularity;
   onChange: (next: Granularity) => void;
   pending?: boolean;
+  lang?: Lang;
 }
 
-export function GranularityToggle({ value, onChange, pending = false }: Props) {
+export function GranularityToggle({ value, onChange, pending = false, lang = "en" }: Props) {
   const options: { key: Granularity; label: string }[] = [
-    { key: "monthly", label: "Monthly" },
-    { key: "weekly", label: "Weekly" },
+    { key: "monthly", label: t(lang, "monthlyGran") },
+    { key: "weekly", label: t(lang, "weeklyGran") },
   ];
 
   return (

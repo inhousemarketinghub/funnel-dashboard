@@ -11,16 +11,18 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { getMetricOptionsForFunnel } from "./metric-selector";
+import { getMetricOptionsForFunnel, metricLabel } from "./metric-selector";
 import type { TrendPoint } from "@/lib/trends";
 import { momPct } from "@/lib/utils";
 import { INVERTED_METRICS } from "@/components/shared/mom-badge";
+import { t, type Lang } from "@/lib/i18n";
 
 interface TrendChartProps {
   data: TrendPoint[];
   comparison?: TrendPoint[];
   selectedMetrics: string[];
   funnelType?: string;
+  lang?: Lang;
 }
 
 const CURRENCY_METRICS = new Set(["ad_spend", "sales", "orders", "cpl", "aov"]);
@@ -85,14 +87,15 @@ interface CustomTooltipProps {
   selectedMetrics: string[];
   hasComparison: boolean;
   funnelType: string;
+  lang: Lang;
 }
 
-function CustomTooltip({ active, payload, selectedMetrics, hasComparison, funnelType }: CustomTooltipProps) {
+function CustomTooltip({ active, payload, selectedMetrics, hasComparison, funnelType, lang }: CustomTooltipProps) {
   if (!active || !payload?.length) return null;
   const row = payload[0].payload;
-  const label = row.isPartial ? `(incomplete) ${row.label}` : row.label;
+  const label = row.isPartial ? `(${t(lang, "incomplete")}) ${row.label}` : row.label;
   const cmpLabel = hasComparison && row.cmpLabel
-    ? (row.cmpIsPartial ? `(incomplete) ${row.cmpLabel}` : row.cmpLabel)
+    ? (row.cmpIsPartial ? `(${t(lang, "incomplete")}) ${row.cmpLabel}` : row.cmpLabel)
     : null;
   const options = getMetricOptionsForFunnel(funnelType);
 
@@ -109,7 +112,7 @@ function CustomTooltip({ active, payload, selectedMetrics, hasComparison, funnel
     >
       <div className="text-[11px] font-medium text-[var(--t1)] mb-1">{label}</div>
       {cmpLabel && (
-        <div className="text-[10px] text-[var(--t4)] mb-2">vs {cmpLabel}</div>
+        <div className="text-[10px] text-[var(--t4)] mb-2">{t(lang, "vsLabel")} {cmpLabel}</div>
       )}
       {selectedMetrics.map((key) => {
         const opt = options.find((m) => m.key === key);
@@ -125,7 +128,7 @@ function CustomTooltip({ active, payload, selectedMetrics, hasComparison, funnel
           <div key={key} className="flex items-center justify-between gap-3 py-[2px]">
             <span className="flex items-center gap-1.5">
               <span style={{ width: 8, height: 8, borderRadius: 9999, backgroundColor: opt.color, display: "inline-block" }} />
-              <span className="text-[var(--t2)]">{opt.label}</span>
+              <span className="text-[var(--t2)]">{metricLabel(opt.key, lang, funnelType)}</span>
             </span>
             <span className="num text-[var(--t1)]">
               {formatValue(cur, key)}
@@ -148,7 +151,7 @@ function CustomTooltip({ active, payload, selectedMetrics, hasComparison, funnel
   );
 }
 
-export function TrendChart({ data, comparison, selectedMetrics, funnelType = "appointment" }: TrendChartProps) {
+export function TrendChart({ data, comparison, selectedMetrics, funnelType = "appointment", lang = "en" }: TrendChartProps) {
   const visibleOptions = getMetricOptionsForFunnel(funnelType);
   const visibleKeys = new Set(visibleOptions.map((o) => o.key));
   // Defensive: if user has stale selected metrics from a different funnel type, drop those keys.
@@ -158,7 +161,7 @@ export function TrendChart({ data, comparison, selectedMetrics, funnelType = "ap
     return (
       <div className="card-base">
         <div className="flex items-center justify-center h-[340px] text-[var(--t4)] text-[13px]">
-          Select at least one metric to display the chart.
+          {t(lang, "selectMetricHint")}
         </div>
       </div>
     );
@@ -225,6 +228,7 @@ export function TrendChart({ data, comparison, selectedMetrics, funnelType = "ap
                 selectedMetrics={visibleSelected}
                 hasComparison={hasComparison}
                 funnelType={funnelType}
+                lang={lang}
               />
             }
           />
@@ -239,7 +243,7 @@ export function TrendChart({ data, comparison, selectedMetrics, funnelType = "ap
                 yAxisId={yAxisId}
                 type="monotone"
                 dataKey={key}
-                name={opt.label}
+                name={metricLabel(opt.key, lang, funnelType)}
                 stroke={opt.color}
                 strokeWidth={2}
                 dot={renderDot(opt.color, "isPartial")}
@@ -257,7 +261,7 @@ export function TrendChart({ data, comparison, selectedMetrics, funnelType = "ap
                 yAxisId={yAxisId}
                 type="monotone"
                 dataKey={`${key}__cmp`}
-                name={`${opt.label} (prev)`}
+                name={`${metricLabel(opt.key, lang, funnelType)} (${t(lang, "prev")})`}
                 stroke={opt.color}
                 strokeOpacity={0.45}
                 strokeDasharray="4 4"

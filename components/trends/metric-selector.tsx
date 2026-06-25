@@ -1,5 +1,7 @@
 "use client";
 
+import { t, type Lang } from "@/lib/i18n";
+
 export interface MetricOption {
   key: string;
   label: string;
@@ -39,15 +41,28 @@ export function getMetricOptionsForFunnel(funnelType: string): MetricOption[] {
 }
 
 const GROUPS: ("Frontend" | "Midend" | "Backend")[] = ["Frontend", "Midend", "Backend"];
+const GROUP_KEYS: Record<string, string> = { Frontend: "frontendGroup", Midend: "midendGroup", Backend: "backendGroup" };
+const METRIC_LABEL_KEYS: Record<string, string> = {
+  ad_spend: "adSpend", cpl: "cpl", respond_rate: "respondRate", appt_rate: "apptRate",
+  showup_rate: "showUpRate", sales: "sales", orders: "orders", conv_rate: "convRate",
+  aov: "aov", cpa_pct: "cpaPct",
+};
+
+/** Localized display label for a metric, keyed by its stable key (not the English label). */
+export function metricLabel(key: string, lang: Lang, funnelType: string): string {
+  if (key === "respond_rate" && funnelType === "walkin") return t(lang, "visitRate");
+  return t(lang, METRIC_LABEL_KEYS[key] ?? key);
+}
 
 interface MetricSelectorProps {
   selected: string[];
   onChange: (keys: string[]) => void;
   maxSelect?: number;
   funnelType?: string;
+  lang?: Lang;
 }
 
-export function MetricSelector({ selected, onChange, maxSelect = 5, funnelType = "appointment" }: MetricSelectorProps) {
+export function MetricSelector({ selected, onChange, maxSelect = 5, funnelType = "appointment", lang = "en" }: MetricSelectorProps) {
   const atMax = selected.length >= maxSelect;
   const visibleOptions = getMetricOptionsForFunnel(funnelType);
 
@@ -65,7 +80,7 @@ export function MetricSelector({ selected, onChange, maxSelect = 5, funnelType =
         const options = visibleOptions.filter((m) => m.group === group);
         return (
           <div key={group} className="flex flex-col gap-[6px]">
-            <span className="font-label text-[10px] uppercase tracking-widest text-[var(--t4)]">{group}</span>
+            <span className="font-label text-[10px] uppercase tracking-widest text-[var(--t4)]">{t(lang, GROUP_KEYS[group])}</span>
             <div className="flex flex-wrap gap-[6px]">
               {options.map((opt) => {
                 const isSelected = selected.includes(opt.key);
@@ -85,7 +100,7 @@ export function MetricSelector({ selected, onChange, maxSelect = 5, funnelType =
                       isDisabled ? "opacity-40 cursor-not-allowed" : "cursor-pointer hover:opacity-80",
                     ].join(" ")}
                   >
-                    {opt.label}
+                    {metricLabel(opt.key, lang, funnelType)}
                   </button>
                 );
               })}

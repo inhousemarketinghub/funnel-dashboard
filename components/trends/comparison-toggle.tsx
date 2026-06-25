@@ -1,15 +1,18 @@
 "use client";
 
+import { t, type Lang } from "@/lib/i18n";
+
 interface Props {
   value: boolean;
   onChange: (next: boolean) => void;
   pending?: boolean;
+  lang?: Lang;
 }
 
-export function ComparisonToggle({ value, onChange, pending = false }: Props) {
+export function ComparisonToggle({ value, onChange, pending = false, lang = "en" }: Props) {
   const options: { key: boolean; label: string }[] = [
-    { key: false, label: "Compare Off" },
-    { key: true, label: "Compare On" },
+    { key: false, label: t(lang, "compareOff") },
+    { key: true, label: t(lang, "compareOn") },
   ];
 
   return (

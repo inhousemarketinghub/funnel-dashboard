@@ -4,7 +4,9 @@ import Link from "next/link";
 import { Menu } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ThemeToggle } from "./theme-toggle";
+import { LanguageToggle } from "./language-toggle";
 import { LogoutButton } from "./logout-button";
+import { t, type Lang } from "@/lib/i18n";
 
 interface Props {
   clientId: string;
@@ -12,6 +14,7 @@ interface Props {
   logoUrl?: string | null;
   email?: string | null;
   canSettings: boolean;
+  lang: Lang;
 }
 
 const ITEM =
@@ -23,7 +26,7 @@ const ITEM =
  * Settings / theme / sign out). Replaces the desktop topbar below md, which
  * eliminates the cramped, overlapping wrapped bar.
  */
-export function MobileNav({ clientId, clientName, logoUrl, email, canSettings }: Props) {
+export function MobileNav({ clientId, clientName, logoUrl, email, canSettings, lang }: Props) {
   return (
     <div
       className="md:hidden sticky top-[3px] z-[101] flex h-[52px] items-center justify-between gap-2 px-4"
@@ -41,9 +44,9 @@ export function MobileNav({ clientId, clientName, logoUrl, email, canSettings }:
             className="h-7 w-7 flex-shrink-0 rounded-[6px] bg-white object-contain p-[2px]"
           />
         )}
-        <span className="truncate font-heading text-[16px] font-semibold text-[var(--t1)]">
+        <Link href={`/${clientId}`} className="truncate font-heading text-[16px] font-semibold text-[var(--t1)]" style={{ textDecoration: "none" }}>
           {clientName}
-        </span>
+        </Link>
       </div>
 
       <Popover>
@@ -59,23 +62,25 @@ export function MobileNav({ clientId, clientName, logoUrl, email, canSettings }:
         />
         <PopoverContent align="end" sideOffset={6} className="w-52 p-1.5">
           <div className="flex flex-col gap-0.5">
-            <Link href={`/${clientId}`} className={ITEM}>Summary</Link>
-            <Link href={`/${clientId}/trends`} className={ITEM}>Trends</Link>
+            <Link href={`/${clientId}/trends`} className={ITEM}>{t(lang, "trends")}</Link>
             {canSettings && (
-              <Link href={`/${clientId}/settings`} className={ITEM}>Settings</Link>
+              <Link href={`/${clientId}/settings`} className={ITEM}>{t(lang, "settings")}</Link>
             )}
-            <Link href="/projects" className={ITEM}>Project Overview</Link>
+            <Link href="/projects" className={ITEM}>{t(lang, "projectOverview")}</Link>
 
             <div className="mt-1 flex items-center justify-between border-t border-[var(--border)] px-2.5 pt-2">
-              <span className="text-[13px] text-[var(--t3)]">Theme</span>
-              <ThemeToggle />
+              <span className="text-[13px] text-[var(--t3)]">{t(lang, "theme")}</span>
+              <div className="flex items-center gap-2">
+                <LanguageToggle lang={lang} />
+                <ThemeToggle />
+              </div>
             </div>
 
             <div className="mt-1 border-t border-[var(--border)] px-2.5 pt-2">
               {email && (
                 <div className="num mb-1 truncate text-[11px] text-[var(--t4)]">{email}</div>
               )}
-              <LogoutButton />
+              <LogoutButton lang={lang} />
             </div>
           </div>
         </PopoverContent>

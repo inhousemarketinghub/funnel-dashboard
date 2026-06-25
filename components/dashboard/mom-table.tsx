@@ -1,5 +1,6 @@
 import type { FunnelMetrics, KPIConfig, MoMResult } from "@/lib/types";
 import { fmtRM, fmtROAS } from "@/lib/utils";
+import { t, type Lang } from "@/lib/i18n";
 import { MoMBadge } from "@/components/shared/mom-badge";
 
 interface FunnelRow {
@@ -16,7 +17,8 @@ function buildRows(
   lm: FunnelMetrics,
   mom: MoMResult,
   kpi: KPIConfig,
-  funnelType: string = "appointment"
+  funnelType: string = "appointment",
+  lang: Lang = "en",
 ): FunnelRow[] {
   const isWalkin = funnelType === "walkin";
   const walkinConvRate = tm.contact > 0 ? (tm.orders / tm.contact) * 100 : 0;
@@ -30,30 +32,30 @@ function buildRows(
   const cplMom = lmCPL > 0 ? ((tmCPL - lmCPL) / lmCPL) * 100 : null;
 
   const rows: FunnelRow[] = [
-    { label: "Ad Spend", tmFmt: fmtRM(tm.ad_spend), lmFmt: fmtRM(lm.ad_spend), mom: mom.ad_spend ?? null, kpiFmt: fmtRM(kpi.ad_spend), inverted: false },
-    { label: "Inquiry (PM)", tmFmt: String(tm.inquiry), lmFmt: String(lm.inquiry), mom: mom.inquiry ?? null, kpiFmt: kpi.cpl > 0 ? String(Math.round(kpi.ad_spend / kpi.cpl)) : "—", inverted: false },
-    { label: "CPL", tmFmt: fmtRM(tmCPL), lmFmt: fmtRM(lmCPL), mom: cplMom, kpiFmt: kpi.cpl > 0 ? fmtRM(kpi.cpl) : "—", inverted: true },
-    { label: isWalkin ? "Visit" : "Contact", tmFmt: String(tm.contact), lmFmt: String(lm.contact), mom: mom.contact ?? null, kpiFmt: String(kpi.target_contact), inverted: false },
-    { label: isWalkin ? "Visit Rate" : "Respond Rate", tmFmt: isWalkin ? `${visitRate.toFixed(1)}%` : `${tm.respond_rate.toFixed(1)}%`, lmFmt: isWalkin ? `${visitRatePrev.toFixed(1)}%` : `${lm.respond_rate.toFixed(1)}%`, mom: isWalkin ? visitRateMom : (mom.respond_rate ?? null), kpiFmt: `${kpi.respond_rate}%`, inverted: false },
+    { label: t(lang, "adSpend"), tmFmt: fmtRM(tm.ad_spend), lmFmt: fmtRM(lm.ad_spend), mom: mom.ad_spend ?? null, kpiFmt: fmtRM(kpi.ad_spend), inverted: false },
+    { label: t(lang, "inquiryPM"), tmFmt: String(tm.inquiry), lmFmt: String(lm.inquiry), mom: mom.inquiry ?? null, kpiFmt: kpi.cpl > 0 ? String(Math.round(kpi.ad_spend / kpi.cpl)) : "—", inverted: false },
+    { label: t(lang, "cpl"), tmFmt: fmtRM(tmCPL), lmFmt: fmtRM(lmCPL), mom: cplMom, kpiFmt: kpi.cpl > 0 ? fmtRM(kpi.cpl) : "—", inverted: true },
+    { label: isWalkin ? t(lang, "visit") : t(lang, "contact"), tmFmt: String(tm.contact), lmFmt: String(lm.contact), mom: mom.contact ?? null, kpiFmt: String(kpi.target_contact), inverted: false },
+    { label: isWalkin ? t(lang, "visitRate") : t(lang, "respondRate"), tmFmt: isWalkin ? `${visitRate.toFixed(1)}%` : `${tm.respond_rate.toFixed(1)}%`, lmFmt: isWalkin ? `${visitRatePrev.toFixed(1)}%` : `${lm.respond_rate.toFixed(1)}%`, mom: isWalkin ? visitRateMom : (mom.respond_rate ?? null), kpiFmt: `${kpi.respond_rate}%`, inverted: false },
   ];
 
   if (!isWalkin) {
     rows.push(
-      { label: "Appointment", tmFmt: String(tm.appointment), lmFmt: String(lm.appointment), mom: mom.appointment ?? null, kpiFmt: String(kpi.target_appt), inverted: false },
-      { label: "Appt Rate", tmFmt: `${tm.appt_rate.toFixed(1)}%`, lmFmt: `${lm.appt_rate.toFixed(1)}%`, mom: mom.appt_rate ?? null, kpiFmt: `${kpi.appt_rate}%`, inverted: false },
-      { label: "Est. Show Up", tmFmt: String(tm.est_showup), lmFmt: String(lm.est_showup), mom: null, kpiFmt: "\u2014", inverted: false },
-      { label: "Show Up", tmFmt: String(tm.showup), lmFmt: String(lm.showup), mom: mom.showup ?? null, kpiFmt: String(kpi.target_showup), inverted: false },
-      { label: "Show Up Rate", tmFmt: `${tm.showup_rate.toFixed(1)}%`, lmFmt: `${lm.showup_rate.toFixed(1)}%`, mom: mom.showup_rate ?? null, kpiFmt: `${kpi.showup_rate}%`, inverted: false },
+      { label: t(lang, "appointment"), tmFmt: String(tm.appointment), lmFmt: String(lm.appointment), mom: mom.appointment ?? null, kpiFmt: String(kpi.target_appt), inverted: false },
+      { label: t(lang, "apptRate"), tmFmt: `${tm.appt_rate.toFixed(1)}%`, lmFmt: `${lm.appt_rate.toFixed(1)}%`, mom: mom.appt_rate ?? null, kpiFmt: `${kpi.appt_rate}%`, inverted: false },
+      { label: t(lang, "estShowUp"), tmFmt: String(tm.est_showup), lmFmt: String(lm.est_showup), mom: null, kpiFmt: "\u2014", inverted: false },
+      { label: t(lang, "showUp"), tmFmt: String(tm.showup), lmFmt: String(lm.showup), mom: mom.showup ?? null, kpiFmt: String(kpi.target_showup), inverted: false },
+      { label: t(lang, "showUpRate"), tmFmt: `${tm.showup_rate.toFixed(1)}%`, lmFmt: `${lm.showup_rate.toFixed(1)}%`, mom: mom.showup_rate ?? null, kpiFmt: `${kpi.showup_rate}%`, inverted: false },
     );
   }
 
   rows.push(
-    { label: "Orders", tmFmt: String(tm.orders), lmFmt: String(lm.orders), mom: mom.orders ?? null, kpiFmt: String(kpi.orders), inverted: false },
-    { label: "Conv Rate", tmFmt: isWalkin ? `${walkinConvRate.toFixed(1)}%` : `${tm.conv_rate.toFixed(1)}%`, lmFmt: isWalkin ? `${walkinConvRatePrev.toFixed(1)}%` : `${lm.conv_rate.toFixed(1)}%`, mom: isWalkin ? walkinConvMom : (mom.conv_rate ?? null), kpiFmt: `${kpi.conv_rate}%`, inverted: false },
-    { label: "Sales", tmFmt: fmtRM(tm.sales), lmFmt: fmtRM(lm.sales), mom: mom.sales ?? null, kpiFmt: fmtRM(kpi.sales), inverted: false },
-    { label: "AOV", tmFmt: fmtRM(tm.aov), lmFmt: fmtRM(lm.aov), mom: mom.aov ?? null, kpiFmt: fmtRM(kpi.aov), inverted: false },
-    { label: "ROAS", tmFmt: fmtROAS(tm.roas), lmFmt: fmtROAS(lm.roas), mom: mom.roas ?? null, kpiFmt: fmtROAS(kpi.roas), inverted: false },
-    { label: "CPA%", tmFmt: `${tm.cpa_pct.toFixed(2)}%`, lmFmt: `${lm.cpa_pct.toFixed(2)}%`, mom: mom.cpa_pct ?? null, kpiFmt: `${kpi.cpa_pct}%`, inverted: true },
+    { label: t(lang, "orders"), tmFmt: String(tm.orders), lmFmt: String(lm.orders), mom: mom.orders ?? null, kpiFmt: String(kpi.orders), inverted: false },
+    { label: t(lang, "convRate"), tmFmt: isWalkin ? `${walkinConvRate.toFixed(1)}%` : `${tm.conv_rate.toFixed(1)}%`, lmFmt: isWalkin ? `${walkinConvRatePrev.toFixed(1)}%` : `${lm.conv_rate.toFixed(1)}%`, mom: isWalkin ? walkinConvMom : (mom.conv_rate ?? null), kpiFmt: `${kpi.conv_rate}%`, inverted: false },
+    { label: t(lang, "sales"), tmFmt: fmtRM(tm.sales), lmFmt: fmtRM(lm.sales), mom: mom.sales ?? null, kpiFmt: fmtRM(kpi.sales), inverted: false },
+    { label: t(lang, "aov"), tmFmt: fmtRM(tm.aov), lmFmt: fmtRM(lm.aov), mom: mom.aov ?? null, kpiFmt: fmtRM(kpi.aov), inverted: false },
+    { label: t(lang, "roas"), tmFmt: fmtROAS(tm.roas), lmFmt: fmtROAS(lm.roas), mom: mom.roas ?? null, kpiFmt: fmtROAS(kpi.roas), inverted: false },
+    { label: t(lang, "cpaPct"), tmFmt: `${tm.cpa_pct.toFixed(2)}%`, lmFmt: `${lm.cpa_pct.toFixed(2)}%`, mom: mom.cpa_pct ?? null, kpiFmt: `${kpi.cpa_pct}%`, inverted: true },
   );
 
   return rows;
@@ -71,6 +73,7 @@ export function MoMTable({
   thisMonth,
   lastMonth,
   funnelType = "appointment",
+  lang = "en",
 }: {
   tm: FunnelMetrics;
   lm: FunnelMetrics;
@@ -79,8 +82,9 @@ export function MoMTable({
   thisMonth: string;
   lastMonth: string;
   funnelType?: string;
+  lang?: Lang;
 }) {
-  const rows = buildRows(tm, lm, mom, kpi, funnelType);
+  const rows = buildRows(tm, lm, mom, kpi, funnelType, lang);
 
   return (
     <div className="overflow-x-auto">
@@ -88,7 +92,7 @@ export function MoMTable({
         <thead>
           <tr>
             <th className={TH} style={{ padding: "10px 16px" }}>
-              Metric
+              {t(lang, "metric")}
             </th>
             <th className={TH} style={{ padding: "10px 16px" }}>
               {thisMonth}
@@ -97,10 +101,10 @@ export function MoMTable({
               {lastMonth}
             </th>
             <th className={TH} style={{ padding: "10px 16px" }}>
-              PoP
+              {t(lang, "pop")}
             </th>
             <th className={TH} style={{ padding: "10px 16px" }}>
-              KPI
+              {t(lang, "kpiCol")}
             </th>
           </tr>
         </thead>

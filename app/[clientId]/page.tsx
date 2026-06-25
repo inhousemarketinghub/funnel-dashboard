@@ -26,6 +26,8 @@ import { SummaryCards } from "@/components/dashboard/summary-cards";
 import { MobileDashboard } from "@/components/dashboard/mobile-dashboard";
 import { Suspense } from "react";
 import Link from "next/link";
+import { cookies } from "next/headers";
+import { t, normalizeLang, LANG_COOKIE } from "@/lib/i18n";
 
 export default async function DashboardPage({
   params,
@@ -39,7 +41,7 @@ export default async function DashboardPage({
   const supabase = await createServerSupabase();
   const { data: client } = await supabase.from("clients").select("*").eq("id", clientId).single();
   if (!client) return <p className="text-[#78716C] p-8">Client not found</p>;
-  const clientLanguage = (client.language as "en" | "zh" | "ms") || "en";
+  const lang = normalizeLang((await cookies()).get(LANG_COOKIE)?.value);
 
   // Date range from URL params (defaults to this month 1st → today)
   const { from: reportStart, to: reportEnd } = resolveSearchParams(sp.from, sp.to);
@@ -142,7 +144,7 @@ export default async function DashboardPage({
   const summaryAch = { ...ach, sales: paceAchSales, ad_spend: paceAchAdSpend, orders: paceAchOrders };
   const insights = generateInsights({
     metrics: tm, kpi, achievement: summaryAch,
-    paceRatio, funnelType: detectedFunnelType, language: clientLanguage,
+    paceRatio, funnelType: detectedFunnelType, language: lang,
   });
 
   const isWalkin = detectedFunnelType === "walkin";
@@ -158,61 +160,63 @@ export default async function DashboardPage({
   const targetedDailyBudget = daysInMonth > 0 ? kpi.ad_spend / daysInMonth : 0;
   const avgDailySpend = rangeDays > 0 ? tm.ad_spend / rangeDays : 0;
 
+  const paceL = t(lang, "pace");
+  const monthlyL = t(lang, "monthly");
   const kpiItems = [
-    { label: "Sales", value: paceAchSales, target: `Pace: ${fmtRM(paceSales)}`, actual: fmtRM(tm.sales), prevActual: fmtRM(lm.sales), monthlyTarget: `Monthly: ${fmtRM(kpi.sales)}` },
-    { label: "Ad Spend", value: paceAchAdSpend, target: `Pace: ${fmtRM(paceAdSpend)}`, actual: fmtRM(tm.ad_spend), prevActual: fmtRM(lm.ad_spend), monthlyTarget: `Monthly: ${fmtRM(kpi.ad_spend)}`,
+    { label: t(lang, "sales"), value: paceAchSales, target: `${paceL}: ${fmtRM(paceSales)}`, actual: fmtRM(tm.sales), prevActual: fmtRM(lm.sales), monthlyTarget: `${monthlyL}: ${fmtRM(kpi.sales)}` },
+    { label: t(lang, "adSpend"), value: paceAchAdSpend, target: `${paceL}: ${fmtRM(paceAdSpend)}`, actual: fmtRM(tm.ad_spend), prevActual: fmtRM(lm.ad_spend), monthlyTarget: `${monthlyL}: ${fmtRM(kpi.ad_spend)}`,
       breakdown: [
         ...(hasSpendSplit ? [
-          { label: "Lead Funnel Ad Spend", value: fmtRM(leadFunnelTaxed) },
-          { label: "Branding Ad Spend", value: fmtRM(brandingTaxed) },
+          { label: t(lang, "leadFunnelAdSpend"), value: fmtRM(leadFunnelTaxed) },
+          { label: t(lang, "brandingAdSpend"), value: fmtRM(brandingTaxed) },
         ] : []),
-        { label: "Targeted Daily Budget", value: fmtRM(targetedDailyBudget) },
-        { label: "Current Daily Budget", value: fmtRM(kpi.daily_ad) },
-        { label: "Avg. Daily", value: fmtRM(avgDailySpend) },
+        { label: t(lang, "targetedDailyBudget"), value: fmtRM(targetedDailyBudget) },
+        { label: t(lang, "currentDailyBudget"), value: fmtRM(kpi.daily_ad) },
+        { label: t(lang, "avgDaily"), value: fmtRM(avgDailySpend) },
       ],
     },
-    { label: "Orders", value: paceAchOrders, target: `Pace: ${Math.round(paceOrders)}`, actual: String(tm.orders), prevActual: String(lm.orders), monthlyTarget: `Monthly: ${kpi.orders}` },
-    { label: "AOV", value: ach.aov, target: fmtRM(kpi.aov), actual: fmtRM(tm.aov), prevActual: fmtRM(lm.aov) },
-    { label: "CPL", value: ach.cpl, target: fmtRM(kpi.cpl), actual: fmtRM(tm.cpl), prevActual: fmtRM(lm.cpl),
-      breakdown: [{ label: "Inquiry (PM)", value: String(tm.inquiry) }],
+    { label: t(lang, "orders"), value: paceAchOrders, target: `${paceL}: ${Math.round(paceOrders)}`, actual: String(tm.orders), prevActual: String(lm.orders), monthlyTarget: `${monthlyL}: ${kpi.orders}` },
+    { label: t(lang, "aov"), value: ach.aov, target: fmtRM(kpi.aov), actual: fmtRM(tm.aov), prevActual: fmtRM(lm.aov) },
+    { label: t(lang, "cpl"), value: ach.cpl, target: fmtRM(kpi.cpl), actual: fmtRM(tm.cpl), prevActual: fmtRM(lm.cpl),
+      breakdown: [{ label: t(lang, "inquiryPM"), value: String(tm.inquiry) }],
     },
     {
-      label: isWalkin ? "Visit Rate" : "Respond Rate",
+      label: isWalkin ? t(lang, "visitRate") : t(lang, "respondRate"),
       value: isWalkin ? (kpi.respond_rate > 0 ? (walkinVisitRate / kpi.respond_rate) * 100 : 0) : ach.respond_rate,
       target: `${kpi.respond_rate}%`,
       actual: isWalkin ? `${walkinVisitRate.toFixed(1)}%` : `${tm.respond_rate.toFixed(1)}%`,
       prevActual: isWalkin ? `${walkinVisitRatePrev.toFixed(1)}%` : `${lm.respond_rate.toFixed(1)}%`,
       breakdown: [
-        { label: isWalkin ? "Visit" : "Contact Given", value: String(tm.contact) },
-        { label: "Inquiry", value: String(tm.inquiry) },
+        { label: isWalkin ? t(lang, "visit") : t(lang, "contactGiven"), value: String(tm.contact) },
+        { label: t(lang, "inquiry"), value: String(tm.inquiry) },
       ],
     },
     ...(!isWalkin ? [
-      { label: "Appt Rate", value: ach.appt_rate, target: `${kpi.appt_rate}%`, actual: `${tm.appt_rate.toFixed(1)}%`, prevActual: `${lm.appt_rate.toFixed(1)}%`,
+      { label: t(lang, "apptRate"), value: ach.appt_rate, target: `${kpi.appt_rate}%`, actual: `${tm.appt_rate.toFixed(1)}%`, prevActual: `${lm.appt_rate.toFixed(1)}%`,
         breakdown: [
-          { label: "Appointment", value: String(tm.appointment) },
-          { label: "Contact Given", value: String(tm.contact) },
+          { label: t(lang, "appointment"), value: String(tm.appointment) },
+          { label: t(lang, "contactGiven"), value: String(tm.contact) },
         ],
       },
-      { label: "Show Up Rate", value: ach.showup_rate, target: `${kpi.showup_rate}%`, actual: `${tm.showup_rate.toFixed(1)}%`, prevActual: `${lm.showup_rate.toFixed(1)}%`,
+      { label: t(lang, "showUpRate"), value: ach.showup_rate, target: `${kpi.showup_rate}%`, actual: `${tm.showup_rate.toFixed(1)}%`, prevActual: `${lm.showup_rate.toFixed(1)}%`,
         breakdown: [
-          { label: "Show Up", value: String(tm.showup) },
-          { label: "Est. Show Up", value: String(tm.est_showup) },
+          { label: t(lang, "showUp"), value: String(tm.showup) },
+          { label: t(lang, "estShowUp"), value: String(tm.est_showup) },
         ],
       },
     ] : []),
     {
-      label: "Conv Rate",
+      label: t(lang, "convRate"),
       value: isWalkin ? (kpi.conv_rate > 0 ? (walkinConvRate / kpi.conv_rate) * 100 : 0) : Math.min(ach.conv_rate, 200),
       target: `${kpi.conv_rate}%`,
       actual: isWalkin ? `${walkinConvRate.toFixed(1)}%` : `${tm.conv_rate.toFixed(1)}%`,
       prevActual: isWalkin ? `${walkinConvRatePrev.toFixed(1)}%` : `${lm.conv_rate.toFixed(1)}%`,
       breakdown: [
-        { label: "Orders", value: String(tm.orders) },
-        { label: isWalkin ? "Visit" : "Show Up", value: isWalkin ? String(tm.contact) : String(tm.showup) },
+        { label: t(lang, "orders"), value: String(tm.orders) },
+        { label: isWalkin ? t(lang, "visit") : t(lang, "showUp"), value: isWalkin ? String(tm.contact) : String(tm.showup) },
       ],
     },
-    { label: "CPA%", value: tm.cpa_pct ? (kpi.cpa_pct / tm.cpa_pct) * 100 : 0, target: `${kpi.cpa_pct}%`, actual: `${tm.cpa_pct.toFixed(2)}%`, prevActual: `${lm.cpa_pct.toFixed(2)}%` },
+    { label: t(lang, "cpaPct"), value: tm.cpa_pct ? (kpi.cpa_pct / tm.cpa_pct) * 100 : 0, target: `${kpi.cpa_pct}%`, actual: `${tm.cpa_pct.toFixed(2)}%`, prevActual: `${lm.cpa_pct.toFixed(2)}%` },
   ];
 
   const perms = await getProjectPermissions(clientId);
@@ -225,22 +229,23 @@ export default async function DashboardPage({
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start mb-7">
         <div>
-          <SplitText text="Performance Overview" />
+          <SplitText text={t(lang, "performanceOverview")} />
           <div className="flex items-center gap-3 mt-[3px]">
             <p className="text-[14px] text-[var(--t3)] font-light">{thisRangeLabel}</p>
             {brands.length > 0 && (
               <Suspense>
-                <BrandSelector clientId={clientId} brands={brands.length > 1 ? ["Overall", ...brands] : brands} />
+                <BrandSelector clientId={clientId} brands={brands.length > 1 ? ["Overall", ...brands] : brands} lang={lang} />
               </Suspense>
             )}
           </div>
         </div>
         <div className="flex items-start gap-2">
-          {canReport && <MonthPickerDialog clientId={clientId} />}
+          <Link href={`/${clientId}/trends`} className="topbar-btn">{t(lang, "trends")}</Link>
+          {canReport && <MonthPickerDialog clientId={clientId} lang={lang} />}
           <Suspense>
-            <DateRangePicker clientId={clientId} />
+            <DateRangePicker clientId={clientId} lang={lang} />
           </Suspense>
-          <RefreshButton sheetId={client.sheet_id} fetchedAtLabel={fetchedAtLabel} />
+          <RefreshButton sheetId={client.sheet_id} fetchedAtLabel={fetchedAtLabel} lang={lang} />
         </div>
       </div>
 
@@ -248,16 +253,16 @@ export default async function DashboardPage({
       {fetchError && (
         <div className="p-8 rounded-[10px] border border-[var(--red)] bg-[var(--red-bg)] text-center">
           <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-[var(--red)]/10 flex items-center justify-center text-[var(--red)] text-[20px] font-bold">!</div>
-          <p className="text-[var(--red)] text-[15px] font-medium mb-1">Unable to load data</p>
+          <p className="text-[var(--red)] text-[15px] font-medium mb-1">{t(lang, "unableToLoadData")}</p>
           <p className="text-[var(--red)]/70 text-[13px] mb-3">{fetchError}</p>
-          <p className="text-[var(--t4)] text-[12px]">Make sure the Google Sheet is shared as &quot;Anyone with the link can view&quot; and contains the required tabs.</p>
+          <p className="text-[var(--t4)] text-[12px]">{t(lang, "unableToLoadDataHint")}</p>
         </div>
       )}
 
       {!fetchError && <>
       {/* KPI Cards: grouped by Frontend/Midend/Backend */}
       <div className="mb-8">
-        <HeroCards metrics={tm} kpi={kpi} achievement={{...ach, sales: paceAchSales, ad_spend: paceAchAdSpend, orders: paceAchOrders}} prevMetrics={lm} days={rangeDays} funnelType={detectedFunnelType || "appointment"} paceKpi={{sales: paceSales, ad_spend: paceAdSpend, orders: paceOrders}} />
+        <HeroCards metrics={tm} kpi={kpi} achievement={{...ach, sales: paceAchSales, ad_spend: paceAchAdSpend, orders: paceAchOrders}} prevMetrics={lm} days={rangeDays} funnelType={detectedFunnelType || "appointment"} paceKpi={{sales: paceSales, ad_spend: paceAdSpend, orders: paceOrders}} lang={lang} />
       </div>
 
       {/* Performance Summary */}
@@ -270,31 +275,31 @@ export default async function DashboardPage({
         {/* Row 2: Funnel + Period Comparison */}
         <CardReveal delay={200} className="c5">
           <div className="card-base">
-            <div className="font-label text-[11px] uppercase tracking-widest text-[var(--t3)] mb-1">Conversion</div>
+            <div className="font-label text-[11px] uppercase tracking-widest text-[var(--t3)] mb-1">{t(lang, "conversion")}</div>
             <BlurText>
-              <div className="text-[14px] font-semibold text-[var(--t1)] mb-4">Lead Funnel</div>
+              <div className="text-[14px] font-semibold text-[var(--t1)] mb-4">{t(lang, "leadFunnel")}</div>
             </BlurText>
-            <FunnelFlow metrics={tm} funnelType={detectedFunnelType} />
+            <FunnelFlow metrics={tm} funnelType={detectedFunnelType} lang={lang} />
           </div>
         </CardReveal>
         <CardReveal delay={280} className="c7">
           <div className="card-deep">
-            <div className="font-label text-[11px] uppercase tracking-widest text-[var(--t3)] mb-1">Analysis</div>
+            <div className="font-label text-[11px] uppercase tracking-widest text-[var(--t3)] mb-1">{t(lang, "analysis")}</div>
             <BlurText>
-              <div className="text-[14px] font-semibold text-[var(--t1)] mb-4">Period Comparison</div>
+              <div className="text-[14px] font-semibold text-[var(--t1)] mb-4">{t(lang, "periodComparison")}</div>
             </BlurText>
-            <MoMTable tm={tm} lm={lm} mom={mom} kpi={kpi} thisMonth={thisRangeLabel} lastMonth={prevRangeLabel} funnelType={detectedFunnelType} />
+            <MoMTable tm={tm} lm={lm} mom={mom} kpi={kpi} thisMonth={thisRangeLabel} lastMonth={prevRangeLabel} funnelType={detectedFunnelType} lang={lang} />
           </div>
         </CardReveal>
 
         {/* Row 3: KPI Achievement */}
         <CardReveal delay={360} className="c12">
           <div className="card-deep">
-            <div className="font-label text-[11px] uppercase tracking-widest text-[var(--t3)] mb-1">Targets</div>
+            <div className="font-label text-[11px] uppercase tracking-widest text-[var(--t3)] mb-1">{t(lang, "targetsSection")}</div>
             <BlurText>
-              <div className="text-[14px] font-semibold text-[var(--t1)] mb-4">KPI Achievement</div>
+              <div className="text-[14px] font-semibold text-[var(--t1)] mb-4">{t(lang, "kpiAchievement")}</div>
             </BlurText>
-            <KPIChart items={kpiItems} />
+            <KPIChart items={kpiItems} lang={lang} />
           </div>
         </CardReveal>
       </div>
@@ -303,9 +308,9 @@ export default async function DashboardPage({
       {(personData.appointmentPersons.length > 0 || personData.salesPersons.length > 0) && (
         <CardReveal delay={500} className="mt-[10px]">
           <div className="card-base">
-            <div className="font-label text-[11px] uppercase tracking-widest text-[var(--t3)] mb-1">Team</div>
+            <div className="font-label text-[11px] uppercase tracking-widest text-[var(--t3)] mb-1">{t(lang, "team")}</div>
             <BlurText>
-              <div className="text-[14px] font-semibold text-[var(--t1)] mb-4">Person Performance</div>
+              <div className="text-[14px] font-semibold text-[var(--t1)] mb-4">{t(lang, "personPerformance")}</div>
             </BlurText>
             <PersonPerformance
               appointmentPersons={personData.appointmentPersons}
@@ -314,6 +319,7 @@ export default async function DashboardPage({
               brandBreakdowns={personData.brandBreakdowns}
               hasMultiBrand={brands.length > 1}
               funnelType={detectedFunnelType}
+              lang={lang}
             />
           </div>
         </CardReveal>
@@ -323,11 +329,11 @@ export default async function DashboardPage({
       {brandPerformance && brandPerformance.totalQty > 0 && (
         <CardReveal delay={580} className="mt-[10px]">
           <div className="card-base">
-            <div className="font-label text-[11px] uppercase tracking-widest text-[var(--t3)] mb-1">Products</div>
+            <div className="font-label text-[11px] uppercase tracking-widest text-[var(--t3)] mb-1">{t(lang, "products")}</div>
             <BlurText>
-              <div className="text-[14px] font-semibold text-[var(--t1)] mb-4">Brand Performance</div>
+              <div className="text-[14px] font-semibold text-[var(--t1)] mb-4">{t(lang, "brandPerformanceTitle")}</div>
             </BlurText>
-            <BrandPerformance data={brandPerformance} />
+            <BrandPerformance data={brandPerformance} lang={lang} />
           </div>
         </CardReveal>
       )}
@@ -338,11 +344,12 @@ export default async function DashboardPage({
       <div className="md:hidden">
         {fetchError ? (
           <div className="mt-4 rounded-[10px] border border-[var(--red)] bg-[var(--red-bg)] p-6 text-center">
-            <p className="text-[15px] font-medium text-[var(--red)] mb-1">Unable to load data</p>
+            <p className="text-[15px] font-medium text-[var(--red)] mb-1">{t(lang, "unableToLoadData")}</p>
             <p className="text-[13px] text-[var(--red)]/70">{fetchError}</p>
           </div>
         ) : (
           <MobileDashboard
+            lang={lang}
             tm={tm}
             lm={lm}
             kpi={kpi}

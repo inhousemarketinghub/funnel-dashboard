@@ -4,6 +4,7 @@ import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { RefreshCw } from "lucide-react";
 import { refreshSheet } from "@/app/[clientId]/actions";
+import { t, type Lang } from "@/lib/i18n";
 
 interface Props {
   sheetId: string;
@@ -13,9 +14,10 @@ interface Props {
    * mismatch — this component just renders the string.
    */
   fetchedAtLabel: string | null;
+  lang: Lang;
 }
 
-export function RefreshButton({ sheetId, fetchedAtLabel }: Props) {
+export function RefreshButton({ sheetId, fetchedAtLabel, lang }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -42,10 +44,10 @@ export function RefreshButton({ sheetId, fetchedAtLabel }: Props) {
         `}
       >
         <RefreshCw className={`w-4 h-4 text-[var(--t3)] ${isPending ? "animate-spin" : ""}`} />
-        {isPending ? "刷新中…" : "刷新"}
+        {isPending ? t(lang, "refreshing") : t(lang, "refresh")}
       </button>
       {fetchedAtLabel && (
-        <span className="text-[11px] text-[var(--t3)] num">数据更新于 {fetchedAtLabel}</span>
+        <span className="text-[11px] text-[var(--t3)] num">{t(lang, "dataUpdatedAt")} {fetchedAtLabel}</span>
       )}
     </div>
   );
