@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { ApptPersonMetrics, SalesPersonMetrics, BrandSalesBreakdown } from "@/lib/sheets";
 import type { KPIConfig } from "@/lib/types";
 import { fmtRM } from "@/lib/utils";
+import { t, type Lang } from "@/lib/i18n";
 import { DonutChart, Metric } from "./breakdown-donut";
 
 interface Props {
@@ -13,9 +14,10 @@ interface Props {
   brandBreakdowns?: Record<string, BrandSalesBreakdown[]>;
   hasMultiBrand?: boolean;
   funnelType?: string;
+  lang?: Lang;
 }
 
-export function PersonPerformance({ appointmentPersons, salesPersons, kpi, brandBreakdowns = {}, hasMultiBrand = false, funnelType = "appointment" }: Props) {
+export function PersonPerformance({ appointmentPersons, salesPersons, kpi, brandBreakdowns = {}, hasMultiBrand = false, funnelType = "appointment", lang = "en" }: Props) {
   const [selectedAppt, setSelectedAppt] = useState("all");
   const [selectedSales, setSelectedSales] = useState("all");
   const isWalkin = funnelType === "walkin";
@@ -73,31 +75,31 @@ export function PersonPerformance({ appointmentPersons, salesPersons, kpi, brand
       {hasAppt && (
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-4">
-            <div className="font-label text-[11px] uppercase tracking-widest text-[var(--t3)]">Appointment Setter</div>
+            <div className="font-label text-[11px] uppercase tracking-widest text-[var(--t3)]">{t(lang, "appointmentSetter")}</div>
             <select value={selectedAppt} onChange={(e) => setSelectedAppt(e.target.value)}
               className="text-[12px] py-[4px] px-2 rounded-[6px] border border-[var(--border)] bg-[var(--bg2)] text-[var(--t1)] outline-none">
-              <option value="all">All ({appointmentPersons.length})</option>
+              <option value="all">{t(lang, "all")} ({appointmentPersons.length})</option>
               {appointmentPersons.map((p) => <option key={p.name} value={p.name}>{p.name}</option>)}
             </select>
           </div>
           <div className="flex gap-5 flex-wrap">
             <div className="flex-1 min-w-0 sm:min-w-[320px]">
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-[8px]">
-                <Metric label="Contact Given" value={selectedApptData.contactGiven} />
-                <Metric label="Appointment" value={selectedApptData.appointment} />
-                <Metric label="Show Up" value={selectedApptData.showUp}
+                <Metric label={t(lang, "contactGiven")} value={selectedApptData.contactGiven} />
+                <Metric label={t(lang, "appointment")} value={selectedApptData.appointment} />
+                <Metric label={t(lang, "showUp")} value={selectedApptData.showUp}
                   sub={`${selectedApptData.contactGiven ? ((selectedApptData.showUp / selectedApptData.contactGiven) * 100).toFixed(1) : 0}%`} />
-                <Metric label="Appt Rate" text={`${selectedApptData.apptRate.toFixed(1)}%`} />
-                <Metric label="Orders" value={selectedApptData.orders} />
-                <Metric label="Sales" text={fmtRM(selectedApptData.sales)} />
+                <Metric label={t(lang, "apptRate")} text={`${selectedApptData.apptRate.toFixed(1)}%`} />
+                <Metric label={t(lang, "orders")} value={selectedApptData.orders} />
+                <Metric label={t(lang, "sales")} text={fmtRM(selectedApptData.sales)} />
               </div>
             </div>
             <div className="w-full sm:w-[260px] flex-shrink-0">
               <DonutChart
                 data={appointmentPersons.map((p) => ({ name: p.name, value: p.appointment }))}
-                label="appts"
-                title="Person Appt Distribution"
-                hoverFn={(d) => `${d.name}: ${d.value} appointments`}
+                label={t(lang, "appointmentsUnit")}
+                title={t(lang, "personApptDistribution")}
+                hoverFn={(d) => `${d.name}: ${d.value} ${t(lang, "appointmentsUnit")}`}
               />
             </div>
           </div>
@@ -107,23 +109,23 @@ export function PersonPerformance({ appointmentPersons, salesPersons, kpi, brand
       {/* ── Sales Person Section ── */}
       <div>
         <div className="flex items-center gap-3 mb-4">
-          <div className="font-label text-[11px] uppercase tracking-widest text-[var(--t3)]">Sales Person</div>
+          <div className="font-label text-[11px] uppercase tracking-widest text-[var(--t3)]">{t(lang, "salesPersonLabel")}</div>
           <select value={selectedSales} onChange={(e) => setSelectedSales(e.target.value)}
             className="text-[12px] py-[4px] px-2 rounded-[6px] border border-[var(--border)] bg-[var(--bg2)] text-[var(--t1)] outline-none">
-            <option value="all">All ({salesPersons.length})</option>
+            <option value="all">{t(lang, "all")} ({salesPersons.length})</option>
             {salesPersons.map((p) => <option key={p.name} value={p.name}>{p.name}</option>)}
           </select>
         </div>
 
         {/* Metrics */}
         <div className={`grid grid-cols-2 md:grid-cols-3 ${isWalkin ? "lg:grid-cols-5" : "lg:grid-cols-7"} gap-[8px] mb-5`}>
-          <Metric label={isWalkin ? "Visit" : "Est.Show Up"} value={selectedSalesData.appointment} />
-          {!isWalkin && <Metric label="Show Up" value={selectedSalesData.showUp} />}
-          {!isWalkin && <Metric label="Show Up Rate" text={`${selectedSalesData.showUpRate.toFixed(1)}%`} />}
-          <Metric label="Orders" value={selectedSalesData.orders} />
-          <Metric label="Conv Rate" text={`${selectedSalesData.convRate.toFixed(1)}%`} />
-          <Metric label="Sales" text={fmtRM(selectedSalesData.sales)} />
-          <Metric label="AOV" text={fmtRM(selectedSalesData.aov)} />
+          <Metric label={isWalkin ? t(lang, "visit") : t(lang, "estShowUpShort")} value={selectedSalesData.appointment} />
+          {!isWalkin && <Metric label={t(lang, "showUp")} value={selectedSalesData.showUp} />}
+          {!isWalkin && <Metric label={t(lang, "showUpRate")} text={`${selectedSalesData.showUpRate.toFixed(1)}%`} />}
+          <Metric label={t(lang, "orders")} value={selectedSalesData.orders} />
+          <Metric label={t(lang, "convRate")} text={`${selectedSalesData.convRate.toFixed(1)}%`} />
+          <Metric label={t(lang, "sales")} text={fmtRM(selectedSalesData.sales)} />
+          <Metric label={t(lang, "aov")} text={fmtRM(selectedSalesData.aov)} />
         </div>
 
         {/* Donut charts */}
@@ -132,9 +134,9 @@ export function PersonPerformance({ appointmentPersons, salesPersons, kpi, brand
           <div>
             <DonutChart
               data={salesPersons.map((p) => ({ name: p.name, value: p.appointment }))}
-              label={isWalkin ? "visits" : "est.show up"}
-              title={isWalkin ? "Person Visit" : "Person Est.Show Up"}
-              hoverFn={(d) => `${d.name}: ${d.value} ${isWalkin ? "visits" : "est.show up"}`}
+              label={isWalkin ? t(lang, "visitsUnit") : t(lang, "estShowUpUnit")}
+              title={isWalkin ? t(lang, "personVisit") : t(lang, "personEstShowUp")}
+              hoverFn={(d) => `${d.name}: ${d.value} ${isWalkin ? t(lang, "visitsUnit") : t(lang, "estShowUpUnit")}`}
             />
           </div>
 
@@ -142,11 +144,11 @@ export function PersonPerformance({ appointmentPersons, salesPersons, kpi, brand
           <div>
             <DonutChart
               data={salesPersons.map((p) => ({ name: p.name, value: p.sales }))}
-              label="sales"
-              title="Person Sales"
+              label={t(lang, "salesUnit")}
+              title={t(lang, "personSales")}
               hoverFn={(d) => {
                 const sp = salesPersons.find((s) => s.name === d.name);
-                return `${d.name}: ${fmtRM(d.value)} (${sp?.orders || 0} orders)`;
+                return `${d.name}: ${fmtRM(d.value)} (${sp?.orders || 0} ${t(lang, "ordersUnit")})`;
               }}
             />
           </div>
@@ -156,11 +158,11 @@ export function PersonPerformance({ appointmentPersons, salesPersons, kpi, brand
             <div>
               <DonutChart
                 data={selectedBrandBreakdown.map((b) => ({ name: b.brand, value: b.orders }))}
-                label="orders"
-                title="Brand Orders"
+                label={t(lang, "ordersUnit")}
+                title={t(lang, "brandOrders")}
                 hoverFn={(d) => {
                   const bb = selectedBrandBreakdown.find((b) => b.brand === d.name);
-                  return `${d.name}: ${bb?.orders || 0} orders`;
+                  return `${d.name}: ${bb?.orders || 0} ${t(lang, "ordersUnit")}`;
                 }}
               />
             </div>
@@ -171,11 +173,11 @@ export function PersonPerformance({ appointmentPersons, salesPersons, kpi, brand
             <div>
               <DonutChart
                 data={selectedBrandBreakdown.map((b) => ({ name: b.brand, value: b.sales }))}
-                label="sales"
-                title="Brand Sales"
+                label={t(lang, "salesUnit")}
+                title={t(lang, "brandSales")}
                 hoverFn={(d) => {
                   const bb = selectedBrandBreakdown.find((b) => b.brand === d.name);
-                  return `${d.name}: ${fmtRM(d.value)} (${bb?.orders || 0} orders)`;
+                  return `${d.name}: ${fmtRM(d.value)} (${bb?.orders || 0} ${t(lang, "ordersUnit")})`;
                 }}
               />
             </div>

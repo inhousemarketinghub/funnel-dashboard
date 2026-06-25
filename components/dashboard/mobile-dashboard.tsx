@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import type { FunnelMetrics, KPIConfig, MoMResult, InsightGroup } from "@/lib/types";
 import type { PersonData, BrandPerformanceData } from "@/lib/sheets";
+import { t, type Lang } from "@/lib/i18n";
 import { FunnelFlow } from "./funnel-flow";
 import { MoMTable } from "./mom-table";
 import { KPIChart } from "./kpi-chart";
@@ -44,6 +46,7 @@ interface Props {
   brandPerformance: BrandPerformanceData | null;
   sheetId: string;
   fetchedAtLabel: string | null;
+  lang: Lang;
 }
 
 const TABS = [
@@ -60,16 +63,20 @@ function statusColor(v: number): string {
   if (v >= 80) return "var(--yellow)";
   return "var(--red)";
 }
-function statusText(v: number): string {
-  if (v >= 100) return "Excellent";
-  if (v >= 80) return "Warning";
-  return "Poor";
+function statusText(v: number, lang: Lang): string {
+  if (v >= 100) return t(lang, "excellent");
+  if (v >= 80) return t(lang, "warning");
+  return t(lang, "poor");
 }
+
+const TAB_LABEL_KEYS: Record<TabKey, string> = {
+  overview: "overviewTab", funnel: "funnelTab", team: "team", targets: "targetsSection", products: "products",
+};
 
 export function MobileDashboard({
   tm, lm, kpi, mom, insights, personData, funnelType, kpiItems,
   thisRangeLabel, prevRangeLabel, clientId, brands, hasMultiBrand, canReport,
-  brandPerformance, sheetId, fetchedAtLabel,
+  brandPerformance, sheetId, fetchedAtLabel, lang,
 }: Props) {
   const [tab, setTab] = useState<TabKey>("overview");
   const [selected, setSelected] = useState<KpiItem | null>(null);
@@ -93,10 +100,11 @@ export function MobileDashboard({
       <div className="mb-3 flex flex-col gap-2">
         <div className="num text-[13px] text-[var(--t3)]">{thisRangeLabel}</div>
         <div className="flex flex-wrap items-center gap-2">
-          {hasMultiBrand && <BrandSelector clientId={clientId} brands={brands} />}
-          {canReport && <MonthPickerDialog clientId={clientId} />}
-          <DateRangePicker clientId={clientId} />
-          <RefreshButton sheetId={sheetId} fetchedAtLabel={fetchedAtLabel} />
+          {hasMultiBrand && <BrandSelector clientId={clientId} brands={brands} lang={lang} />}
+          <Link href={`/${clientId}/trends`} className="topbar-btn">{t(lang, "trends")}</Link>
+          {canReport && <MonthPickerDialog clientId={clientId} lang={lang} />}
+          <DateRangePicker clientId={clientId} lang={lang} />
+          <RefreshButton sheetId={sheetId} fetchedAtLabel={fetchedAtLabel} lang={lang} />
         </div>
       </div>
 
@@ -105,12 +113,12 @@ export function MobileDashboard({
         className="no-scrollbar sticky top-[55px] z-40 -mx-4 flex gap-2 overflow-x-auto px-4 py-2"
         style={{ background: "var(--bg)", borderBottom: "1px solid var(--border)", scrollbarWidth: "none" }}
       >
-        {visibleTabs.map((t) => {
-          const active = tab === t.key;
+        {visibleTabs.map((tabItem) => {
+          const active = tab === tabItem.key;
           return (
             <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
+              key={tabItem.key}
+              onClick={() => setTab(tabItem.key)}
               className="font-label flex-shrink-0 whitespace-nowrap rounded-full px-4 py-1.5 text-[12px] transition-colors"
               style={{
                 background: active ? "var(--blue)" : "var(--bg3)",
@@ -118,7 +126,7 @@ export function MobileDashboard({
                 border: `1px solid ${active ? "var(--blue)" : "var(--border)"}`,
               }}
             >
-              {t.label}
+              {t(lang, TAB_LABEL_KEYS[tabItem.key])}
             </button>
           );
         })}
@@ -134,9 +142,13 @@ export function MobileDashboard({
             >
               <span className="h-3 w-3 flex-shrink-0 rounded-full" style={{ background: bannerColor }} />
               <div className="text-[13px] text-[var(--t1)]">
-                <span className="num font-semibold">{avgAch}%</span> avg achievement
+                <span className="num font-semibold">{avgAch}%</span> {t(lang, "avgAchievement")}
                 {" · "}
-                {poorCount === 0 ? "all on track" : `${poorCount} need${poorCount > 1 ? "" : "s"} attention`}
+                {poorCount === 0
+                  ? t(lang, "allOnTrack")
+                  : (lang === "zh"
+                      ? `${poorCount} 项需关注`
+                      : `${poorCount} need${poorCount > 1 ? "" : "s"} attention`)}
               </div>
             </div>
 
@@ -156,7 +168,7 @@ export function MobileDashboard({
                     {k.actual}
                   </div>
                   <div className="mt-1 text-[10px]" style={{ color: statusColor(k.value) }}>
-                    {statusText(k.value)} · {Math.round(k.value)}%
+                    {statusText(k.value, lang)} · {Math.round(k.value)}%
                   </div>
                 </button>
               ))}
@@ -171,7 +183,7 @@ export function MobileDashboard({
 
         {tab === "funnel" && (
           <div className="card-base flex justify-center">
-            <FunnelFlow metrics={tm} funnelType={funnelType} />
+            <FunnelFlow metrics={tm} funnelType={funnelType} lang={lang} />
           </div>
         )}
 
@@ -184,6 +196,7 @@ export function MobileDashboard({
               brandBreakdowns={personData.brandBreakdowns}
               hasMultiBrand={hasMultiBrand}
               funnelType={funnelType}
+              lang={lang}
             />
           </div>
         )}
@@ -192,13 +205,13 @@ export function MobileDashboard({
           <div className="space-y-4">
             <div className="card-deep">
               <div className="font-label mb-3 text-[11px] uppercase tracking-widest text-[var(--t3)]">
-                KPI Achievement
+                {t(lang, "kpiAchievement")}
               </div>
-              <KPIChart items={kpiItems} />
+              <KPIChart items={kpiItems} lang={lang} />
             </div>
             <div className="card-deep">
               <div className="font-label mb-3 text-[11px] uppercase tracking-widest text-[var(--t3)]">
-                Period Comparison
+                {t(lang, "periodComparison")}
               </div>
               <MoMTable
                 tm={tm}
@@ -208,6 +221,7 @@ export function MobileDashboard({
                 thisMonth={thisRangeLabel}
                 lastMonth={prevRangeLabel}
                 funnelType={funnelType}
+                lang={lang}
               />
             </div>
           </div>
@@ -215,7 +229,7 @@ export function MobileDashboard({
 
         {tab === "products" && hasBrand && brandPerformance && (
           <div className="card-base">
-            <BrandPerformance data={brandPerformance} />
+            <BrandPerformance data={brandPerformance} lang={lang} />
           </div>
         )}
       </div>
@@ -240,12 +254,12 @@ export function MobileDashboard({
               className="mb-5 inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold"
               style={{ background: "var(--bg3)", color: statusColor(selected.value) }}
             >
-              {statusText(selected.value)} · {Math.round(selected.value)}% of target
+              {statusText(selected.value, lang)} · {Math.round(selected.value)}% {t(lang, "ofTarget")}
             </span>
             <div className="space-y-1.5 text-[13px] text-[var(--t2)]">
               <div>{selected.target}</div>
               {selected.monthlyTarget && <div>{selected.monthlyTarget}</div>}
-              {selected.prevActual && <div>Previous: {selected.prevActual}</div>}
+              {selected.prevActual && <div>{t(lang, "previous")}: {selected.prevActual}</div>}
             </div>
             {selected.breakdown && selected.breakdown.length > 0 && (
               <div
@@ -267,7 +281,7 @@ export function MobileDashboard({
               className="mt-6 w-full rounded-[12px] py-3 text-[13px] font-medium"
               style={{ background: "var(--t1)", color: "var(--bg)" }}
             >
-              Close
+              {t(lang, "close")}
             </button>
           </div>
         </div>

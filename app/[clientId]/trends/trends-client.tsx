@@ -18,6 +18,7 @@ import {
   type DateRangeObj,
 } from "@/lib/dates";
 import type { TrendBundle } from "@/lib/trends";
+import { t, type Lang } from "@/lib/i18n";
 
 interface TrendsClientProps {
   bundle: TrendBundle;
@@ -29,6 +30,7 @@ interface TrendsClientProps {
   compare: boolean;
   comparisonRange: DateRangeObj | null;
   funnelType: string;
+  lang: Lang;
 }
 
 export function TrendsClient({
@@ -41,6 +43,7 @@ export function TrendsClient({
   compare,
   comparisonRange,
   funnelType,
+  lang,
 }: TrendsClientProps) {
   const [selectedMetrics, setSelectedMetrics] = useState<string[]>(["sales", "cpl", "conv_rate"]);
   const [isPending, startTransition] = useTransition();
@@ -106,7 +109,7 @@ export function TrendsClient({
       ? Math.round((range.to.getTime() - range.from.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1
       : (range.to.getFullYear() - range.from.getFullYear()) * 12 +
         (range.to.getMonth() - range.from.getMonth()) + 1;
-  const unit = granularity === "weekly" ? "weeks" : "months";
+  const unit = granularity === "weekly" ? t(lang, "weeksUnit") : t(lang, "monthsUnit");
 
   const dateRangeExtraParams: Record<string, string> = { granularity };
   if (selectedBrand) dateRangeExtraParams.brand = selectedBrand;
@@ -116,13 +119,13 @@ export function TrendsClient({
     <div>
       <div className="flex justify-between items-start mb-7">
         <div>
-          <h1 className="font-heading text-[22px] font-semibold text-[var(--t1)]">Historical Trends</h1>
+          <h1 className="font-heading text-[22px] font-semibold text-[var(--t1)]">{t(lang, "historicalTrends")}</h1>
           <p className="text-[14px] text-[var(--t3)] font-light mt-[3px]">
-            {granularity === "weekly" ? "Weekly" : "Monthly"} performance · {formatRangeLabel(range.from, range.to)} ({subtitleCount} {unit})
+            {granularity === "weekly" ? t(lang, "weeklyGran") : t(lang, "monthlyGran")} {t(lang, "performanceLabel")} · {formatRangeLabel(range.from, range.to)} ({subtitleCount} {unit})
             {selectedBrand && <span className="ml-1">— {selectedBrand}</span>}
             {compare && comparisonRange && (
               <span className="ml-2 text-[12px] text-[var(--t4)]">
-                vs {formatRangeLabel(comparisonRange.from, comparisonRange.to)}
+                {t(lang, "vsLabel")} {formatRangeLabel(comparisonRange.from, comparisonRange.to)}
               </span>
             )}
           </p>
@@ -132,11 +135,13 @@ export function TrendsClient({
             value={granularity}
             onChange={handleGranularityChange}
             pending={isPending}
+            lang={lang}
           />
           <ComparisonToggle
             value={compare}
             onChange={handleCompareChange}
             pending={isPending}
+            lang={lang}
           />
           <DateRangePicker
             clientId={clientId}
@@ -144,6 +149,7 @@ export function TrendsClient({
             presets={granularity === "weekly" ? WEEKLY_PRESETS : MONTHLY_PRESETS}
             maxRange={granularity === "weekly" ? { weeks: 104 } : { months: 24 }}
             extraParams={dateRangeExtraParams}
+            lang={lang}
           />
           {hasMultiBrand && (
             <select
@@ -151,7 +157,7 @@ export function TrendsClient({
               onChange={(e) => handleBrandChange(e.target.value)}
               className="px-3 py-2 border border-[var(--border)] rounded-lg text-[12px] bg-[var(--bg)] text-[var(--t2)]"
             >
-              <option value="Overall">All Brands</option>
+              <option value="Overall">{t(lang, "allBrands")}</option>
               {brands.map((b) => (
                 <option key={b} value={b}>{b}</option>
               ))}
@@ -162,13 +168,14 @@ export function TrendsClient({
 
       <div className="card-base mb-4 p-4">
         <div className="font-label text-[11px] uppercase text-[var(--t3)] mb-3" style={{ letterSpacing: "0.2em" }}>
-          Metrics
+          {t(lang, "metricsLabel")}
         </div>
         <MetricSelector
           selected={selectedMetrics}
           onChange={setSelectedMetrics}
           maxSelect={5}
           funnelType={funnelType}
+          lang={lang}
         />
       </div>
 
@@ -178,6 +185,7 @@ export function TrendsClient({
         selectedMetrics={selectedMetrics}
         compare={compare}
         funnelType={funnelType}
+        lang={lang}
       />
 
       <TrendChart
@@ -185,6 +193,7 @@ export function TrendsClient({
         comparison={bundle.comparison}
         selectedMetrics={selectedMetrics}
         funnelType={funnelType}
+        lang={lang}
       />
     </div>
   );

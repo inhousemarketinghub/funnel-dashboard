@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { t, type Lang } from "@/lib/i18n";
 
 interface KPIItem {
   label: string;
@@ -11,13 +12,13 @@ interface KPIItem {
   monthlyTarget?: string;
 }
 
-function getStatus(value: number): { color: string; text: string } {
-  if (value >= 100) return { color: "var(--green)", text: "Excellent" };
-  if (value >= 80) return { color: "var(--yellow)", text: "Warning" };
-  return { color: "var(--red)", text: "Poor" };
+function getStatus(value: number, lang: Lang): { color: string; text: string } {
+  if (value >= 100) return { color: "var(--green)", text: t(lang, "excellent") };
+  if (value >= 80) return { color: "var(--yellow)", text: t(lang, "warning") };
+  return { color: "var(--red)", text: t(lang, "poor") };
 }
 
-export function KPIChart({ items }: { items: KPIItem[] }) {
+export function KPIChart({ items, lang = "en" }: { items: KPIItem[]; lang?: Lang }) {
   const [hovered, setHovered] = useState<number | null>(null);
   const [visible, setVisible] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -38,7 +39,7 @@ export function KPIChart({ items }: { items: KPIItem[] }) {
   return (
     <div ref={ref}>
       {items.map((item, i) => {
-        const status = getStatus(item.value);
+        const status = getStatus(item.value, lang);
         const currentWidth = Math.min((item.value / maxScale) * 100, 100);
         const targetPos = (100 / maxScale) * 100;
 
@@ -100,7 +101,7 @@ export function KPIChart({ items }: { items: KPIItem[] }) {
               >
                 {item.label}: {item.actual} / {item.target}
                 {item.monthlyTarget && ` / ${item.monthlyTarget}`}
-                {item.prevActual && ` / Prev: ${item.prevActual}`}
+                {item.prevActual && ` / ${t(lang, "prev")}: ${item.prevActual}`}
               </div>
             )}
           </div>

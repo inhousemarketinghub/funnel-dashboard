@@ -17,13 +17,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { t, type Lang } from "@/lib/i18n";
 
-const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
-
-export function MonthPickerDialog({ clientId }: { clientId: string }) {
+export function MonthPickerDialog({ clientId, lang = "en" }: { clientId: string; lang?: Lang }) {
+  const MONTHS = Array.from({ length: 12 }, (_, i) =>
+    new Intl.DateTimeFormat(lang === "zh" ? "zh-CN" : "en-US", { month: "long" }).format(new Date(2000, i, 1)),
+  );
   const router = useRouter();
   const now = new Date();
   const [month, setMonth] = useState(String(now.getMonth() + 1));
@@ -41,17 +40,17 @@ export function MonthPickerDialog({ clientId }: { clientId: string }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger className="topbar-btn">
-        Monthly Performance Overview
+        {t(lang, "monthlyPerformanceOverview")}
       </DialogTrigger>
       <DialogContent className="sm:max-w-[360px]">
         <DialogHeader>
           <DialogTitle className="font-heading text-[20px] font-semibold tracking-tight">
-            Select Report Month
+            {t(lang, "selectReportMonth")}
           </DialogTitle>
         </DialogHeader>
         <div className="flex gap-3 mt-4">
           <div className="flex-1">
-            <label className="text-[11px] text-[var(--t3)] font-label uppercase tracking-wider mb-1 block">Month</label>
+            <label className="text-[11px] text-[var(--t3)] font-label uppercase tracking-wider mb-1 block">{t(lang, "monthField")}</label>
             <Select value={month} onValueChange={(v) => v && setMonth(v)}>
               <SelectTrigger className="border-[var(--border)]">
                 <SelectValue />
@@ -64,7 +63,7 @@ export function MonthPickerDialog({ clientId }: { clientId: string }) {
             </Select>
           </div>
           <div className="w-[100px]">
-            <label className="text-[11px] text-[var(--t3)] font-label uppercase tracking-wider mb-1 block">Year</label>
+            <label className="text-[11px] text-[var(--t3)] font-label uppercase tracking-wider mb-1 block">{t(lang, "yearField")}</label>
             <Select value={year} onValueChange={(v) => v && setYear(v)}>
               <SelectTrigger className="border-[var(--border)]">
                 <SelectValue />
@@ -81,7 +80,7 @@ export function MonthPickerDialog({ clientId }: { clientId: string }) {
           onClick={handleGenerate}
           className="w-full mt-4 bg-[var(--blue)] hover:bg-[#A34D2F] text-white"
         >
-          Generate Report
+          {t(lang, "generate")}
         </Button>
       </DialogContent>
     </Dialog>

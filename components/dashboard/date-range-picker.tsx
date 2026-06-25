@@ -16,7 +16,16 @@ import {
   getPreviousPeriod,
   type DatePreset,
 } from "@/lib/dates";
+import { t, type Lang } from "@/lib/i18n";
 import type { DateRange } from "react-day-picker";
+
+// Chinese labels for the date presets (English falls back to the preset's own label).
+const PRESET_ZH: Record<string, string> = {
+  "this-week": "本周", "last-week": "上周", "this-month": "本月", "last-month": "上月",
+  "last-7": "近 7 天", "last-30": "近 30 天",
+  "last-3m": "近 3 个月", "last-6m": "近 6 个月", "last-12m": "近 12 个月", "ytd": "年初至今",
+  "last-4w": "近 4 周", "last-8w": "近 8 周", "last-12w": "近 12 周", "last-26w": "近 26 周",
+};
 
 interface Props {
   clientId: string;
@@ -24,9 +33,11 @@ interface Props {
   presets?: readonly DatePreset[];
   maxRange?: { weeks?: number; months?: number };
   extraParams?: Record<string, string>;
+  lang?: Lang;
 }
 
-export function DateRangePicker({ clientId, basePath, presets, maxRange, extraParams }: Props) {
+export function DateRangePicker({ clientId, basePath, presets, maxRange, extraParams, lang = "en" }: Props) {
+  const presetLabel = (p: DatePreset) => (lang === "zh" && PRESET_ZH[p.value]) || p.label;
   const effectiveBasePath = basePath ?? `/${clientId}`;
   const effectivePresets = presets ?? DATE_PRESETS;
   const router = useRouter();
@@ -147,7 +158,7 @@ export function DateRangePicker({ clientId, basePath, presets, maxRange, extraPa
               }`}
               onClick={() => setActiveTab("current")}
             >
-              Current Period
+              {t(lang, "currentPeriodTab")}
               {activeTab === "current" && (
                 <span className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-[var(--blue)]" />
               )}
@@ -158,7 +169,7 @@ export function DateRangePicker({ clientId, basePath, presets, maxRange, extraPa
               }`}
               onClick={() => setActiveTab("compare")}
             >
-              Compare Period
+              {t(lang, "comparePeriodTab")}
               {activeTab === "compare" && (
                 <span className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-[var(--red)]" />
               )}
@@ -177,7 +188,7 @@ export function DateRangePicker({ clientId, basePath, presets, maxRange, extraPa
                     onClick={() => handlePreset(p.value)}
                     className="text-xs h-7 px-2.5 text-[var(--t3)] hover:text-[var(--t1)] hover:bg-[var(--bg3)]"
                   >
-                    {p.label}
+                    {presetLabel(p)}
                   </Button>
                 ))}
               </div>
@@ -195,7 +206,7 @@ export function DateRangePicker({ clientId, basePath, presets, maxRange, extraPa
           ) : (
             <>
               <div className="p-3 text-[12px] text-[var(--t3)] border-b border-[var(--border)]">
-                Select the period to compare against
+                {t(lang, "comparePeriodHint")}
               </div>
               <div className="p-3">
                 <Calendar
@@ -211,7 +222,9 @@ export function DateRangePicker({ clientId, basePath, presets, maxRange, extraPa
 
           {overLimit && (
             <div className="px-3 py-2 text-[11px] text-red-600 border-t border-[var(--border)]">
-              Select a range ≤ {maxRange?.weeks ?? maxRange?.months} {maxRange?.weeks ? "weeks" : "months"} for performance reasons.
+              {lang === "zh"
+                ? `请选择不超过 ${maxRange?.weeks ?? maxRange?.months} ${maxRange?.weeks ? "周" : "个月"} 的范围(性能考虑)。`
+                : `Select a range ≤ ${maxRange?.weeks ?? maxRange?.months} ${maxRange?.weeks ? "weeks" : "months"} for performance reasons.`}
             </div>
           )}
 
@@ -220,11 +233,11 @@ export function DateRangePicker({ clientId, basePath, presets, maxRange, extraPa
             <span className="text-[11px] text-[var(--t4)] num">
               {calRange?.from && calRange?.to
                 ? formatRangeLabel(calRange.from, calRange.to)
-                : "Select date range"}
+                : t(lang, "selectDateRange")}
             </span>
             <div className="flex gap-2">
               <Button variant="ghost" size="sm" onClick={() => setOpen(false)} className="text-xs h-7 text-[var(--t3)]">
-                Cancel
+                {t(lang, "cancel")}
               </Button>
               <Button
                 size="sm"
@@ -232,14 +245,14 @@ export function DateRangePicker({ clientId, basePath, presets, maxRange, extraPa
                 disabled={!calRange?.from || !calRange?.to || overLimit}
                 className="text-xs h-7 bg-[var(--blue)] hover:bg-[#A34D2F] text-white"
               >
-                Apply
+                {t(lang, "apply")}
               </Button>
             </div>
           </div>
         </PopoverContent>
       </Popover>
       <span className="text-[11px] text-[var(--t3)] num">
-        vs. {formatRangeLabel(prev.from, prev.to)}
+        {t(lang, "vsLabel")} {formatRangeLabel(prev.from, prev.to)}
       </span>
     </div>
   );

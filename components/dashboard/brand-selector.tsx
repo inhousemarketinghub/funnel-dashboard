@@ -2,13 +2,15 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
+import { t, type Lang } from "@/lib/i18n";
 
 interface Props {
   clientId: string;
   brands: string[];
+  lang?: Lang;
 }
 
-export function BrandSelector({ clientId, brands }: Props) {
+export function BrandSelector({ clientId, brands, lang = "en" }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
@@ -36,7 +38,7 @@ export function BrandSelector({ clientId, brands }: Props) {
               : "border-[var(--border)] text-[var(--t3)] hover:text-[var(--t1)] hover:border-[var(--border-hover)]"
           } ${isPending ? "opacity-60" : ""}`}
         >
-          {b}
+          {b === "Overall" ? t(lang, "overall") : b}
         </button>
       ))}
     </div>

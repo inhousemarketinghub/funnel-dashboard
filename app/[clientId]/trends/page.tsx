@@ -10,6 +10,8 @@ import {
   type DateRangeObj,
 } from "@/lib/dates";
 import { notFound } from "next/navigation";
+import { cookies } from "next/headers";
+import { normalizeLang, LANG_COOKIE } from "@/lib/i18n";
 import { TrendsClient } from "./trends-client";
 
 function resolveTrendParams(sp: { [k: string]: string | string[] | undefined }): {
@@ -62,6 +64,7 @@ export default async function TrendsPage({
   const { data: client } = await supabase.from("clients").select("*").eq("id", clientId).single();
   if (!client) notFound();
 
+  const lang = normalizeLang((await cookies()).get(LANG_COOKIE)?.value);
   const brands = await detectBrandsOrdered(client.sheet_id);
   const { granularity, range, brand, compare, comparisonRange } = resolveTrendParams(sp);
 
@@ -87,6 +90,7 @@ export default async function TrendsPage({
       compare={compare}
       comparisonRange={comparisonRange}
       funnelType={client.funnel_type ?? "appointment"}
+      lang={lang}
     />
   );
 }
