@@ -142,7 +142,11 @@ export function HeroCards({ metrics: tm, kpi, achievement: ach, prevMetrics: lm,
         </div>
         <Stagger className={`grid ${gridCols(groupCards.length)} gap-4`} staggerMs={150}>
           {groupCards.map((card, i) => (
-            <KPICard key={card.label} card={card} accent={ACCENT_COLORS[startIndex + i]} lang={lang} />
+            // Key by stable position, NOT card.label: the label is translated, so
+            // keying by it would remount every card on language switch — and the
+            // Stagger reveal only fires once (it unobserves), leaving the remounted
+            // cards stuck at opacity:0 (blank). Position keys keep cards mounted.
+            <KPICard key={startIndex + i} card={card} accent={ACCENT_COLORS[startIndex + i]} lang={lang} />
           ))}
         </Stagger>
       </div>
