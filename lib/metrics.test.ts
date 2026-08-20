@@ -3,13 +3,13 @@ import { computeMetrics, computeMoM, computeAchievement, budgetScenario } from "
 import type { DailyMetric, KPIConfig } from "./types";
 
 const sampleRows: DailyMetric[] = [
-  { date: new Date("2026-03-01"), ad_spend: 250, lead_funnel_spend: 100, branding_spend: 50, inquiry: 10, contact: 5, appointment: 1, showup: 0, orders: 0, sales: 0 },
-  { date: new Date("2026-03-02"), ad_spend: 260, lead_funnel_spend: 110, branding_spend: 50, inquiry: 12, contact: 4, appointment: 2, showup: 1, orders: 1, sales: 40000 },
+  { date: new Date("2026-03-01"), ad_spend: 250, lead_funnel_spend: 100, branding_spend: 50, inquiry: 10, contact: 5, appointment: 1, est_showup: 1, showup: 0, orders: 0, sales: 0 },
+  { date: new Date("2026-03-02"), ad_spend: 260, lead_funnel_spend: 110, branding_spend: 50, inquiry: 12, contact: 4, appointment: 2, est_showup: 2, showup: 1, orders: 1, sales: 40000 },
 ];
 
 describe("computeMetrics", () => {
   it("aggregates daily rows into funnel metrics", () => {
-    const m = computeMetrics(sampleRows, 3);
+    const m = computeMetrics(sampleRows);
     // Total is derived from the split: (Lead Funnel + Branding) × 1.08
     expect(m.ad_spend).toBeCloseTo((210 + 100) * 1.08, 2);
     expect(m.inquiry).toBe(22);
@@ -21,17 +21,19 @@ describe("computeMetrics", () => {
     // CPL = (Lead Funnel × 1.08) / leads, not taxed total / leads
     expect(m.cpl).toBeCloseTo((210 * 1.08) / 22, 2);
     expect(m.respond_rate).toBeCloseTo(9 / 22 * 100, 1);
+    // Est.Show Up is summed off the Performance Tracker rows (1 + 2), not passed in
+    expect(m.est_showup).toBe(3);
     expect(m.showup_rate).toBeCloseTo(1 / 3 * 100, 1);
     expect(m.roas).toBeCloseTo(40000 / ((210 + 100) * 1.08), 1);
   });
 
   it("derived total reconciles exactly with the taxed breakdown lines", () => {
-    const m = computeMetrics(sampleRows, 3);
+    const m = computeMetrics(sampleRows);
     expect(m.ad_spend).toBeCloseTo(m.lead_funnel_spend * 1.08 + m.branding_spend * 1.08, 6);
   });
 
   it("handles zero denominators", () => {
-    const m = computeMetrics([], 0);
+    const m = computeMetrics([]);
     expect(m.cpl).toBe(0);
     expect(m.roas).toBe(0);
     expect(m.aov).toBe(0);
@@ -39,25 +41,25 @@ describe("computeMetrics", () => {
 
   it("CPL = 0 when Lead Funnel is 0 but Branding has spend (split exists)", () => {
     const rows: DailyMetric[] = [
-      { date: new Date("2026-03-01"), ad_spend: 270, lead_funnel_spend: 0, branding_spend: 250, inquiry: 10, contact: 0, appointment: 0, showup: 0, orders: 0, sales: 0 },
+      { date: new Date("2026-03-01"), ad_spend: 270, lead_funnel_spend: 0, branding_spend: 250, inquiry: 10, contact: 0, appointment: 0, est_showup: 0, showup: 0, orders: 0, sales: 0 },
     ];
-    const m = computeMetrics(rows, 0);
+    const m = computeMetrics(rows);
     expect(m.cpl).toBe(0);
   });
 
   it("falls back to taxed total / leads when no split columns present", () => {
     const rows: DailyMetric[] = [
-      { date: new Date("2026-03-01"), ad_spend: 250, lead_funnel_spend: 0, branding_spend: 0, inquiry: 10, contact: 0, appointment: 0, showup: 0, orders: 0, sales: 0 },
+      { date: new Date("2026-03-01"), ad_spend: 250, lead_funnel_spend: 0, branding_spend: 0, inquiry: 10, contact: 0, appointment: 0, est_showup: 0, showup: 0, orders: 0, sales: 0 },
     ];
-    const m = computeMetrics(rows, 0);
+    const m = computeMetrics(rows);
     expect(m.cpl).toBeCloseTo(250 / 10, 2);
   });
 });
 
 describe("computeMoM", () => {
   it("computes percentage changes", () => {
-    const current = computeMetrics(sampleRows, 3);
-    const previous = computeMetrics([sampleRows[0]], 1);
+    const current = computeMetrics(sampleRows);
+    const previous = computeMetrics([sampleRows[0]]);
     const mom = computeMoM(current, previous);
     // Totals are derived: current (210+100)×1.08, previous (100+50)×1.08
     expect(mom.ad_spend).toBeCloseTo((310 * 1.08 - 150 * 1.08) / (150 * 1.08) * 100, 1);
@@ -74,7 +76,7 @@ const testKPI: KPIConfig = {
 
 describe("computeAchievement", () => {
   it("returns percentage of KPI achieved", () => {
-    const m = computeMetrics(sampleRows, 3);
+    const m = computeMetrics(sampleRows);
     const ach = computeAchievement(m, testKPI);
     expect(ach.sales).toBeCloseTo(40000 / 300000 * 100, 1);
     expect(ach.orders).toBeCloseTo(1 / 6 * 100, 1);
@@ -83,7 +85,7 @@ describe("computeAchievement", () => {
 
 describe("budgetScenario", () => {
   it("projects next month sales from pipeline", () => {
-    const m = computeMetrics(sampleRows, 3);
+    const m = computeMetrics(sampleRows);
     const sc = budgetScenario(510, m, testKPI, 5);
     expect(sc.spend).toBe(510);
     expect(sc.inquiry).toBeCloseTo(510 / m.cpl, 0);
@@ -96,26 +98,26 @@ describe("conv_rate by funnel type", () => {
   // Walk-in funnels skip the appointment/show-up stage, so showup is always 0.
   // The conversion rate must come off Visit (contact), or it collapses to 0%.
   const walkinRows: DailyMetric[] = [
-    { date: new Date("2026-03-01"), ad_spend: 200, lead_funnel_spend: 100, branding_spend: 0, inquiry: 50, contact: 20, appointment: 0, showup: 0, orders: 6, sales: 30000 },
+    { date: new Date("2026-03-01"), ad_spend: 200, lead_funnel_spend: 100, branding_spend: 0, inquiry: 50, contact: 20, appointment: 0, est_showup: 0, showup: 0, orders: 6, sales: 30000 },
   ];
 
   it("walk-in conv_rate = orders / visit (contact)", () => {
-    const m = computeMetrics(walkinRows, 0, "walkin");
+    const m = computeMetrics(walkinRows, "walkin");
     expect(m.conv_rate).toBeCloseTo((6 / 20) * 100, 1); // 30%
   });
 
   it("regression: omitting funnelType collapses walk-in conv_rate to 0% (the funnel bug)", () => {
     // Defaulting to "appointment" divides orders by showup (0) → 0%. This is exactly
     // what the dashboard funnel showed before the fix.
-    const m = computeMetrics(walkinRows, 0);
+    const m = computeMetrics(walkinRows);
     expect(m.conv_rate).toBe(0);
   });
 
   it("appointment conv_rate = orders / show-up", () => {
     const apptRows: DailyMetric[] = [
-      { date: new Date("2026-03-01"), ad_spend: 200, lead_funnel_spend: 100, branding_spend: 0, inquiry: 50, contact: 20, appointment: 10, showup: 8, orders: 4, sales: 20000 },
+      { date: new Date("2026-03-01"), ad_spend: 200, lead_funnel_spend: 100, branding_spend: 0, inquiry: 50, contact: 20, appointment: 10, est_showup: 10, showup: 8, orders: 4, sales: 20000 },
     ];
-    const m = computeMetrics(apptRows, 0, "appointment");
+    const m = computeMetrics(apptRows, "appointment");
     expect(m.conv_rate).toBeCloseTo((4 / 8) * 100, 1); // 50%
   });
 });

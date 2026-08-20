@@ -79,7 +79,7 @@ function bucketize(
   return ranges.map((range) => {
     try {
       const rows = allData.filter((r) => r.date >= range.from && r.date <= range.to);
-      return { label: range.label, isPartial: range.isPartial, metrics: computeMetrics(rows, 0, funnelType) };
+      return { label: range.label, isPartial: range.isPartial, metrics: computeMetrics(rows, funnelType) };
     } catch {
       return { label: range.label, isPartial: range.isPartial, metrics: zeroMetrics() };
     }
@@ -93,7 +93,7 @@ function pooledAvg(
   funnelType: string,
 ): FunnelMetrics {
   const rows = allData.filter((r) => r.date >= from && r.date <= to);
-  return computeMetrics(rows, 0, funnelType);
+  return computeMetrics(rows, funnelType);
 }
 
 export async function fetchTrends(opts: {

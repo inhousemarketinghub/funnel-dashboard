@@ -6,6 +6,7 @@ export interface DailyMetric {
   inquiry: number;
   contact: number;
   appointment: number;
+  est_showup: number;
   showup: number;
   orders: number;
   sales: number;

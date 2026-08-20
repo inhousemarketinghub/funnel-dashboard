@@ -39,11 +39,8 @@ export async function POST(request: NextRequest) {
 
   const thisRangeRows = perfData.filter((r) => r.date >= reportStart && r.date <= reportEnd);
   const prevRangeRows = perfData.filter((r) => r.date >= prevStart && r.date <= prevEnd);
-  const estSU = countEstShowUp(leadData, reportStart, reportEnd);
-  const estSUPrev = countEstShowUp(leadData, prevStart, prevEnd);
-
-  const tm = computeMetrics(thisRangeRows, estSU, perfResult.funnelType);
-  const lm = computeMetrics(prevRangeRows, estSUPrev, perfResult.funnelType);
+  const tm = computeMetrics(thisRangeRows, perfResult.funnelType);
+  const lm = computeMetrics(prevRangeRows, perfResult.funnelType);
   const mom = computeMoM(tm, lm);
   const ach = computeAchievement(tm, kpi);
 

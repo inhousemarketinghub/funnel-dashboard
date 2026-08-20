@@ -152,6 +152,7 @@ interface PerfColumnMap {
   inquiry: number;
   contact: number;
   appointment: number | null;
+  estShowup: number | null;
   showup: number | null;
   orders: number;
   sales: number;
@@ -186,7 +187,15 @@ function detectPerfColumns(rows: string[][]): PerfColumnMap {
     inquiry: findCol(merged, ["pm"]) ?? 5,
     contact: findCol(merged, ["contact", "showroom", "visit"], ["rate"]) ?? 7,
     appointment: findCol(merged, ["appointment"], ["rate", "tracker"]),
-    showup: findCol(merged, ["showed up", "show up"], ["rate"]),
+    estShowup: findCol(merged, ["est.show up", "est show up", "est. show up", "estimated show up"], ["rate"]),
+    // "Est.Show Up" contains the substring "show up", so a bare substring match
+    // stops on the estimate column and never reaches the actuals column beside
+    // it. Match the distinct "showed up" wording first and exclude "est" so the
+    // estimate can never be mistaken for the actual. Sheets that only have one
+    // column ("Showed Up", no estimate) still resolve through the same branch.
+    showup:
+      findCol(merged, ["showed up"], ["rate", "est"]) ??
+      findCol(merged, ["show up"], ["rate", "est"]),
     orders: findCol(merged, ["order count"]) ?? findCol(merged, ["order"], ["rate", "tracker", "new", "repeat", "upsell"]) ?? 14,
     sales: findCol(merged, ["total sales"]) ?? 18,
   };
@@ -213,6 +222,7 @@ function parsePerformanceRows(rows: string[][]): DailyMetric[] {
       inquiry: parseInt2(cols[colMap.inquiry]),
       contact: parseInt2(cols[colMap.contact]),
       appointment: colMap.appointment !== null ? parseInt2(cols[colMap.appointment]) : 0,
+      est_showup: colMap.estShowup !== null ? parseInt2(cols[colMap.estShowup]) : 0,
       showup: colMap.showup !== null ? parseInt2(cols[colMap.showup]) : 0,
       orders: parseInt2(cols[colMap.orders]),
       sales: parseRM(cols[colMap.sales]),
@@ -883,6 +893,7 @@ export async function fetchPerformanceData(sheetId: string, brandName?: string):
           existing.inquiry += row.inquiry;
           existing.contact += row.contact;
           existing.appointment += row.appointment;
+          existing.est_showup += row.est_showup;
           existing.showup += row.showup;
           existing.orders += row.orders;
           existing.sales += row.sales;
