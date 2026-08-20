@@ -10,6 +10,8 @@ interface KPIItem {
   actual: string;
   prevActual?: string;
   monthlyTarget?: string;
+  /** Sheet column missing — grey "not tracked" instead of a red Poor 0% */
+  notTracked?: boolean;
 }
 
 function getStatus(value: number, lang: Lang): { color: string; text: string } {
@@ -39,8 +41,10 @@ export function KPIChart({ items, lang = "en" }: { items: KPIItem[]; lang?: Lang
   return (
     <div ref={ref}>
       {items.map((item, i) => {
-        const status = getStatus(item.value, lang);
-        const currentWidth = Math.min((item.value / maxScale) * 100, 100);
+        const status = item.notTracked
+          ? { color: "var(--t4)", text: t(lang, "notTracked") }
+          : getStatus(item.value, lang);
+        const currentWidth = item.notTracked ? 0 : Math.min((item.value / maxScale) * 100, 100);
         const targetPos = (100 / maxScale) * 100;
 
         return (
@@ -99,7 +103,7 @@ export function KPIChart({ items, lang = "en" }: { items: KPIItem[]; lang?: Lang
                   zIndex: 20,
                 }}
               >
-                {item.label}: {item.actual} / {item.target}
+                {item.label}: {item.notTracked ? t(lang, "notTracked") : item.actual} / {item.target}
                 {item.monthlyTarget && ` / ${item.monthlyTarget}`}
                 {item.prevActual && ` / ${t(lang, "prev")}: ${item.prevActual}`}
               </div>

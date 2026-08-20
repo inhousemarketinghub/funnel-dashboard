@@ -335,7 +335,7 @@ export function detectFunnelTypeFromColumns(colMap: PerfColumnMap): "appointment
 
 // ── Performance data parsing ───────────────────────────────────
 
-function parsePerformanceRows(rows: string[][]): DailyMetric[] {
+export function parsePerformanceRows(rows: string[][]): DailyMetric[] {
   const colMap = detectPerfColumns(rows);
   const results: DailyMetric[] = [];
   for (const cols of rows) {

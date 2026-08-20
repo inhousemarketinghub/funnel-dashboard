@@ -186,13 +186,17 @@ export default async function DashboardPage({
       ],
     },
     ...(!isWalkin ? [
+      // notTracked: the sheet has no column for the underlying metric — show
+      // "not tracked" instead of a fabricated 0% (and keep it out of averages).
       { label: t(lang, "apptRate"), value: ach.appt_rate, target: `${kpi.appt_rate}%`, actual: `${tm.appt_rate.toFixed(1)}%`, prevActual: `${lm.appt_rate.toFixed(1)}%`,
+        notTracked: !perfResult.tracked.appointment,
         breakdown: [
           { label: t(lang, "appointment"), value: String(tm.appointment) },
           { label: t(lang, "contactGiven"), value: String(tm.contact) },
         ],
       },
       { label: t(lang, "showUpRate"), value: ach.showup_rate, target: `${kpi.showup_rate}%`, actual: `${tm.showup_rate.toFixed(1)}%`, prevActual: `${lm.showup_rate.toFixed(1)}%`,
+        notTracked: !perfResult.tracked.showup || !perfResult.tracked.est_showup,
         breakdown: [
           { label: t(lang, "showUp"), value: String(tm.showup) },
           { label: t(lang, "estShowUp"), value: String(tm.est_showup) },
@@ -205,6 +209,7 @@ export default async function DashboardPage({
       target: `${kpi.conv_rate}%`,
       actual: isWalkin ? `${walkinConvRate.toFixed(1)}%` : `${tm.conv_rate.toFixed(1)}%`,
       prevActual: isWalkin ? `${walkinConvRatePrev.toFixed(1)}%` : `${lm.conv_rate.toFixed(1)}%`,
+      notTracked: !isWalkin && !perfResult.tracked.showup, // appt conv_rate = orders / showup
       breakdown: [
         { label: t(lang, "orders"), value: String(tm.orders) },
         { label: isWalkin ? t(lang, "visit") : t(lang, "showUp"), value: isWalkin ? String(tm.contact) : String(tm.showup) },
@@ -256,7 +261,7 @@ export default async function DashboardPage({
       {!fetchError && <>
       {/* KPI Cards: grouped by Frontend/Midend/Backend */}
       <div className="mb-8">
-        <HeroCards metrics={tm} kpi={kpi} achievement={{...ach, sales: paceAchSales, ad_spend: paceAchAdSpend, orders: paceAchOrders}} prevMetrics={lm} days={rangeDays} funnelType={detectedFunnelType || "appointment"} paceKpi={{sales: paceSales, ad_spend: paceAdSpend, orders: paceOrders}} lang={lang} />
+        <HeroCards metrics={tm} kpi={kpi} achievement={{...ach, sales: paceAchSales, ad_spend: paceAchAdSpend, orders: paceAchOrders}} prevMetrics={lm} days={rangeDays} funnelType={detectedFunnelType || "appointment"} paceKpi={{sales: paceSales, ad_spend: paceAdSpend, orders: paceOrders}} lang={lang} tracked={perfResult.tracked} />
       </div>
 
       {/* Performance Summary */}
@@ -273,7 +278,7 @@ export default async function DashboardPage({
             <BlurText>
               <div className="text-[14px] font-semibold text-[var(--t1)] mb-4">{t(lang, "leadFunnel")}</div>
             </BlurText>
-            <FunnelFlow metrics={tm} funnelType={detectedFunnelType} lang={lang} />
+            <FunnelFlow metrics={tm} funnelType={detectedFunnelType} lang={lang} tracked={perfResult.tracked} />
           </div>
         </CardReveal>
         <CardReveal delay={280} className="c7">
@@ -282,7 +287,7 @@ export default async function DashboardPage({
             <BlurText>
               <div className="text-[14px] font-semibold text-[var(--t1)] mb-4">{t(lang, "periodComparison")}</div>
             </BlurText>
-            <MoMTable tm={tm} lm={lm} mom={mom} kpi={kpi} thisMonth={thisRangeLabel} lastMonth={prevRangeLabel} funnelType={detectedFunnelType} lang={lang} />
+            <MoMTable tm={tm} lm={lm} mom={mom} kpi={kpi} thisMonth={thisRangeLabel} lastMonth={prevRangeLabel} funnelType={detectedFunnelType} lang={lang} tracked={perfResult.tracked} />
           </div>
         </CardReveal>
 

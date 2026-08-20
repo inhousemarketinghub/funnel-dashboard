@@ -38,6 +38,7 @@ export default async function ClientLayout({ children, params }: { children: Rea
         <div className="flex flex-wrap items-center gap-[10px]">
           <LanguageToggle lang={lang} />
           <ThemeToggle />
+          {canSettings && <Link href={`/${clientId}/diagnostics`} className="topbar-btn">{t(lang, "diagnostics")}</Link>}
           {canSettings && <Link href={`/${clientId}/settings`} className="topbar-btn">{t(lang, "settings")}</Link>}
           <span className="topbar-email text-[11px] text-[var(--t4)] num">{email}</span>
           <LogoutButton lang={lang} />

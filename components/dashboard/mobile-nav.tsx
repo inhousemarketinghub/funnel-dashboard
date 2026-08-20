@@ -64,6 +64,9 @@ export function MobileNav({ clientId, clientName, logoUrl, email, canSettings, l
           <div className="flex flex-col gap-0.5">
             <Link href={`/${clientId}/trends`} className={ITEM}>{t(lang, "trends")}</Link>
             {canSettings && (
+              <Link href={`/${clientId}/diagnostics`} className={ITEM}>{t(lang, "diagnostics")}</Link>
+            )}
+            {canSettings && (
               <Link href={`/${clientId}/settings`} className={ITEM}>{t(lang, "settings")}</Link>
             )}
             <Link href="/projects" className={ITEM}>{t(lang, "projectOverview")}</Link>

@@ -23,8 +23,16 @@ const WALKIN_STEPS = [
   { key: "sales", labelKey: "sales", colors: ["#20201D", "#000000"] },
 ] as const;
 
-export function FunnelFlow({ metrics, funnelType = "appointment", lang = "en" }: { metrics: FunnelMetrics; funnelType?: string; lang?: Lang }) {
+import type { TrackedMetrics } from "@/lib/sheets";
+
+export function FunnelFlow({ metrics, funnelType = "appointment", lang = "en", tracked }: { metrics: FunnelMetrics; funnelType?: string; lang?: Lang; tracked?: TrackedMetrics }) {
   const STEPS = funnelType === "walkin" ? WALKIN_STEPS : APPOINTMENT_STEPS;
+  // Steps whose sheet column is missing show "—" instead of a fabricated 0.
+  // Geometry keeps the numeric 0 so the funnel shape still renders.
+  const untracked = new Set<string>([
+    ...(tracked && !tracked.appointment ? ["appointment"] : []),
+    ...(tracked && !tracked.showup ? ["showup"] : []),
+  ]);
   const ref = useRef<HTMLDivElement>(null);
   // Unique per instance so the desktop + mobile funnels don't share gradient ids
   // (duplicate ids made the second funnel reference the hidden first one → no fill).
@@ -54,9 +62,16 @@ export function FunnelFlow({ metrics, funnelType = "appointment", lang = "en" }:
     orders: metrics.conv_rate, sales: null,
   };
   const values = STEPS.map((s) => valueMap[s.key] ?? 0);
-  const rates = STEPS.map((s) => rateMap[s.key] ?? null);
+  // showup_rate's denominator is est_showup — hide the rate when either show-up
+  // column is missing (null already suppresses rendering below).
+  const rates = STEPS.map((s) => {
+    if (untracked.has(s.key)) return null;
+    if (s.key === "showup" && tracked && !tracked.est_showup) return null;
+    return rateMap[s.key] ?? null;
+  });
 
   function formatValue(idx: number, val: number) {
+    if (untracked.has(STEPS[idx].key)) return "—";
     if (STEPS[idx].key === "sales") return fmtRM(val);
     return val.toLocaleString();
   }

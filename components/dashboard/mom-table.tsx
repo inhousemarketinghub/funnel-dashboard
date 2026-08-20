@@ -1,4 +1,5 @@
 import type { FunnelMetrics, KPIConfig, MoMResult } from "@/lib/types";
+import type { TrackedMetrics } from "@/lib/sheets";
 import { fmtRM, fmtROAS } from "@/lib/utils";
 import { t, type Lang } from "@/lib/i18n";
 import { MoMBadge } from "@/components/shared/mom-badge";
@@ -19,7 +20,11 @@ function buildRows(
   kpi: KPIConfig,
   funnelType: string = "appointment",
   lang: Lang = "en",
+  tracked?: TrackedMetrics,
 ): FunnelRow[] {
+  // Untracked (sheet column missing) renders as "—" with an N/A MoM badge —
+  // the existing convention for absent values in this table.
+  const tk = tracked ?? { appointment: true, est_showup: true, showup: true };
   const isWalkin = funnelType === "walkin";
   const walkinConvRate = tm.contact > 0 ? (tm.orders / tm.contact) * 100 : 0;
   const walkinConvRatePrev = lm.contact > 0 ? (lm.orders / lm.contact) * 100 : 0;
@@ -40,18 +45,32 @@ function buildRows(
   ];
 
   if (!isWalkin) {
+    const suTracked = tk.showup && tk.est_showup;
     rows.push(
-      { label: t(lang, "appointment"), tmFmt: String(tm.appointment), lmFmt: String(lm.appointment), mom: mom.appointment ?? null, kpiFmt: String(kpi.target_appt), inverted: false },
-      { label: t(lang, "apptRate"), tmFmt: `${tm.appt_rate.toFixed(1)}%`, lmFmt: `${lm.appt_rate.toFixed(1)}%`, mom: mom.appt_rate ?? null, kpiFmt: `${kpi.appt_rate}%`, inverted: false },
-      { label: t(lang, "estShowUp"), tmFmt: String(tm.est_showup), lmFmt: String(lm.est_showup), mom: null, kpiFmt: "\u2014", inverted: false },
-      { label: t(lang, "showUp"), tmFmt: String(tm.showup), lmFmt: String(lm.showup), mom: mom.showup ?? null, kpiFmt: String(kpi.target_showup), inverted: false },
-      { label: t(lang, "showUpRate"), tmFmt: `${tm.showup_rate.toFixed(1)}%`, lmFmt: `${lm.showup_rate.toFixed(1)}%`, mom: mom.showup_rate ?? null, kpiFmt: `${kpi.showup_rate}%`, inverted: false },
+      tk.appointment
+        ? { label: t(lang, "appointment"), tmFmt: String(tm.appointment), lmFmt: String(lm.appointment), mom: mom.appointment ?? null, kpiFmt: String(kpi.target_appt), inverted: false }
+        : { label: t(lang, "appointment"), tmFmt: "\u2014", lmFmt: "\u2014", mom: null, kpiFmt: "\u2014", inverted: false },
+      tk.appointment
+        ? { label: t(lang, "apptRate"), tmFmt: `${tm.appt_rate.toFixed(1)}%`, lmFmt: `${lm.appt_rate.toFixed(1)}%`, mom: mom.appt_rate ?? null, kpiFmt: `${kpi.appt_rate}%`, inverted: false }
+        : { label: t(lang, "apptRate"), tmFmt: "\u2014", lmFmt: "\u2014", mom: null, kpiFmt: "\u2014", inverted: false },
+      tk.est_showup
+        ? { label: t(lang, "estShowUp"), tmFmt: String(tm.est_showup), lmFmt: String(lm.est_showup), mom: null, kpiFmt: "\u2014", inverted: false }
+        : { label: t(lang, "estShowUp"), tmFmt: "\u2014", lmFmt: "\u2014", mom: null, kpiFmt: "\u2014", inverted: false },
+      tk.showup
+        ? { label: t(lang, "showUp"), tmFmt: String(tm.showup), lmFmt: String(lm.showup), mom: mom.showup ?? null, kpiFmt: String(kpi.target_showup), inverted: false }
+        : { label: t(lang, "showUp"), tmFmt: "\u2014", lmFmt: "\u2014", mom: null, kpiFmt: "\u2014", inverted: false },
+      suTracked
+        ? { label: t(lang, "showUpRate"), tmFmt: `${tm.showup_rate.toFixed(1)}%`, lmFmt: `${lm.showup_rate.toFixed(1)}%`, mom: mom.showup_rate ?? null, kpiFmt: `${kpi.showup_rate}%`, inverted: false }
+        : { label: t(lang, "showUpRate"), tmFmt: "\u2014", lmFmt: "\u2014", mom: null, kpiFmt: "\u2014", inverted: false },
     );
   }
 
   rows.push(
     { label: t(lang, "orders"), tmFmt: String(tm.orders), lmFmt: String(lm.orders), mom: mom.orders ?? null, kpiFmt: String(kpi.orders), inverted: false },
-    { label: t(lang, "convRate"), tmFmt: isWalkin ? `${walkinConvRate.toFixed(1)}%` : `${tm.conv_rate.toFixed(1)}%`, lmFmt: isWalkin ? `${walkinConvRatePrev.toFixed(1)}%` : `${lm.conv_rate.toFixed(1)}%`, mom: isWalkin ? walkinConvMom : (mom.conv_rate ?? null), kpiFmt: `${kpi.conv_rate}%`, inverted: false },
+    // Appointment conv_rate = orders / showup; untracked showup would fabricate 0%
+    !isWalkin && !tk.showup
+      ? { label: t(lang, "convRate"), tmFmt: "—", lmFmt: "—", mom: null, kpiFmt: "—", inverted: false }
+      : { label: t(lang, "convRate"), tmFmt: isWalkin ? `${walkinConvRate.toFixed(1)}%` : `${tm.conv_rate.toFixed(1)}%`, lmFmt: isWalkin ? `${walkinConvRatePrev.toFixed(1)}%` : `${lm.conv_rate.toFixed(1)}%`, mom: isWalkin ? walkinConvMom : (mom.conv_rate ?? null), kpiFmt: `${kpi.conv_rate}%`, inverted: false },
     { label: t(lang, "sales"), tmFmt: fmtRM(tm.sales), lmFmt: fmtRM(lm.sales), mom: mom.sales ?? null, kpiFmt: fmtRM(kpi.sales), inverted: false },
     { label: t(lang, "aov"), tmFmt: fmtRM(tm.aov), lmFmt: fmtRM(lm.aov), mom: mom.aov ?? null, kpiFmt: fmtRM(kpi.aov), inverted: false },
     { label: t(lang, "roas"), tmFmt: fmtROAS(tm.roas), lmFmt: fmtROAS(lm.roas), mom: mom.roas ?? null, kpiFmt: fmtROAS(kpi.roas), inverted: false },
@@ -74,6 +93,7 @@ export function MoMTable({
   lastMonth,
   funnelType = "appointment",
   lang = "en",
+  tracked,
 }: {
   tm: FunnelMetrics;
   lm: FunnelMetrics;
@@ -83,8 +103,9 @@ export function MoMTable({
   lastMonth: string;
   funnelType?: string;
   lang?: Lang;
+  tracked?: TrackedMetrics;
 }) {
-  const rows = buildRows(tm, lm, mom, kpi, funnelType, lang);
+  const rows = buildRows(tm, lm, mom, kpi, funnelType, lang, tracked);
 
   return (
     <div className="overflow-x-auto">
