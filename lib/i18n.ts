@@ -112,6 +112,9 @@ const D: Dict = {
   // ── Top nav / layout ──
   projectOverview: { en: "Project Overview", zh: "项目总览" },
   settings: { en: "Settings", zh: "设置" },
+  diagnostics: { en: "Diagnostics", zh: "数据诊断" },
+  notTracked: { en: "Not tracked", zh: "未追踪" },
+  notTrackedHint: { en: "Column missing in Performance Tracker", zh: "Performance Tracker 缺少该列" },
   signOut: { en: "Sign Out", zh: "登出" },
   trends: { en: "Trends", zh: "趋势" },
   theme: { en: "Theme", zh: "主题" },

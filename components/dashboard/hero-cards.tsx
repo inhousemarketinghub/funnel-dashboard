@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { FunnelMetrics, KPIConfig, Achievement } from "@/lib/types";
+import type { TrackedMetrics } from "@/lib/sheets";
 import { fmtRM } from "@/lib/utils";
 import { CountUp } from "@/components/animations/count-up";
 import { Stagger } from "@/components/animations/stagger";
@@ -16,6 +17,9 @@ interface Props {
   funnelType?: "appointment" | "walkin" | string;
   paceKpi?: { sales: number; ad_spend: number; orders: number };
   lang?: Lang;
+  /** Column presence per metric; defaults to all-tracked so existing callers
+   *  (report page) keep today's behavior. */
+  tracked?: TrackedMetrics;
 }
 
 function statusLabel(ach: number, lang: Lang): { text: string; color: string; bg: string } {
@@ -40,9 +44,13 @@ interface CardDef {
   kpiLabel: string;
   achievement: number;
   expandContent?: React.ReactNode;
+  /** Underlying column(s) missing in the sheet — render "Not tracked", not a fake 0 */
+  notTracked?: boolean;
 }
 
-export function HeroCards({ metrics: tm, kpi, achievement: ach, prevMetrics: lm, days, funnelType = "appointment", paceKpi, lang = "en" }: Props) {
+const ALL_TRACKED: TrackedMetrics = { appointment: true, est_showup: true, showup: true };
+
+export function HeroCards({ metrics: tm, kpi, achievement: ach, prevMetrics: lm, days, funnelType = "appointment", paceKpi, lang = "en", tracked = ALL_TRACKED }: Props) {
   const isWalkin = funnelType === "walkin";
   const pk = paceKpi || { sales: kpi.sales, ad_spend: kpi.ad_spend, orders: kpi.orders };
   const avgDaily = days > 0 ? tm.ad_spend / days : 0;
@@ -101,13 +109,14 @@ export function HeroCards({ metrics: tm, kpi, achievement: ach, prevMetrics: lm,
     { label: t(lang, "respondRate"), value: `${tm.respond_rate.toFixed(1)}%`, rawValue: tm.respond_rate, suffix: "%", decimals: 1, kpiLabel: `${t(lang, "target")}: ${kpi.respond_rate}%`, achievement: ach.respond_rate,
       expandContent: (<div className="flex gap-4 flex-wrap"><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">{t(lang, "contactGiven")}</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{tm.contact}</div></div><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">{t(lang, "inquiry")}</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{tm.inquiry}</div></div></div>),
     },
-    { label: t(lang, "appointmentRate"), value: `${tm.appt_rate.toFixed(1)}%`, rawValue: tm.appt_rate, suffix: "%", decimals: 1, kpiLabel: `${t(lang, "target")}: ${kpi.appt_rate}%`, achievement: ach.appt_rate,
+    { label: t(lang, "appointmentRate"), value: `${tm.appt_rate.toFixed(1)}%`, rawValue: tm.appt_rate, suffix: "%", decimals: 1, kpiLabel: `${t(lang, "target")}: ${kpi.appt_rate}%`, achievement: ach.appt_rate, notTracked: !tracked.appointment,
       expandContent: (<div className="flex gap-4 flex-wrap"><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">{t(lang, "appointment")}</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{tm.appointment}</div></div><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">{t(lang, "contactGiven")}</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{tm.contact}</div></div></div>),
     },
-    { label: t(lang, "showUpRate"), value: `${tm.showup_rate.toFixed(1)}%`, rawValue: tm.showup_rate, suffix: "%", decimals: 1, kpiLabel: `${t(lang, "target")}: ${kpi.showup_rate}%`, achievement: ach.showup_rate,
+    { label: t(lang, "showUpRate"), value: `${tm.showup_rate.toFixed(1)}%`, rawValue: tm.showup_rate, suffix: "%", decimals: 1, kpiLabel: `${t(lang, "target")}: ${kpi.showup_rate}%`, achievement: ach.showup_rate, notTracked: !tracked.showup || !tracked.est_showup,
       expandContent: (<div className="flex gap-4 flex-wrap"><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">{t(lang, "showUp")}</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{tm.showup}</div></div><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">{t(lang, "estShowUp")}</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{tm.est_showup}</div></div></div>),
     },
-    { label: t(lang, "conversionRate"), value: `${tm.conv_rate.toFixed(1)}%`, rawValue: tm.conv_rate, suffix: "%", decimals: 1, kpiLabel: `${t(lang, "target")}: ${kpi.conv_rate}%`, achievement: ach.conv_rate,
+    // conv_rate = orders / showup — with showup untracked the 0.0% would be fabricated
+    { label: t(lang, "conversionRate"), value: `${tm.conv_rate.toFixed(1)}%`, rawValue: tm.conv_rate, suffix: "%", decimals: 1, kpiLabel: `${t(lang, "target")}: ${kpi.conv_rate}%`, achievement: ach.conv_rate, notTracked: !tracked.showup,
       expandContent: (<div className="flex gap-4 flex-wrap"><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">{t(lang, "orders")}</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{tm.orders}</div></div><div><div className="text-[10px] text-[var(--t4)] uppercase tracking-wider mb-1">{t(lang, "showUp")}</div><div className="num text-[15px] font-semibold text-[var(--t1)]">{tm.showup}</div></div></div>),
     },
   ];
@@ -165,6 +174,28 @@ export function HeroCards({ metrics: tm, kpi, achievement: ach, prevMetrics: lm,
 function KPICard({ card, accent, lang }: { card: CardDef; accent: string; lang: Lang }) {
   const [open, setOpen] = useState(false);
   const status = statusLabel(card.achievement, lang);
+
+  if (card.notTracked) {
+    // The sheet has no column for this metric — a numeric 0 here would be a
+    // fabricated figure, and a red "Poor" pill a false alarm.
+    return (
+      <div className={`card-base accent-top ${accent} stagger-child`} style={{ userSelect: "none" }}>
+        <div className="font-label text-[11px] uppercase tracking-widest text-[var(--t3)] mb-1">
+          {card.label}
+        </div>
+        <div className="text-[22px] font-semibold tracking-tight text-[var(--t4)] leading-none mb-2">
+          {t(lang, "notTracked")}
+        </div>
+        <span
+          className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-[2px] rounded-full"
+          style={{ background: "var(--bg3)", color: "var(--t4)" }}
+        >
+          —
+        </span>
+        <div className="text-[11px] text-[var(--t4)] mt-[5px]">{t(lang, "notTrackedHint")}</div>
+      </div>
+    );
+  }
 
   return (
     <div

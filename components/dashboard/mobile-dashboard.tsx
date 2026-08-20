@@ -26,6 +26,8 @@ export interface KpiItem {
   prevActual?: string;
   monthlyTarget?: string;
   breakdown?: { label: string; value: string }[]; // underlying counts, shown in the tap-detail sheet
+  /** Sheet column missing — grey "not tracked" tile, excluded from banner stats */
+  notTracked?: boolean;
 }
 
 interface Props {
@@ -83,9 +85,12 @@ export function MobileDashboard({
 
   const hasPerson =
     personData.appointmentPersons.length > 0 || personData.salesPersons.length > 0;
-  const poorCount = kpiItems.filter((k) => k.value < 80).length;
-  const avgAch = kpiItems.length
-    ? Math.round(kpiItems.reduce((a, k) => a + Math.min(k.value, 150), 0) / kpiItems.length)
+  // Untracked metrics are opinion-free: keep them out of the banner stats so a
+  // missing sheet column can't pin the banner at "needs attention" forever.
+  const scoredItems = kpiItems.filter((k) => !k.notTracked);
+  const poorCount = scoredItems.filter((k) => k.value < 80).length;
+  const avgAch = scoredItems.length
+    ? Math.round(scoredItems.reduce((a, k) => a + Math.min(k.value, 150), 0) / scoredItems.length)
     : 0;
   const bannerColor = poorCount === 0 ? "var(--green)" : poorCount <= 2 ? "var(--yellow)" : "var(--red)";
   const hasBrand = !!brandPerformance && brandPerformance.totalQty > 0;
@@ -159,16 +164,16 @@ export function MobileDashboard({
                   key={k.label}
                   onClick={() => setSelected(k)}
                   className="card-base relative text-left"
-                  style={{ padding: 14, borderLeft: `3px solid ${statusColor(k.value)}` }}
+                  style={{ padding: 14, borderLeft: `3px solid ${k.notTracked ? "var(--t4)" : statusColor(k.value)}` }}
                 >
                   <div className="font-label mb-1 truncate text-[10px] uppercase tracking-wider text-[var(--t4)]">
                     {k.label}
                   </div>
-                  <div className="num text-[20px] font-bold leading-tight text-[var(--t1)]">
-                    {k.actual}
+                  <div className={`num text-[20px] font-bold leading-tight ${k.notTracked ? "text-[var(--t4)]" : "text-[var(--t1)]"}`}>
+                    {k.notTracked ? t(lang, "notTracked") : k.actual}
                   </div>
-                  <div className="mt-1 text-[10px]" style={{ color: statusColor(k.value) }}>
-                    {statusText(k.value, lang)} · {Math.round(k.value)}%
+                  <div className="mt-1 text-[10px]" style={{ color: k.notTracked ? "var(--t4)" : statusColor(k.value) }}>
+                    {k.notTracked ? t(lang, "notTrackedHint") : `${statusText(k.value, lang)} · ${Math.round(k.value)}%`}
                   </div>
                 </button>
               ))}
@@ -252,9 +257,11 @@ export function MobileDashboard({
             </div>
             <span
               className="mb-5 inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold"
-              style={{ background: "var(--bg3)", color: statusColor(selected.value) }}
+              style={{ background: "var(--bg3)", color: selected.notTracked ? "var(--t4)" : statusColor(selected.value) }}
             >
-              {statusText(selected.value, lang)} · {Math.round(selected.value)}% {t(lang, "ofTarget")}
+              {selected.notTracked
+                ? t(lang, "notTrackedHint")
+                : `${statusText(selected.value, lang)} · ${Math.round(selected.value)}% ${t(lang, "ofTarget")}`}
             </span>
             <div className="space-y-1.5 text-[13px] text-[var(--t2)]">
               <div>{selected.target}</div>
