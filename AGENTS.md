@@ -20,9 +20,21 @@ column counts and orderings. `lib/sheets.ts` holds all of it.
 | Per-person performance | Lead & Sales Tracker | the daily tracker has no per-person split |
 | Next-month budget projection | Lead & Sales Tracker | a daily tracker has no future-dated rows |
 
-Est. Show Up and Showed Up both come from the Performance Tracker **on purpose**.
-The two tabs are maintained by different people and drift apart, so mixing them
-produced a rate whose numerator and denominator described different populations.
+Est. Show Up and Showed Up both come from the Performance Tracker **on purpose**,
+and the two tabs are expected to disagree — **that is not missing data**. The
+Performance Tracker can be scoped to a subset of the business: on Rygis it counts
+**Paid Ads leads only** (Facebook / Instagram / WhatsApp), while the Lead & Sales
+Tracker is the data-entry log for **every** lead including organic. Counting
+appointment dates in the Lead tracker therefore inflated Est. Show Up with
+non-paid leads — the funnel's numerator and denominator described different
+populations. Never "reconcile" the two tabs 1:1 and never treat a Performance
+Tracker gap as a data-entry omission without checking the lead's Source.
+
+Note the features that still read the Lead & Sales Tracker do so **across all
+sources** (no Source filter): per-person performance and the next-month budget
+projection. For paid-ads-scoped clients like Rygis these figures include organic
+leads — flag this to the user before building anything on top of them.
+
 If a sheet lacks the `Est.Show Up` column the figure reports 0 — "not tracked" —
 rather than silently substituting a differently-scoped number from another tab.
 
