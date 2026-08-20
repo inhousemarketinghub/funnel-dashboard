@@ -108,6 +108,45 @@ describe("parsePerformanceCSV with empty fields", () => {
   });
 });
 
+// Real Rygis Private Gym header shape: an "Est.Show Up" column sits immediately
+// BEFORE the real "Showed Up" column. Substring matching on "show up" used to
+// stop at Est.Show Up, so the dashboard reported estimates as actuals.
+const perfCSVWithEstShowUp = `,Lead Tracker,,,,,,,,,,,Conversion Tracker,,,,,ROAS Tracker
+Date,Taxed Ad Spend,Lead Funnel Ad Spend,Branding Ad Spend,8% SST,PM,Cost Per PM (Included 8% SST),Contect Given,Appointment,Est.Show Up,Showed Up,,Appointment Rate,Show Up Rate,Conversion Rate,Order Counts,,Date,Taxed Ad Spend,Total Sales,Total ROAS,AOV,,Month Filter,Week ending
+04/08/2026,RM100.00,90,10,8,5,20,3,0,1,1,,,,,0,,04/08/2026,RM100.00,0,,,,Aug 2026,09/08/2026
+05/08/2026,RM100.00,90,10,8,5,20,3,1,1,0,,,,,0,,05/08/2026,RM100.00,0,,,,Aug 2026,09/08/2026`;
+
+describe("Est.Show Up vs Showed Up column detection", () => {
+  it("reads Showed Up from the actuals column, not the adjacent Est.Show Up column", () => {
+    const rows = parsePerformanceCSV(perfCSVWithEstShowUp);
+    expect(rows).toHaveLength(2);
+    expect(rows[0].showup).toBe(1);
+    expect(rows[1].showup).toBe(0);
+  });
+
+  it("reads Est.Show Up from the Performance Tracker", () => {
+    const rows = parsePerformanceCSV(perfCSVWithEstShowUp);
+    expect(rows[0].est_showup).toBe(1);
+    expect(rows[1].est_showup).toBe(1);
+  });
+
+  it("keeps Appointment separate from both show-up columns", () => {
+    const rows = parsePerformanceCSV(perfCSVWithEstShowUp);
+    expect(rows[0].appointment).toBe(0);
+    expect(rows[1].appointment).toBe(1);
+  });
+
+  it("still finds Showed Up on sheets that have no Est.Show Up column", () => {
+    // Good Brand / Carress@BD shape: Showed Up sits where Est.Show Up would be.
+    const csv = `Date,Taxed Ad Spend,Lead Funnel,Branding,SST,PM,CPL,Contect Given,Appointment,Showed Up,,Appointment Rate,Show Up Rate,Conversion Rate,Order Counts
+04/08/2026,RM100.00,90,10,8,5,20,3,2,1,,,,,0`;
+    const rows = parsePerformanceCSV(csv);
+    expect(rows[0].appointment).toBe(2);
+    expect(rows[0].showup).toBe(1);
+    expect(rows[0].est_showup).toBe(0);
+  });
+});
+
 describe("countEstShowUp", () => {
   it("counts leads with appointment dates in range", () => {
     const leads = parseLeadSalesCSV(leadCSV);

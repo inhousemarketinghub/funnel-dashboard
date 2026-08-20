@@ -1,6 +1,6 @@
 import { createServerSupabase } from "@/lib/supabase/server";
 import { getProjectPermissions } from "@/lib/auth";
-import { fetchPerformanceData, fetchLeadData, countEstShowUp, fetchKPIData, fetchPersonData, detectBrandsOrdered, fetchOverallKPI, fetchBrandPerformance, getDataFetchedAt } from "@/lib/sheets";
+import { fetchPerformanceData, fetchKPIData, fetchPersonData, detectBrandsOrdered, fetchOverallKPI, fetchBrandPerformance, getDataFetchedAt } from "@/lib/sheets";
 import type { PersonData, PerfResult, BrandPerformanceData } from "@/lib/sheets";
 import { BrandSelector } from "@/components/dashboard/brand-selector";
 import { computeMetrics, computeMoM, computeAchievement } from "@/lib/metrics";
@@ -66,7 +66,6 @@ export default async function DashboardPage({
   const selectedBrand = brandParam && brandParam !== "Overall" ? brandParam : brands.length === 1 ? brands[0] : undefined;
 
   let perfResult: PerfResult = { data: [], funnelType: "appointment" };
-  let leadData: import("@/lib/types").Lead[] = [];
   let sheetKPI: KPIConfig | null = null;
   let personData: PersonData = { appointmentPersons: [], salesPersons: [], brandBreakdowns: {} };
   // Brand Performance follows the date range only (not the brand selector); resilient to absent tab.
@@ -75,9 +74,8 @@ export default async function DashboardPage({
   let fetchedAt: number | null = null;
   let fetchError: string | null = null;
   try {
-    [perfResult, leadData, sheetKPI, personData, brandPerformance, fetchedAt] = await Promise.all([
+    [perfResult, sheetKPI, personData, brandPerformance, fetchedAt] = await Promise.all([
       fetchPerformanceData(client.sheet_id, selectedBrand),
-      fetchLeadData(client.sheet_id, selectedBrand),
       fetchKPIData(client.sheet_id, selectedBrand),
       fetchPersonData(client.sheet_id, reportStart, reportEnd, selectedBrand),
       fetchBrandPerformance(client.sheet_id, reportStart, reportEnd),
@@ -85,7 +83,6 @@ export default async function DashboardPage({
     ]);
   } catch (err) {
     perfResult = { data: [], funnelType: "appointment" };
-    leadData = [];
     fetchError = err instanceof Error ? err.message : "Failed to fetch Google Sheet data";
   }
 
@@ -113,11 +110,8 @@ export default async function DashboardPage({
   const detectedFunnelType = perfResult.funnelType;
   const thisRangeRows = perfData.filter((r) => r.date >= reportStart && r.date <= reportEnd);
   const prevRangeRows = perfData.filter((r) => r.date >= prevStart && r.date <= prevEnd);
-  const estSU = countEstShowUp(leadData, reportStart, reportEnd);
-  const estSUPrev = countEstShowUp(leadData, prevStart, prevEnd);
-
-  const tm = computeMetrics(thisRangeRows, estSU, detectedFunnelType);
-  const lm = computeMetrics(prevRangeRows, estSUPrev, detectedFunnelType);
+  const tm = computeMetrics(thisRangeRows, detectedFunnelType);
+  const lm = computeMetrics(prevRangeRows, detectedFunnelType);
   const mom = computeMoM(tm, lm);
   const ach = computeAchievement(tm, kpi);
 

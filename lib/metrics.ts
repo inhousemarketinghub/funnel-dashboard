@@ -1,9 +1,15 @@
 import type { DailyMetric, FunnelMetrics, KPIConfig, MoMResult, Achievement, BudgetScenario } from "./types";
 import { pct, momPct } from "./utils";
 
+/**
+ * Both Est.Show Up and Showed Up come from the Performance Tracker's own daily
+ * columns — the sheet is the single source of truth for the appointment stage.
+ * Sheets without an "Est.Show Up" column report 0, which reads as "not tracked"
+ * rather than silently substituting a differently-scoped number from the Lead
+ * & Sales Tracker (those two tabs are maintained separately and drift apart).
+ */
 export function computeMetrics(
   rows: DailyMetric[],
-  estShowUp: number,
   funnelType: "appointment" | "walkin" | string = "appointment",
 ): FunnelMetrics {
   const sum = (fn: (r: DailyMetric) => number) => rows.reduce((a, r) => a + fn(r), 0);
@@ -14,6 +20,7 @@ export function computeMetrics(
   const inquiry = sum((r) => r.inquiry);
   const contact = sum((r) => r.contact);
   const appointment = sum((r) => r.appointment);
+  const estShowUp = sum((r) => r.est_showup);
   const showup = sum((r) => r.showup);
   const orders = sum((r) => r.orders);
   const sales = sum((r) => r.sales);
@@ -103,5 +110,5 @@ export function computeWeeklyBreakdown(
   const w2 = rows.filter((r) => r.date.getDate() >= 8 && r.date.getDate() <= 14);
   const w3 = rows.filter((r) => r.date.getDate() >= 15 && r.date.getDate() <= 21);
   const w4 = rows.filter((r) => r.date.getDate() >= 22);
-  return [w1, w2, w3, w4].map((w) => computeMetrics(w, 0, funnelType));
+  return [w1, w2, w3, w4].map((w) => computeMetrics(w, funnelType));
 }

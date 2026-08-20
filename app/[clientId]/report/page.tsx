@@ -52,30 +52,27 @@ export default async function ReportPage({
     return data.filter((r) => r.date >= start && r.date <= end);
   }
 
-  function computeAll(perfData: typeof overallPerf.data, leadData: typeof overallLead, kpi: KPIConfig) {
+  function computeAll(perfData: typeof overallPerf.data, kpi: KPIConfig) {
     const thisR = filterRange(perfData, reportStart, reportEnd);
     const prevR = filterRange(perfData, prevStart, prevEnd);
-    const esu = countEstShowUp(leadData, reportStart, reportEnd);
-    const esuP = countEstShowUp(leadData, prevStart, prevEnd);
-    const tm = computeMetrics(thisR, esu, ft);
-    const lm = computeMetrics(prevR, esuP, ft);
+    const tm = computeMetrics(thisR, ft);
+    const lm = computeMetrics(prevR, ft);
     return { tm, lm, mom: computeMoM(tm, lm), ach: computeAchievement(tm, kpi), weeks: computeWeeklyBreakdown(thisR, ft), kpi };
   }
 
-  const overall = computeAll(overallPerf.data, overallLead, kpi0);
+  const overall = computeAll(overallPerf.data, kpi0);
 
   // Per-brand data
   interface BrandBundle { name: string; tm: FunnelMetrics; lm: FunnelMetrics; mom: MoMResult; ach: Achievement; kpi: KPIConfig; weeks: FunnelMetrics[] }
   const brandBundles: BrandBundle[] = [];
   if (isMultiBrand) {
     for (const b of brands) {
-      const [bp, bl, bk] = await Promise.all([
+      const [bp, bk] = await Promise.all([
         fetchPerformanceData(client.sheet_id, b),
-        fetchLeadData(client.sheet_id, b),
         fetchKPIData(client.sheet_id, b),
       ]);
       const bkpi = bk || kpi0;
-      const d = computeAll(bp.data, bl, bkpi);
+      const d = computeAll(bp.data, bkpi);
       brandBundles.push({ name: b, ...d });
     }
   }

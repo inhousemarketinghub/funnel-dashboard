@@ -45,7 +45,6 @@ export async function fetchAllClientsOverview(): Promise<{
 
         const metrics = computeMetrics(
           monthData,
-          0,
           client.funnel_type === "walkin" ? "walkin" : "appointment",
         );
 
