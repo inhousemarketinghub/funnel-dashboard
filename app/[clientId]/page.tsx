@@ -65,7 +65,7 @@ export default async function DashboardPage({
   // "Overall" or no selection = no brand filter (aggregate all)
   const selectedBrand = brandParam && brandParam !== "Overall" ? brandParam : brands.length === 1 ? brands[0] : undefined;
 
-  let perfResult: PerfResult = { data: [], funnelType: "appointment" };
+  let perfResult: PerfResult = { data: [], funnelType: "appointment", tracked: { appointment: true, est_showup: true, showup: true } };
   let sheetKPI: KPIConfig | null = null;
   let personData: PersonData = { appointmentPersons: [], salesPersons: [], brandBreakdowns: {} };
   // Brand Performance follows the date range only (not the brand selector); resilient to absent tab.
@@ -82,7 +82,7 @@ export default async function DashboardPage({
       getDataFetchedAt(client.sheet_id),
     ]);
   } catch (err) {
-    perfResult = { data: [], funnelType: "appointment" };
+    perfResult = { data: [], funnelType: "appointment", tracked: { appointment: true, est_showup: true, showup: true } };
     fetchError = err instanceof Error ? err.message : "Failed to fetch Google Sheet data";
   }
 

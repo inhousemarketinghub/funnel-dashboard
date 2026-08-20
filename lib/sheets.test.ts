@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { parsePerformanceCSV, parseLeadSalesCSV, countEstShowUp, parseCSVLine } from "./sheets";
+import {
+  parsePerformanceCSV, parseLeadSalesCSV, countEstShowUp, parseCSVLine,
+  diagnosePerfColumns, deriveTracked, mergeTracked, pickTab, pickPerformanceTab, TAB_RULES,
+} from "./sheets";
+
+const csvToRows = (csv: string) => csv.trim().split("\n").map((line) => parseCSVLine(line));
 
 const perfCSV = `Date,Taxed Ad Spend,Lead Funnel,Branding,SST,PM,CPL,Contact Given,Appointment,Showed Up,x,Appt Rate,SU Rate,Conv Rate,Order Counts,x,ROAS Date,ROAS Spend,Total Sales
 01/03/2026,RM250.00,200,50,20,10,25,5,1,0,,,,,0,,,,0
@@ -144,6 +149,111 @@ describe("Est.Show Up vs Showed Up column detection", () => {
     expect(rows[0].appointment).toBe(2);
     expect(rows[0].showup).toBe(1);
     expect(rows[0].est_showup).toBe(0);
+  });
+});
+
+describe("diagnosePerfColumns", () => {
+  it("resolves the Rygis shape unambiguously with real header text", () => {
+    const d = diagnosePerfColumns(csvToRows(perfCSVWithEstShowUp));
+    const by = (m: string) => d.columns.find((c) => c.metric === m)!;
+    expect(by("showup")).toMatchObject({ index: 10, header: "Showed Up", ambiguous: false, usedFallback: false });
+    expect(by("estShowup")).toMatchObject({ index: 9, header: "Est.Show Up", ambiguous: false });
+    expect(by("appointment")).toMatchObject({ index: 8, ambiguous: false });
+    expect(d.columns.every((c) => !c.ambiguous)).toBe(true);
+  });
+
+  it("does not flag identical-text duplicates (ROAS section repeats Date / Taxed Ad Spend)", () => {
+    const d = diagnosePerfColumns(csvToRows(perfCSVWithEstShowUp));
+    const by = (m: string) => d.columns.find((c) => c.metric === m)!;
+    // The rule matches both the main and ROAS-section columns…
+    expect(by("date").matches.length).toBeGreaterThanOrEqual(2);
+    expect(by("adSpend").matches.length).toBeGreaterThanOrEqual(2);
+    // …but identical header text = normal layout, not a warning; first wins.
+    expect(by("date")).toMatchObject({ index: 0, ambiguous: false });
+    expect(by("adSpend")).toMatchObject({ index: 1, ambiguous: false });
+  });
+
+  it("flags ambiguity when two columns match the same rule, first one winning", () => {
+    const csv = `Date,Taxed Ad Spend,Lead Funnel,Branding,SST,PM,CPL,Contect Given,Appointment,Appointment Confirm,Showed Up,,Order Counts
+04/08/2026,RM100.00,90,10,8,5,20,3,2,1,1,,0`;
+    const d = diagnosePerfColumns(csvToRows(csv));
+    const appt = d.columns.find((c) => c.metric === "appointment")!;
+    expect(appt.ambiguous).toBe(true);
+    expect(appt.matches).toHaveLength(2);
+    expect(appt.matches.map((m) => m.header)).toEqual(["Appointment", "Appointment Confirm"]);
+    expect(appt.index).toBe(8); // first match wins — same value the parser uses
+  });
+
+  it("reports untracked columns as null without fallback", () => {
+    // walk-in shape: no Appointment / Est.Show Up / Showed Up columns at all
+    const csv = `Date,Taxed Ad Spend,Lead Funnel,Branding,SST,PM,CPL,Visit,,Order Counts,Total Sales
+04/08/2026,RM100.00,90,10,8,5,20,3,,1,RM500`;
+    const d = diagnosePerfColumns(csvToRows(csv));
+    const by = (m: string) => d.columns.find((c) => c.metric === m)!;
+    expect(by("appointment").index).toBeNull();
+    expect(by("estShowup").index).toBeNull();
+    expect(by("showup").index).toBeNull();
+    expect(deriveTracked(d.colMap)).toEqual({ appointment: false, est_showup: false, showup: false });
+  });
+
+  it("falls back to legacy column positions when no header matches", () => {
+    const d = diagnosePerfColumns([["", "", ""], ["01/03/2026", "RM250.00", ""]]);
+    const by = (m: string) => d.columns.find((c) => c.metric === m)!;
+    for (const [metric, idx] of [["date", 0], ["adSpend", 1], ["orders", 14], ["sales", 18]] as const) {
+      expect(by(metric)).toMatchObject({ index: idx, usedFallback: true, header: null });
+    }
+  });
+});
+
+describe("tracked metadata", () => {
+  it("mergeTracked ORs per field (tracked in ANY brand = tracked overall)", () => {
+    const a = { appointment: true, est_showup: false, showup: true };
+    const b = { appointment: false, est_showup: false, showup: false };
+    expect(mergeTracked(a, b)).toEqual({ appointment: true, est_showup: false, showup: true });
+    expect(mergeTracked(b, b)).toEqual({ appointment: false, est_showup: false, showup: false });
+  });
+
+  it("parsePerformanceCSV-shaped sheets derive tracked from column presence", () => {
+    const d = diagnosePerfColumns(csvToRows(perfCSVWithEstShowUp));
+    expect(deriveTracked(d.colMap)).toEqual({ appointment: true, est_showup: true, showup: true });
+  });
+});
+
+describe("pickTab", () => {
+  const tabs = [
+    { name: "Dashboard", hidden: false, gid: 1 },
+    { name: "Lead & Sales Tracker", hidden: false, gid: 2 },
+    { name: "Lead Tracker Filter", hidden: true, gid: 3 },
+    { name: "Performance Tracker", hidden: false, gid: 4 },
+    { name: "Performance Tracker Filter", hidden: false, gid: 5 },
+    { name: "KPI Indicator", hidden: false, gid: 6 },
+  ];
+
+  it("applies include/exclude rules in sheet order", () => {
+    expect(pickTab(tabs, TAB_RULES.performance)).toBe("Performance Tracker");
+    expect(pickTab(tabs, TAB_RULES.lead)).toBe("Lead & Sales Tracker");
+    expect(pickTab(tabs, TAB_RULES.kpi)).toBe("KPI Indicator");
+  });
+
+  it("pickPerformanceTab prefers the exact @brand tab", () => {
+    const brandTabs = [...tabs, { name: "Performance Tracker@Carress", hidden: false, gid: 7 }];
+    expect(pickPerformanceTab(brandTabs, "Carress")).toBe("Performance Tracker@Carress");
+    expect(pickPerformanceTab(brandTabs)).toBe("Performance Tracker");
+  });
+});
+
+describe("lead tracker Est.Show Up collision (regression)", () => {
+  it("reads Showed Up from the actuals column when an Est column sits beside it", () => {
+    const csv = `Date,Source,Status,Name,Phone,x,x,x,x,x,Appt Person,Sales Person,x,Appointment Date,Appt Time,x,Remarks,Est.Show Up,Showed Up,x,x,x,x,x,Purchase Date,x,x,Sales
+01/01/2026,FB,New,John,012,x,x,x,x,x,Ali,Ben,x,15/03/2026,10am,x,x,Yes,No,x,x,x,x,x,,x,x,0`;
+    const leads = parseLeadSalesCSV(csv);
+    expect(leads[0].showed_up).toBe(false); // actuals says No; the Est "Yes" must not leak in
+  });
+
+  it("single Showed Up column shape is unaffected", () => {
+    const leads = parseLeadSalesCSV(leadCSV);
+    expect(leads[0].showed_up).toBe(false);
+    expect(leads[1].showed_up).toBe(true);
   });
 });
 
