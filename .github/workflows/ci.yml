@@ -35,5 +35,4 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
-          GOOGLE_SHEETS_API_KEY: placeholder
         run: npx next build

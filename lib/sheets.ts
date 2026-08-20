@@ -1,7 +1,14 @@
 import type { DailyMetric, Lead, KPIConfig } from "./types";
+import { getSheetsAccessToken } from "./google-auth";
 
-const API_KEY = process.env.GOOGLE_SHEETS_API_KEY || "";
 const SHEETS_API = "https://sheets.googleapis.com/v4/spreadsheets";
+
+/** Reads authenticate as the service account so client sheets can stay
+ *  private ("anyone with the link" is no longer required). Kept on plain
+ *  fetch() to preserve Next's data cache + sheet:${id} tag invalidation. */
+async function authHeaders(): Promise<HeadersInit> {
+  return { Authorization: `Bearer ${await getSheetsAccessToken()}` };
+}
 
 // ── Google Sheets API helpers ──────────────────────────────────
 
@@ -12,8 +19,8 @@ interface SheetTab {
 }
 
 export async function listSheetTabs(sheetId: string): Promise<SheetTab[]> {
-  const url = `${SHEETS_API}/${sheetId}?key=${API_KEY}&fields=sheets.properties`;
-  const res = await fetch(url, { next: { revalidate: 300, tags: [`sheet:${sheetId}`] } });
+  const url = `${SHEETS_API}/${sheetId}?fields=sheets.properties`;
+  const res = await fetch(url, { headers: await authHeaders(), next: { revalidate: 300, tags: [`sheet:${sheetId}`] } });
   if (!res.ok) throw new Error(`Failed to list tabs: ${res.status}`);
   const data = await res.json();
   return (data.sheets || []).map((s: { properties: { title: string; hidden?: boolean; sheetId: number } }) => ({
@@ -24,8 +31,8 @@ export async function listSheetTabs(sheetId: string): Promise<SheetTab[]> {
 }
 
 export async function fetchSheetData(sheetId: string, tabName: string): Promise<string[][]> {
-  const url = `${SHEETS_API}/${sheetId}/values/${encodeURIComponent(tabName)}?key=${API_KEY}&valueRenderOption=FORMATTED_VALUE`;
-  const res = await fetch(url, { next: { revalidate: 300, tags: [`sheet:${sheetId}`] } });
+  const url = `${SHEETS_API}/${sheetId}/values/${encodeURIComponent(tabName)}?valueRenderOption=FORMATTED_VALUE`;
+  const res = await fetch(url, { headers: await authHeaders(), next: { revalidate: 300, tags: [`sheet:${sheetId}`] } });
   if (!res.ok) throw new Error(`Failed to fetch tab "${tabName}": ${res.status}`);
   const data = await res.json();
   return data.values || [];
@@ -41,8 +48,8 @@ export async function fetchSheetData(sheetId: string, tabName: string): Promise<
  */
 export async function getDataFetchedAt(sheetId: string): Promise<number | null> {
   try {
-    const url = `${SHEETS_API}/${sheetId}?key=${API_KEY}&fields=spreadsheetId`;
-    const res = await fetch(url, { next: { revalidate: 300, tags: [`sheet:${sheetId}`] } });
+    const url = `${SHEETS_API}/${sheetId}?fields=spreadsheetId`;
+    const res = await fetch(url, { headers: await authHeaders(), next: { revalidate: 300, tags: [`sheet:${sheetId}`] } });
     if (!res.ok) return null;
     const dateHeader = res.headers.get("date");
     if (!dateHeader) return null;
