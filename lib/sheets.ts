@@ -12,7 +12,7 @@ async function authHeaders(): Promise<HeadersInit> {
 
 // ── Google Sheets API helpers ──────────────────────────────────
 
-interface SheetTab {
+export interface SheetTab {
   name: string;
   hidden: boolean;
   gid: number;
@@ -61,31 +61,50 @@ export async function getDataFetchedAt(sheetId: string): Promise<number | null> 
 }
 
 // ── Tab auto-discovery ─────────────────────────────────────────
+//
+// Match rules are data (TAB_RULES) and selection is a pure function (pickTab)
+// so the diagnostics page can show which tabs were candidates and which won,
+// using the exact same rules the fetchers use.
 
-async function findTab(sheetId: string, includes: string[], excludes: string[] = []): Promise<string | null> {
-  const tabs = await listSheetTabs(sheetId);
+export interface TabRule {
+  includes: string[];
+  excludes: string[];
+}
+
+export const TAB_RULES = {
+  performance: { includes: ["performance tracker"], excludes: ["filter"] },
+  lead: { includes: ["lead"], excludes: ["filter"] },
+  kpi: { includes: ["kpi"], excludes: [] },
+  orderItems: { includes: ["order items"], excludes: [] },
+} satisfies Record<string, TabRule>;
+
+/** First tab matching the rule, in sheet order. Hidden tabs are NOT excluded. */
+export function pickTab(tabs: SheetTab[], rule: TabRule): string | null {
   const match = tabs.find((t) =>
-    includes.every((kw) => t.name.toLowerCase().includes(kw.toLowerCase())) &&
-    !excludes.some((kw) => t.name.toLowerCase().includes(kw.toLowerCase()))
+    rule.includes.every((kw) => t.name.toLowerCase().includes(kw.toLowerCase())) &&
+    !rule.excludes.some((kw) => t.name.toLowerCase().includes(kw.toLowerCase()))
   );
   return match?.name ?? null;
 }
 
-async function findPerformanceTab(sheetId: string, brandName?: string): Promise<string | null> {
+export function pickPerformanceTab(tabs: SheetTab[], brandName?: string): string | null {
   if (brandName) {
-    const tabs = await listSheetTabs(sheetId);
     const exact = tabs.find((t) => t.name.toLowerCase() === `performance tracker@${brandName.toLowerCase()}`);
     if (exact) return exact.name;
   }
-  return findTab(sheetId, ["performance tracker"], ["filter"]);
+  return pickTab(tabs, TAB_RULES.performance);
+}
+
+async function findPerformanceTab(sheetId: string, brandName?: string): Promise<string | null> {
+  return pickPerformanceTab(await listSheetTabs(sheetId), brandName);
 }
 
 async function findLeadSalesTab(sheetId: string): Promise<string | null> {
-  return findTab(sheetId, ["lead"], ["filter"]);
+  return pickTab(await listSheetTabs(sheetId), TAB_RULES.lead);
 }
 
 async function findKPITab(sheetId: string): Promise<string | null> {
-  return findTab(sheetId, ["kpi"]);
+  return pickTab(await listSheetTabs(sheetId), TAB_RULES.kpi);
 }
 
 // ── Value parsers ──────────────────────────────────────────────
@@ -150,8 +169,12 @@ export function parseCSVLine(line: string): string[] {
 }
 
 // ── Header-based column detection ──────────────────────────────
+//
+// All matching rules live in PERF_COL_RULES and are executed only by
+// diagnosePerfColumns — the dashboard's column map and the diagnostics page
+// both project from the same result, so they can never disagree.
 
-interface PerfColumnMap {
+export interface PerfColumnMap {
   date: number;
   adSpend: number;
   leadFunnelSpend: number | null;
@@ -165,47 +188,144 @@ interface PerfColumnMap {
   sales: number;
 }
 
-function findCol(headers: string[], keywords: string[], exclude: string[] = []): number | null {
+export interface ColMatch {
+  index: number;
+  header: string; // original casing, newlines collapsed — for display
+}
+
+/** All columns matching a keyword set, in sheet order. First one wins. */
+function findColAll(headers: string[], keywords: string[], exclude: string[] = []): ColMatch[] {
+  const out: ColMatch[] = [];
   for (let ci = 0; ci < headers.length; ci++) {
-    const h = (headers[ci] || "").toLowerCase().replace(/\n/g, " ");
+    const raw = (headers[ci] || "").replace(/\n/g, " ");
+    const h = raw.toLowerCase();
     if (keywords.some((kw) => h.includes(kw)) && !exclude.some((ex) => h.includes(ex))) {
-      return ci;
+      out.push({ index: ci, header: raw.trim() });
     }
   }
-  return null;
+  return out;
+}
+
+interface ColAttempt { keywords: string[]; exclude?: string[] }
+interface ColRule { attempts: ColAttempt[]; fallback: number | null }
+
+// Ordered attempts per metric; a later attempt runs only when the earlier one
+// matched nothing. `fallback` is the legacy hardcoded column position used
+// when no header matches at all (surfaced as usedFallback in diagnostics).
+const PERF_COL_RULES: Record<keyof PerfColumnMap, ColRule> = {
+  date: { attempts: [{ keywords: ["date"] }], fallback: 0 },
+  adSpend: { attempts: [{ keywords: ["taxed ad spend"] }], fallback: 1 },
+  leadFunnelSpend: { attempts: [{ keywords: ["lead funnel"] }], fallback: null },
+  brandingSpend: { attempts: [{ keywords: ["branding"] }], fallback: null },
+  // "pm" alone also matches "Cost Per PM (Included 8% SST)" — exclude it so the
+  // per-lead cost column can never be mistaken for the lead count. On every
+  // known sheet the PM column precedes Cost Per PM, so the chosen index is
+  // unchanged; this only removes the false second match.
+  inquiry: { attempts: [{ keywords: ["pm"], exclude: ["cost per"] }], fallback: 5 },
+  contact: { attempts: [{ keywords: ["contact", "showroom", "visit"], exclude: ["rate"] }], fallback: 7 },
+  appointment: { attempts: [{ keywords: ["appointment"], exclude: ["rate", "tracker"] }], fallback: null },
+  estShowup: {
+    attempts: [{ keywords: ["est.show up", "est show up", "est. show up", "estimated show up"], exclude: ["rate"] }],
+    fallback: null,
+  },
+  // "Est.Show Up" contains the substring "show up", so a bare substring match
+  // stops on the estimate column and never reaches the actuals column beside
+  // it. Match the distinct "showed up" wording first and exclude "est" so the
+  // estimate can never be mistaken for the actual. Sheets that only have one
+  // column ("Showed Up", no estimate) still resolve through the same branch.
+  showup: {
+    attempts: [
+      { keywords: ["showed up"], exclude: ["rate", "est"] },
+      { keywords: ["show up"], exclude: ["rate", "est"] },
+    ],
+    fallback: null,
+  },
+  orders: {
+    attempts: [
+      { keywords: ["order count"] },
+      { keywords: ["order"], exclude: ["rate", "tracker", "new", "repeat", "upsell"] },
+    ],
+    fallback: 14,
+  },
+  sales: { attempts: [{ keywords: ["total sales"] }], fallback: 18 },
+};
+
+export interface ColumnDiagnostic {
+  metric: keyof PerfColumnMap;
+  index: number | null;
+  header: string | null; // header text of the chosen column (null if fallback/missing)
+  matches: ColMatch[]; // every column the winning attempt matched
+  // Ambiguous = the rule matched columns with DIFFERENT header text (the
+  // "Est.Show Up" vs "Showed Up" class of bug). Identical-text duplicates
+  // (e.g. the ROAS section repeats "Date" / "Taxed Ad Spend" on every sheet)
+  // are normal layout and not flagged, though they stay visible in `matches`.
+  ambiguous: boolean;
+  usedFallback: boolean; // no header matched; positional legacy fallback used
+}
+
+export interface PerfDiagnosis {
+  columns: ColumnDiagnostic[];
+  colMap: PerfColumnMap;
+  headers: string[]; // merged multi-row headers, original casing
+}
+
+export function diagnosePerfColumns(rows: string[][]): PerfDiagnosis {
+  // Merge first 3 rows to build a flat header (some headers span multiple rows).
+  // `merged` reproduces the legacy matching input byte-for-byte (it can absorb
+  // the first data row when a sheet has fewer than 3 header rows — harmless for
+  // substring matching). `display` skips rows that start with a date so the
+  // diagnostics page shows clean header text.
+  // Display skips data rows (first cell parses as a date) AND sparse section
+  // rows ("Lead Tracker" / "ROAS Tracker" group labels with only a few cells) —
+  // otherwise "Taxed Ad Spend" shows as "Lead Tracker Taxed Ad Spend" and
+  // identical-text duplicate detection breaks.
+  const headRows = Array.from({ length: Math.min(3, rows.length) }, (_, ri) => ri);
+  const nonEmpty = headRows.map((ri) => (rows[ri] || []).filter((c) => c?.trim()).length);
+  const maxNonEmpty = Math.max(1, ...nonEmpty);
+  const displayRow = (ri: number) => !parseDate(rows[ri]?.[0]) && nonEmpty[ri] >= maxNonEmpty / 2;
+
+  const merged: string[] = [];
+  const display: string[] = [];
+  for (let ci = 0; ci < 30; ci++) {
+    const matchParts: string[] = [];
+    const displayParts: string[] = [];
+    for (const ri of headRows) {
+      const cell = rows[ri]?.[ci]?.trim();
+      if (!cell) continue;
+      matchParts.push(cell);
+      if (displayRow(ri)) displayParts.push(cell);
+    }
+    merged[ci] = matchParts.join(" ");
+    display[ci] = displayParts.join(" ").replace(/\n/g, " ").trim();
+  }
+
+  const columns: ColumnDiagnostic[] = [];
+  const colMap = {} as Record<keyof PerfColumnMap, number | null>;
+  for (const metric of Object.keys(PERF_COL_RULES) as (keyof PerfColumnMap)[]) {
+    const rule = PERF_COL_RULES[metric];
+    let matches: ColMatch[] = [];
+    for (const attempt of rule.attempts) {
+      matches = findColAll(merged, attempt.keywords, attempt.exclude ?? []);
+      if (matches.length > 0) break;
+    }
+    matches = matches.map((m) => ({ index: m.index, header: display[m.index] || m.header }));
+    const found = matches[0]?.index ?? null;
+    const distinctHeaders = new Set(matches.map((m) => m.header.toLowerCase().trim()));
+    columns.push({
+      metric,
+      index: found ?? rule.fallback,
+      header: found !== null ? matches[0].header : null,
+      matches,
+      ambiguous: distinctHeaders.size >= 2,
+      usedFallback: found === null && rule.fallback !== null,
+    });
+    colMap[metric] = found ?? rule.fallback;
+  }
+  return { columns, colMap: colMap as PerfColumnMap, headers: display };
 }
 
 function detectPerfColumns(rows: string[][]): PerfColumnMap {
-  // Merge first 3 rows to build a flat header (some headers span multiple rows)
-  const merged: string[] = [];
-  for (let ci = 0; ci < 30; ci++) {
-    const parts: string[] = [];
-    for (let ri = 0; ri < Math.min(3, rows.length); ri++) {
-      if (rows[ri]?.[ci]?.trim()) parts.push(rows[ri][ci].trim());
-    }
-    merged[ci] = parts.join(" ").toLowerCase();
-  }
-
-  return {
-    date: findCol(merged, ["date"]) ?? 0,
-    adSpend: findCol(merged, ["taxed ad spend"]) ?? 1,
-    leadFunnelSpend: findCol(merged, ["lead funnel"]),
-    brandingSpend: findCol(merged, ["branding"]),
-    inquiry: findCol(merged, ["pm"]) ?? 5,
-    contact: findCol(merged, ["contact", "showroom", "visit"], ["rate"]) ?? 7,
-    appointment: findCol(merged, ["appointment"], ["rate", "tracker"]),
-    estShowup: findCol(merged, ["est.show up", "est show up", "est. show up", "estimated show up"], ["rate"]),
-    // "Est.Show Up" contains the substring "show up", so a bare substring match
-    // stops on the estimate column and never reaches the actuals column beside
-    // it. Match the distinct "showed up" wording first and exclude "est" so the
-    // estimate can never be mistaken for the actual. Sheets that only have one
-    // column ("Showed Up", no estimate) still resolve through the same branch.
-    showup:
-      findCol(merged, ["showed up"], ["rate", "est"]) ??
-      findCol(merged, ["show up"], ["rate", "est"]),
-    orders: findCol(merged, ["order count"]) ?? findCol(merged, ["order"], ["rate", "tracker", "new", "repeat", "upsell"]) ?? 14,
-    sales: findCol(merged, ["total sales"]) ?? 18,
-  };
+  return diagnosePerfColumns(rows).colMap;
 }
 
 /** Detect funnel type from performance tracker headers */
@@ -261,6 +381,12 @@ interface LeadColumnMap {
 
 function detectLeadColumns(header: string[]): LeadColumnMap {
   const h = header.map((v) => (v || "").toLowerCase().replace(/\n/g, " "));
+  // Same collision as the Performance Tracker's showup rule: "Est.Show Up"
+  // contains "show up", so prefer the distinct "showed up" wording and never
+  // accept an "est" column as the actuals.
+  const showedUpExact = h.findIndex((v) => v.includes("showed up") && !v.includes("est"));
+  const showedUpLoose = h.findIndex((v) => v.includes("show up") && !v.includes("est"));
+  const showedUpIdx = showedUpExact >= 0 ? showedUpExact : showedUpLoose;
   return {
     date: h.findIndex((v) => v.includes("date") && !v.includes("appointment") && !v.includes("purchase") && !v.includes("week")) >= 0
       ? h.findIndex((v) => v.includes("date") && !v.includes("appointment") && !v.includes("purchase") && !v.includes("week"))
@@ -271,8 +397,7 @@ function detectLeadColumns(header: string[]): LeadColumnMap {
       ? h.findIndex((v) => v.includes("sales person")) : null,
     appointmentDate: h.findIndex((v) => v.includes("appointment") && v.includes("date")) >= 0
       ? h.findIndex((v) => v.includes("appointment") && v.includes("date")) : null,
-    showedUp: h.findIndex((v) => v.includes("showed up") || v.includes("show up")) >= 0
-      ? h.findIndex((v) => v.includes("showed up") || v.includes("show up")) : null,
+    showedUp: showedUpIdx >= 0 ? showedUpIdx : null,
     purchaseDate: h.findIndex((v) => v.includes("purchase") && v.includes("date")) >= 0
       ? h.findIndex((v) => v.includes("purchase") && v.includes("date")) : null,
     sales: h.findIndex((v) => v === "sales" || (v.includes("sales") && !v.includes("person") && !v.includes("new") && !v.includes("repeat") && !v.includes("total"))) >= 0
@@ -694,7 +819,7 @@ export async function fetchDerivedKPI(sheetId: string, brandName?: string): Prom
 
 // ── KPI Cell Address Discovery (for write-back) ─────────────
 
-function colToLetter(col: number): string {
+export function colToLetter(col: number): string {
   let s = "";
   let c = col;
   while (c >= 0) {
@@ -864,9 +989,44 @@ export async function writeKPIValues(
 
 // ── Public API ─────────────────────────────────────────────────
 
+/**
+ * Whether the Performance Tracker actually has a column for each
+ * appointment-stage metric. Untracked (column missing) must render as
+ * "not tracked" in the UI, never as 0 — a sheet without an Est.Show Up
+ * column is not reporting zero estimated show-ups.
+ */
+export interface TrackedMetrics {
+  appointment: boolean;
+  est_showup: boolean;
+  showup: boolean;
+}
+
+export function deriveTracked(colMap: PerfColumnMap): TrackedMetrics {
+  return {
+    appointment: colMap.appointment !== null,
+    est_showup: colMap.estShowup !== null,
+    showup: colMap.showup !== null,
+  };
+}
+
+/**
+ * Multi-brand Overall merges with OR: "not tracked" promises NO brand has the
+ * column. If only some brands track a metric the Overall total is partial —
+ * the diagnostics page surfaces that per-brand; the dashboard still shows the
+ * number rather than mislabeling real data as untracked.
+ */
+export function mergeTracked(a: TrackedMetrics, b: TrackedMetrics): TrackedMetrics {
+  return {
+    appointment: a.appointment || b.appointment,
+    est_showup: a.est_showup || b.est_showup,
+    showup: a.showup || b.showup,
+  };
+}
+
 export interface PerfResult {
   data: DailyMetric[];
   funnelType: "appointment" | "walkin";
+  tracked: TrackedMetrics;
 }
 
 export async function fetchPerformanceData(sheetId: string, brandName?: string): Promise<PerfResult> {
@@ -882,10 +1042,12 @@ export async function fetchPerformanceData(sheetId: string, brandName?: string):
       // Multi-brand Overall: merge all performance tabs
       let allData: DailyMetric[] = [];
       let funnelType: "appointment" | "walkin" = "appointment";
+      let tracked: TrackedMetrics = { appointment: false, est_showup: false, showup: false };
       for (const tab of perfTabs) {
         const rows = await fetchSheetData(sheetId, tab.name);
         const colMap = detectPerfColumns(rows);
         funnelType = detectFunnelTypeFromColumns(colMap);
+        tracked = mergeTracked(tracked, deriveTracked(colMap));
         allData = allData.concat(parsePerformanceRows(rows));
       }
       // Merge by date: sum metrics for the same date across brands
@@ -908,7 +1070,7 @@ export async function fetchPerformanceData(sheetId: string, brandName?: string):
           byDate.set(key, { ...row });
         }
       }
-      return { data: Array.from(byDate.values()).sort((a, b) => a.date.getTime() - b.date.getTime()), funnelType };
+      return { data: Array.from(byDate.values()).sort((a, b) => a.date.getTime() - b.date.getTime()), funnelType, tracked };
     }
   }
 
@@ -919,6 +1081,7 @@ export async function fetchPerformanceData(sheetId: string, brandName?: string):
   return {
     data: parsePerformanceRows(rows),
     funnelType: detectFunnelTypeFromColumns(colMap),
+    tracked: deriveTracked(colMap),
   };
 }
 
@@ -1206,7 +1369,7 @@ export function filterOrderItemsByDate(
 }
 
 async function findOrderItemsTab(sheetId: string): Promise<string | null> {
-  return findTab(sheetId, ["order items"]);
+  return pickTab(await listSheetTabs(sheetId), TAB_RULES.orderItems);
 }
 
 /**
