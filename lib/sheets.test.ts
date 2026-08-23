@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   parsePerformanceCSV, parseLeadSalesCSV, countEstShowUp, parseCSVLine,
   diagnosePerfColumns, deriveTracked, mergeTracked, pickTab, pickPerformanceTab, TAB_RULES,
+  buildPersonData,
 } from "./sheets";
 
 const csvToRows = (csv: string) => csv.trim().split("\n").map((line) => parseCSVLine(line));
@@ -274,6 +275,55 @@ describe("lead tracker Est.Show Up collision (regression)", () => {
     const leads = parseLeadSalesCSV(leadCSV);
     expect(leads[0].showed_up).toBe(false);
     expect(leads[1].showed_up).toBe(true);
+  });
+});
+
+describe("buildPersonData source filter", () => {
+  // Rygis-like shape: Source at col 1, Sales Person col 3, all leads in Aug 2026
+  const csv = `Date,Source,Name,Sales Person,Appointment Date,Showed Up,Purchase Date,Sales
+01/08/2026,Facebook,A,Ali,02/08/2026,Yes,03/08/2026,RM100
+02/08/2026,Instagram,B,Ali,03/08/2026,Yes,,0
+03/08/2026,Walk In,C,Ali,04/08/2026,Yes,05/08/2026,RM300
+04/08/2026,facebook,D,Ben,05/08/2026,No,,0
+05/08/2026,,E,Ben,06/08/2026,No,,0`;
+  const rows = csv.trim().split("\n").map(parseCSVLine);
+  const start = new Date(2026, 7, 1);
+  const end = new Date(2026, 7, 31);
+
+  it("enumerates available sources by frequency with original labels", () => {
+    const d = buildPersonData(rows, start, end);
+    expect(d.availableSources[0]).toBe("Facebook"); // 2 hits (case-insensitive merge)
+    expect(d.availableSources).toContain("Instagram");
+    expect(d.availableSources).toContain("Walk In");
+    expect(d.availableSources).toHaveLength(3); // empty source not listed
+  });
+
+  it("unfiltered aggregation counts every row", () => {
+    const d = buildPersonData(rows, start, end);
+    const ali = d.salesPersons.find((p) => p.name === "Ali")!;
+    expect(ali.orders).toBe(2); // FB + Walk In purchases
+    expect(ali.sales).toBe(400);
+  });
+
+  it("filters by selected sources, case-insensitively", () => {
+    const d = buildPersonData(rows, start, end, undefined, ["Facebook", "Instagram"]);
+    const ali = d.salesPersons.find((p) => p.name === "Ali")!;
+    expect(ali.orders).toBe(1); // Walk In purchase excluded
+    expect(ali.sales).toBe(100);
+    const ben = d.salesPersons.find((p) => p.name === "Ben");
+    expect(ben).toBeDefined(); // lowercase "facebook" row still matches
+  });
+
+  it("rows with an empty Source are excluded when filtering", () => {
+    const d = buildPersonData(rows, start, end, undefined, ["Facebook"]);
+    // Ben's only FB row has showed_up=No; his empty-source row must not count
+    const ben = d.salesPersons.find((p) => p.name === "Ben")!;
+    expect(ben.appointment).toBe(1);
+  });
+
+  it("available sources are enumerated before filtering (options never shrink)", () => {
+    const d = buildPersonData(rows, start, end, undefined, ["Facebook"]);
+    expect(d.availableSources).toHaveLength(3);
   });
 });
 

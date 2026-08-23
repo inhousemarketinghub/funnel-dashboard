@@ -65,9 +65,16 @@ export default async function DashboardPage({
   // "Overall" or no selection = no brand filter (aggregate all)
   const selectedBrand = brandParam && brandParam !== "Overall" ? brandParam : brands.length === 1 ? brands[0] : undefined;
 
+  // Person-performance source filter: ?source=Facebook,Instagram (comma-joined).
+  // Only the team section consumes this — funnel cards stay untouched.
+  const sourceParam = Array.isArray(sp.source) ? sp.source[0] : sp.source;
+  const selectedSources = sourceParam
+    ? sourceParam.split(",").map((s) => s.trim()).filter(Boolean)
+    : undefined;
+
   let perfResult: PerfResult = { data: [], funnelType: "appointment", tracked: { appointment: true, est_showup: true, showup: true } };
   let sheetKPI: KPIConfig | null = null;
-  let personData: PersonData = { appointmentPersons: [], salesPersons: [], brandBreakdowns: {} };
+  let personData: PersonData = { appointmentPersons: [], salesPersons: [], brandBreakdowns: {}, availableSources: [] };
   // Brand Performance follows the date range only (not the brand selector); resilient to absent tab.
   let brandPerformance: BrandPerformanceData | null = null;
   // When the cached sheet data was last pulled from Google (for the refresh button label).
@@ -77,7 +84,7 @@ export default async function DashboardPage({
     [perfResult, sheetKPI, personData, brandPerformance, fetchedAt] = await Promise.all([
       fetchPerformanceData(client.sheet_id, selectedBrand),
       fetchKPIData(client.sheet_id, selectedBrand),
-      fetchPersonData(client.sheet_id, reportStart, reportEnd, selectedBrand),
+      fetchPersonData(client.sheet_id, reportStart, reportEnd, selectedBrand, selectedSources),
       fetchBrandPerformance(client.sheet_id, reportStart, reportEnd),
       getDataFetchedAt(client.sheet_id),
     ]);
@@ -319,6 +326,8 @@ export default async function DashboardPage({
               hasMultiBrand={brands.length > 1}
               funnelType={detectedFunnelType}
               lang={lang}
+              clientId={clientId}
+              availableSources={personData.availableSources}
             />
           </div>
         </CardReveal>

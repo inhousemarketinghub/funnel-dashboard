@@ -374,6 +374,7 @@ export function parsePerformanceCSV(csv: string): DailyMetric[] {
 
 interface LeadColumnMap {
   date: number;
+  source: number | null;
   appointmentPerson: number | null;
   salesPerson: number | null;
   appointmentDate: number | null;
@@ -391,7 +392,9 @@ function detectLeadColumns(header: string[]): LeadColumnMap {
   const showedUpExact = h.findIndex((v) => v.includes("showed up") && !v.includes("est"));
   const showedUpLoose = h.findIndex((v) => v.includes("show up") && !v.includes("est"));
   const showedUpIdx = showedUpExact >= 0 ? showedUpExact : showedUpLoose;
+  const sourceIdx = h.findIndex((v) => v.includes("source"));
   return {
+    source: sourceIdx >= 0 ? sourceIdx : null,
     date: h.findIndex((v) => v.includes("date") && !v.includes("appointment") && !v.includes("purchase") && !v.includes("week")) >= 0
       ? h.findIndex((v) => v.includes("date") && !v.includes("appointment") && !v.includes("purchase") && !v.includes("week"))
       : 0,
@@ -462,6 +465,9 @@ export interface PersonData {
   appointmentPersons: ApptPersonMetrics[];
   salesPersons: SalesPersonMetrics[];
   brandBreakdowns: Record<string, BrandSalesBreakdown[]>;
+  /** Distinct Source values present in the lead tab (before source filtering),
+   *  most frequent first — feeds the person-performance source filter. */
+  availableSources: string[];
 }
 
 function aggregateApptPersons(
@@ -1127,11 +1133,18 @@ export interface BrandSalesBreakdown {
   sales: number;
 }
 
-export async function fetchPersonData(sheetId: string, startDate?: Date, endDate?: Date, brandName?: string): Promise<PersonData> {
+const EMPTY_PERSON_DATA: PersonData = { appointmentPersons: [], salesPersons: [], brandBreakdowns: {}, availableSources: [] };
+
+export async function fetchPersonData(sheetId: string, startDate?: Date, endDate?: Date, brandName?: string, sources?: string[]): Promise<PersonData> {
   const tabName = await findLeadSalesTab(sheetId);
-  if (!tabName) return { appointmentPersons: [], salesPersons: [], brandBreakdowns: {} };
+  if (!tabName) return EMPTY_PERSON_DATA;
   const rows = await fetchSheetData(sheetId, tabName);
-  if (rows.length < 2) return { appointmentPersons: [], salesPersons: [], brandBreakdowns: {} };
+  return buildPersonData(rows, startDate, endDate, brandName, sources);
+}
+
+/** Pure assembly over raw lead-tab rows — exported for tests. */
+export function buildPersonData(rows: string[][], startDate?: Date, endDate?: Date, brandName?: string, sources?: string[]): PersonData {
+  if (rows.length < 2) return EMPTY_PERSON_DATA;
 
   const colMap = detectLeadColumns(rows[0]);
 
@@ -1140,6 +1153,31 @@ export async function fetchPersonData(sheetId: string, startDate?: Date, endDate
   if (brandName && colMap.brand !== null) {
     filteredRows = [rows[0], ...rows.slice(1).filter(cols =>
       (cols[colMap.brand!] || "").toLowerCase().trim() === brandName.toLowerCase()
+    )];
+  }
+
+  // Enumerate sources BEFORE source filtering so the filter UI always shows
+  // every option; count by frequency so the common ones (FB/IG/…) come first.
+  let availableSources: string[] = [];
+  if (colMap.source !== null) {
+    const freq = new Map<string, { label: string; n: number }>();
+    for (let i = 1; i < filteredRows.length; i++) {
+      const raw = (filteredRows[i][colMap.source] || "").trim();
+      if (!raw) continue;
+      const key = raw.toLowerCase();
+      const e = freq.get(key);
+      if (e) e.n++;
+      else freq.set(key, { label: raw, n: 1 });
+    }
+    availableSources = [...freq.values()].sort((a, b) => b.n - a.n).map((e) => e.label);
+  }
+
+  // Source filter: keep rows whose Source matches any selected value
+  // (case-insensitive). Rows with an empty Source are unattributed → excluded.
+  if (sources && sources.length > 0 && colMap.source !== null) {
+    const wanted = new Set(sources.map((s) => s.toLowerCase().trim()));
+    filteredRows = [filteredRows[0], ...filteredRows.slice(1).filter(cols =>
+      wanted.has((cols[colMap.source!] || "").toLowerCase().trim())
     )];
   }
 
@@ -1180,7 +1218,7 @@ export async function fetchPersonData(sheetId: string, startDate?: Date, endDate
     }
   }
 
-  return { appointmentPersons, salesPersons, brandBreakdowns };
+  return { appointmentPersons, salesPersons, brandBreakdowns, availableSources };
 }
 
 export async function fetchKPIData(sheetId: string, brandName?: string): Promise<KPIConfig | null> {

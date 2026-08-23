@@ -202,6 +202,8 @@ export function MobileDashboard({
               hasMultiBrand={hasMultiBrand}
               funnelType={funnelType}
               lang={lang}
+              clientId={clientId}
+              availableSources={personData.availableSources}
             />
           </div>
         )}
