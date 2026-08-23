@@ -6,6 +6,7 @@ import type { KPIConfig } from "@/lib/types";
 import { fmtRM } from "@/lib/utils";
 import { t, type Lang } from "@/lib/i18n";
 import { DonutChart, Metric } from "./breakdown-donut";
+import { SourceFilter } from "./source-filter";
 
 interface Props {
   appointmentPersons: ApptPersonMetrics[];
@@ -15,9 +16,12 @@ interface Props {
   hasMultiBrand?: boolean;
   funnelType?: string;
   lang?: Lang;
+  /** Enable the source filter dropdown (needs the route to rebuild on ?source=) */
+  clientId?: string;
+  availableSources?: string[];
 }
 
-export function PersonPerformance({ appointmentPersons, salesPersons, kpi, brandBreakdowns = {}, hasMultiBrand = false, funnelType = "appointment", lang = "en" }: Props) {
+export function PersonPerformance({ appointmentPersons, salesPersons, kpi, brandBreakdowns = {}, hasMultiBrand = false, funnelType = "appointment", lang = "en", clientId, availableSources = [] }: Props) {
   const [selectedAppt, setSelectedAppt] = useState("all");
   const [selectedSales, setSelectedSales] = useState("all");
   const isWalkin = funnelType === "walkin";
@@ -71,6 +75,12 @@ export function PersonPerformance({ appointmentPersons, salesPersons, kpi, brand
 
   return (
     <div>
+      {/* Source filter — URL-driven, so the server re-aggregates on change */}
+      {clientId && availableSources.length > 0 && (
+        <div className="flex justify-end mb-3 -mt-1">
+          <SourceFilter clientId={clientId} availableSources={availableSources} lang={lang} />
+        </div>
+      )}
       {/* ── Appointment Setter Section ── */}
       {hasAppt && (
         <div className="mb-8">

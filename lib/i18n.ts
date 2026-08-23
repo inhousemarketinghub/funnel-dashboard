@@ -115,6 +115,8 @@ const D: Dict = {
   diagnostics: { en: "Diagnostics", zh: "数据诊断" },
   notTracked: { en: "Not tracked", zh: "未追踪" },
   notTrackedHint: { en: "Column missing in Performance Tracker", zh: "Performance Tracker 缺少该列" },
+  source: { en: "Source", zh: "来源" },
+  allSources: { en: "All sources", zh: "全部来源" },
   signOut: { en: "Sign Out", zh: "登出" },
   trends: { en: "Trends", zh: "趋势" },
   theme: { en: "Theme", zh: "主题" },
