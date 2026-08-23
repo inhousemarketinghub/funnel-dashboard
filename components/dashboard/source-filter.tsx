@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { t, type Lang } from "@/lib/i18n";
 import {
   DropdownMenu,
@@ -31,15 +31,24 @@ export function SourceFilter({ clientId, availableSources, lang = "en" }: Props)
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
 
-  if (availableSources.length === 0) return null;
-
   const raw = searchParams.get("source") || "";
-  const selected = new Set(
+  // Optimistic selection: checkmarks must flip the instant the user clicks.
+  // The URL only commits AFTER the server re-renders the whole page (sheet
+  // fetches included — seconds), and a menu that shows nothing for seconds
+  // reads as broken. `optimistic` is keyed to the raw param it was derived
+  // from: the moment a navigation commits (raw changes), it self-invalidates
+  // and the URL becomes the source of truth again. No effects needed.
+  const [optimistic, setOptimistic] = useState<{ raw: string; sel: Set<string> } | null>(null);
+  const urlSelected = new Set(
     raw.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean),
   );
+  const selected = optimistic && optimistic.raw === raw ? optimistic.sel : urlSelected;
   const allSelected = selected.size === 0; // no param = all sources
 
+  if (availableSources.length === 0) return null;
+
   function apply(next: Set<string>) {
+    setOptimistic({ raw, sel: next }); // instant visual feedback
     const params = new URLSearchParams(searchParams.toString());
     // Selecting everything (or nothing) = unfiltered → drop the param entirely
     if (next.size === 0 || next.size >= availableSources.length) {
