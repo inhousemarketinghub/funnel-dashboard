@@ -242,6 +242,26 @@ describe("pickTab", () => {
   });
 });
 
+describe("recruitment funnel orders column (Carress@BD shape)", () => {
+  it('resolves orders to "Signed Up", never the adjacent "Sign Up Rate"', () => {
+    const csv = `Date,Taxed Ad Spend,Lead Funnel,Branding,SST,PM,CPL,Contect Given,Appointment,Est.Show Up,Showed Up,,Appointment Rate,Show Up Rate,Sign Up Rate,Signed Up,Total Sales
+04/08/2026,RM100.00,90,10,8,5,20,3,2,1,1,,,,"50.00%",2,RM1200`;
+    const d = diagnosePerfColumns(csvToRows(csv));
+    const orders = d.columns.find((c) => c.metric === "orders")!;
+    expect(orders).toMatchObject({ index: 15, header: "Signed Up", usedFallback: false, ambiguous: false });
+    const rows = parsePerformanceCSV(csv);
+    expect(rows[0].orders).toBe(2); // not 5000 from parsing "50.00%"
+    expect(rows[0].sales).toBe(1200);
+  });
+
+  it("Order Counts still wins over Signed Up when both exist", () => {
+    const csv = `Date,Taxed Ad Spend,x,x,x,PM,x,Contect Given,Appointment,Showed Up,,Order Counts,Signed Up
+04/08/2026,RM100.00,,,,5,,3,2,1,,4,9`;
+    const d = diagnosePerfColumns(csvToRows(csv));
+    expect(d.columns.find((c) => c.metric === "orders")!.index).toBe(11);
+  });
+});
+
 describe("lead tracker Est.Show Up collision (regression)", () => {
   it("reads Showed Up from the actuals column when an Est column sits beside it", () => {
     const csv = `Date,Source,Status,Name,Phone,x,x,x,x,x,Appt Person,Sales Person,x,Appointment Date,Appt Time,x,Remarks,Est.Show Up,Showed Up,x,x,x,x,x,Purchase Date,x,x,Sales

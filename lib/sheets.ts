@@ -244,6 +244,10 @@ const PERF_COL_RULES: Record<keyof PerfColumnMap, ColRule> = {
     attempts: [
       { keywords: ["order count"] },
       { keywords: ["order"], exclude: ["rate", "tracker", "new", "repeat", "upsell"] },
+      // Recruitment funnels (Carress@BD) label the orders column "Signed Up".
+      // Without this the positional fallback landed on the adjacent "Sign Up
+      // Rate" percentage column and summed rates as counts.
+      { keywords: ["signed up"], exclude: ["rate", "fee"] },
     ],
     fallback: 14,
   },
