@@ -3,8 +3,11 @@ import { getUserRole, getProjectPermissions } from "@/lib/auth";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { syncClient, syncAllClients } from "@/lib/sync";
 
-// Sheet syncs can take a while across 8 clients × multiple tabs
-export const maxDuration = 300;
+// Sheet syncs take a while across 8 clients × multiple tabs. 60s is the
+// Hobby-plan ceiling; the daily cron sweeps all clients, and Phase 2 adds
+// staleness-triggered per-client syncs so intra-day freshness doesn't depend
+// on cron cadence at all.
+export const maxDuration = 60;
 
 // GET /api/sync — Vercel Cron entry. Requires CRON_SECRET to be configured;
 // refuses to run unauthenticated rather than being a public quota-burner.
