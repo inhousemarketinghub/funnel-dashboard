@@ -30,9 +30,14 @@ export async function listSheetTabs(sheetId: string): Promise<SheetTab[]> {
   }));
 }
 
-export async function fetchSheetData(sheetId: string, tabName: string): Promise<string[][]> {
+export async function fetchSheetData(sheetId: string, tabName: string, opts?: { fresh?: boolean }): Promise<string[][]> {
   const url = `${SHEETS_API}/${sheetId}/values/${encodeURIComponent(tabName)}?valueRenderOption=FORMATTED_VALUE`;
-  const res = await fetch(url, { headers: await authHeaders(), next: { revalidate: 300, tags: [`sheet:${sheetId}`] } });
+  // fresh: the sync engine must see Google's current state, not the 5-min page
+  // cache — its mirror IS the freshness layer the pages will read.
+  const res = await fetch(url, {
+    headers: await authHeaders(),
+    ...(opts?.fresh ? { cache: "no-store" as const } : { next: { revalidate: 300, tags: [`sheet:${sheetId}`] } }),
+  });
   if (!res.ok) throw new Error(`Failed to fetch tab "${tabName}": ${res.status}`);
   const data = await res.json();
   return data.values || [];
@@ -429,6 +434,64 @@ function parseLeadRows(rows: string[][]): Lead[] {
     });
   }
   return leads;
+}
+
+// ── Lead row extraction for the sync mirror ────────────────────
+
+/** One Lead & Sales Tracker row, only the fields the app aggregates — no lead
+ *  name/phone, deliberately (the DB must hold less PII than the sheet). */
+export interface SyncLeadRow {
+  brand: string;
+  lead_date: Date | null;
+  source: string;
+  appointment_person: string;
+  sales_person: string;
+  appointment_date: Date | null;
+  showed_up: boolean;
+  purchase_date: Date | null;
+  sales: number;
+}
+
+export interface LeadExtraction {
+  rows: SyncLeadRow[];
+  /** rows with content whose main date cell failed to parse */
+  quarantined: { rowIndex: number; reason: string; sample: Record<string, string> }[];
+}
+
+export function extractLeadRows(rows: string[][]): LeadExtraction {
+  if (rows.length < 2) return { rows: [], quarantined: [] };
+  const colMap = detectLeadColumns(rows[0]);
+  const out: SyncLeadRow[] = [];
+  const quarantined: LeadExtraction["quarantined"] = [];
+  for (let i = 1; i < rows.length; i++) {
+    const cols = rows[i];
+    if (!cols || cols.length < 5) continue;
+    const dateCell = (cols[colMap.date] || "").trim();
+    const person = ((colMap.salesPerson !== null ? cols[colMap.salesPerson] : "") || "").trim()
+      || ((colMap.appointmentPerson !== null ? cols[colMap.appointmentPerson] : "") || "").trim();
+    const source = ((colMap.source !== null ? cols[colMap.source] : "") || "").trim();
+    const leadDate = parseDate(dateCell);
+    if (!leadDate) {
+      // blank filler rows are normal; a row with a person/source but an
+      // unparseable date is data worth flagging, not silently dropping
+      if (dateCell && (person || source)) {
+        quarantined.push({ rowIndex: i + 1, reason: "unparseable_lead_date", sample: { date: dateCell } });
+      }
+      continue;
+    }
+    out.push({
+      brand: ((colMap.brand !== null ? cols[colMap.brand] : "") || "").trim(),
+      lead_date: leadDate,
+      source,
+      appointment_person: ((colMap.appointmentPerson !== null ? cols[colMap.appointmentPerson] : "") || "").trim(),
+      sales_person: ((colMap.salesPerson !== null ? cols[colMap.salesPerson] : "") || "").trim(),
+      appointment_date: colMap.appointmentDate !== null ? parseDate(cols[colMap.appointmentDate]) : null,
+      showed_up: colMap.showedUp !== null ? ["yes", "true"].includes((cols[colMap.showedUp] || "").toLowerCase()) : false,
+      purchase_date: colMap.purchaseDate !== null ? parseDate(cols[colMap.purchaseDate]) : null,
+      sales: colMap.sales !== null ? parseRM(cols[colMap.sales]) : 0,
+    });
+  }
+  return { rows: out, quarantined };
 }
 
 export function parseLeadSalesCSV(csv: string): Lead[] {
