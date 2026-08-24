@@ -24,4 +24,6 @@ export async function middleware(request: NextRequest) {
   return response;
 }
 
-export const config = { matcher: ["/((?!_next/static|_next/image|favicon.ico|login|auth).*)"] };
+// api/sync is exempt: Vercel Cron calls it without a session; the route guards
+// itself (CRON_SECRET for GET, session + edit_settings for POST).
+export const config = { matcher: ["/((?!_next/static|_next/image|favicon.ico|login|auth|api/sync).*)"] };
