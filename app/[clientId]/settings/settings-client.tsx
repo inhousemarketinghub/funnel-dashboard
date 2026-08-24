@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { ProfileEditor } from "@/components/settings/profile-editor";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -429,6 +430,9 @@ export function SettingsClient({ lang }: { lang: Lang }) {
           </div>
         </div>
       </div>
+
+      {/* Project Profile（项目档案）*/}
+      <ProfileEditor clientId={clientId} lang={lang} />
 
       {/* KPI Content */}
       {loading ? (
