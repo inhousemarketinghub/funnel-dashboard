@@ -122,10 +122,20 @@ export async function syncClient(
       changes: 0, lead_rows: 0, lead_skipped_unchanged: false, quarantined: 0,
     };
 
-    // Previous mirror for diffing
-    const { data: existingRows } = await db.from("daily_metrics")
-      .select("brand, date, ad_spend, lead_funnel_spend, branding_spend, inquiry, contact, appointment, est_showup, showup, orders, sales")
-      .eq("client_id", clientId);
+    // Previous mirror for diffing. Paginated: PostgREST caps a single select at
+    // 1000 rows — an unpaginated read silently truncated big clients' mirrors,
+    // making the tail look "new" every run and (worse) skipping change-audit
+    // for it, since first sightings are deliberately not logged.
+    const existingRows: Record<string, unknown>[] = [];
+    for (let from = 0; ; from += 1000) {
+      const { data: pg, error } = await db.from("daily_metrics")
+        .select("brand, date, ad_spend, lead_funnel_spend, branding_spend, inquiry, contact, appointment, est_showup, showup, orders, sales")
+        .eq("client_id", clientId)
+        .range(from, from + 999);
+      if (error) throw new Error(`daily_metrics read: ${error.message}`);
+      existingRows.push(...(pg ?? []));
+      if (!pg || pg.length < 1000) break;
+    }
     const existing = new Map<string, Record<MetricField, number>>();
     for (const r of existingRows ?? []) {
       const { brand, date, ...metrics } = r as { brand: string; date: string } & Record<MetricField, number>;
