@@ -66,6 +66,9 @@ function AccessPageInner() {
   const [selectedProject, setSelectedProject] = useState(initialProject);
   const [selectedUser, setSelectedUser] = useState("");
   const [search, setSearch] = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
+  const [bulkRoleId, setBulkRoleId] = useState<string>("");
   const [draft, setDraft] = useState<AccessRecord[]>([]);
   const [hasChanges, setHasChanges] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -110,9 +113,12 @@ function AccessPageInner() {
     : draft.filter((r) => r.agencyId === selectedUser);
 
   const assignedIds = new Set(draft.filter((r) => r.clientId === selectedProject).map((r) => r.agencyId));
+  // Focused with no query = show everyone not yet assigned (no need to type)
   const searchResults = agencies.filter((a) =>
     !assignedIds.has(a.id) &&
-    search && (a.email.toLowerCase().includes(search.toLowerCase()) || (a.name || "").toLowerCase().includes(search.toLowerCase()))
+    (search
+      ? a.email.toLowerCase().includes(search.toLowerCase()) || (a.name || "").toLowerCase().includes(search.toLowerCase())
+      : searchFocused)
   );
 
   function setRole(accessId: string, roleId: string) {
@@ -120,7 +126,7 @@ function AccessPageInner() {
     setHasChanges(true);
   }
 
-  function addUserToProject(agencyId: string, clientId: string) {
+  function addUserToProject(agencyId: string, clientId: string, roleId?: string) {
     const ag = agencies.find((a) => a.id === agencyId);
     const tempId = `new-${Date.now()}-${Math.random()}`;
     setDraft((prev) => [...prev, {
@@ -129,10 +135,26 @@ function AccessPageInner() {
       clientId,
       email: ag?.email || "",
       name: ag?.name || "",
-      roleId: viewerRole?.id ?? null,
+      roleId: roleId ?? viewerRole?.id ?? null,
     }]);
     setSearch("");
     setHasChanges(true);
+  }
+
+  function toggleBulk(clientId: string) {
+    setBulkSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(clientId)) next.delete(clientId); else next.add(clientId);
+      return next;
+    });
+  }
+
+  function bulkAssign() {
+    if (!selectedUser || !bulkRoleId || bulkSelected.size === 0) return;
+    for (const clientId of bulkSelected) {
+      addUserToProject(selectedUser, clientId, bulkRoleId);
+    }
+    setBulkSelected(new Set());
   }
 
   function removeAccess(accessId: string) {
@@ -202,6 +224,8 @@ function AccessPageInner() {
         <div className="flex items-center gap-3 mb-6">
           <Link href={backHref} className="text-[var(--t3)] hover:text-[var(--t1)] text-[13px] transition-colors">&larr; Back</Link>
           <h1 className="font-heading text-[24px] font-semibold tracking-tight text-[var(--t1)]">Manage Access</h1>
+          <div className="flex-1" />
+          <Link href="/settings/team" className="text-[12px] text-[var(--blue)] hover:underline">+ Invite Member</Link>
         </div>
 
         {/* Tabs */}
@@ -240,11 +264,13 @@ function AccessPageInner() {
             <div className="card-base mb-4" style={{ padding: 16 }}>
               <div className="font-label text-[10px] uppercase tracking-widest text-[var(--t4)] mb-2">Add User to {projectName}</div>
               <div className="relative">
-                <input type="text" placeholder="Search by email or name..." value={search} onChange={(e) => setSearch(e.target.value)}
+                <input type="text" placeholder="Click to see all users, or type to filter..." value={search} onChange={(e) => setSearch(e.target.value)}
+                  onFocus={() => setSearchFocused(true)}
+                  onBlur={() => setTimeout(() => setSearchFocused(false), 200)}
                   className="w-full h-9 px-3 text-[12px] rounded-[6px] border border-[var(--border)] bg-[var(--bg2)] text-[var(--t1)] outline-none focus:border-[var(--blue)]" />
                 {searchResults.length > 0 && (
                   <div className="absolute top-10 left-0 right-0 bg-[var(--bg2)] border border-[var(--border)] rounded-[6px] shadow-md z-10 max-h-[160px] overflow-y-auto">
-                    {searchResults.slice(0, 5).map((a) => (
+                    {searchResults.slice(0, 8).map((a) => (
                       <button key={a.id} onClick={() => addUserToProject(a.id, selectedProject)}
                         className="w-full text-left px-3 py-2 text-[12px] hover:bg-[var(--bg3)] flex justify-between border-b border-[var(--border)] last:border-0">
                         <span className="text-[var(--t1)]">{a.name || a.email} {a.name && <span className="text-[var(--t4)]">{a.email}</span>}</span>
@@ -271,26 +297,58 @@ function AccessPageInner() {
         )}
 
         {/* By User */}
-        {tab === "user" && selectedUser && (
-          <div className="space-y-2">
-            {clients.map((c) => {
-              const rec = draft.find((r) => r.agencyId === selectedUser && r.clientId === c.id);
-              if (rec) {
-                return (
-                  <AssignmentRow key={rec.accessId} label={c.name} sublabel=""
-                    roleId={rec.roleId} roles={roles}
-                    onRole={(id) => setRole(rec.accessId, id)} onRemove={() => removeAccess(rec.accessId)} />
-                );
-              }
-              return (
-                <div key={c.id} className="card-base flex items-center justify-between" style={{ padding: 14 }}>
-                  <span className="text-[13px] text-[var(--t3)]">{c.name}</span>
-                  <button onClick={() => selectedUser && addUserToProject(selectedUser, c.id)} className="text-[11px] text-[var(--blue)] hover:underline">+ Assign</button>
+        {tab === "user" && selectedUser && (() => {
+          const assigned = clients.filter((c) => draft.some((r) => r.agencyId === selectedUser && r.clientId === c.id));
+          const unassigned = clients.filter((c) => !draft.some((r) => r.agencyId === selectedUser && r.clientId === c.id));
+          return (
+            <div className="space-y-4">
+              {assigned.length > 0 && (
+                <div className="space-y-2">
+                  {assigned.map((c) => {
+                    const rec = draft.find((r) => r.agencyId === selectedUser && r.clientId === c.id)!;
+                    return (
+                      <AssignmentRow key={rec.accessId} label={c.name} sublabel=""
+                        roleId={rec.roleId} roles={roles}
+                        onRole={(id) => setRole(rec.accessId, id)} onRemove={() => removeAccess(rec.accessId)} />
+                    );
+                  })}
                 </div>
-              );
-            })}
-          </div>
-        )}
+              )}
+
+              {unassigned.length > 0 && (
+                <div className="card-base" style={{ padding: 16 }}>
+                  <div className="font-label text-[10px] uppercase tracking-widest text-[var(--t4)] mb-3">
+                    Assign more projects — tick, pick a role, one click
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+                    {unassigned.map((c) => (
+                      <label key={c.id} className={`flex items-center gap-2 p-2 rounded-[6px] cursor-pointer transition-colors ${bulkSelected.has(c.id) ? "bg-[var(--blue-bg)]" : "bg-[var(--bg3)]"}`}>
+                        <input type="checkbox" checked={bulkSelected.has(c.id)} onChange={() => toggleBulk(c.id)}
+                          className="w-3.5 h-3.5 rounded accent-[var(--blue)]" />
+                        <span className={`text-[12px] ${bulkSelected.has(c.id) ? "text-[var(--blue)] font-medium" : "text-[var(--t2)]"}`}>{c.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => setBulkSelected(new Set(unassigned.map((c) => c.id)))}
+                      className="text-[11px] text-[var(--t3)] hover:text-[var(--t1)] hover:underline">Select all</button>
+                    <div className="flex-1" />
+                    <span className="text-[11px] text-[var(--t4)]">{bulkSelected.size} selected · as</span>
+                    <select value={bulkRoleId} onChange={(e) => setBulkRoleId(e.target.value)}
+                      className="h-8 px-2 text-[12px] rounded-[6px] border border-[var(--border)] bg-[var(--bg2)] text-[var(--t1)] outline-none">
+                      <option value="">Choose role...</option>
+                      {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                    </select>
+                    <Button onClick={bulkAssign} disabled={!bulkRoleId || bulkSelected.size === 0}
+                      className="bg-[var(--blue)] hover:bg-[#A34D2F] text-white h-8 px-4 text-[12px]">
+                      Assign {bulkSelected.size > 0 ? bulkSelected.size : ""}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Roles */}
         {tab === "roles" && <RolesEditor roles={roles} onChanged={loadAll} />}
