@@ -223,29 +223,79 @@ export async function syncClient(
       }
     }
 
-    await db.from("sync_runs").update({
+    if (runId) await db.from("sync_runs").update({
       status: "success", finished_at: new Date().toISOString(), stats,
     }).eq("id", runId);
     return { ok: true, stats };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    await db.from("sync_runs").update({
+    if (runId) await db.from("sync_runs").update({
       status: "error", finished_at: new Date().toISOString(), error: message,
     }).eq("id", runId);
     return { ok: false, error: message };
   }
 }
 
-export async function syncAllClients(trigger: "cron" | "manual" | "stale") {
+export interface ActiveClient { id: string; name: string; sheet_id: string }
+
+/**
+ * Active clients for the sync fan-out. Throws on query error — a silent []
+ * would make the cron report success while syncing nobody.
+ */
+export async function listActiveClients(): Promise<ActiveClient[]> {
   const db = createAdminSupabase();
-  const { data: clients } = await db.from("clients")
+  const { data, error } = await db.from("clients")
     .select("id, name, sheet_id").eq("status", "active");
-  const results: { client: string; ok: boolean; error?: string }[] = [];
-  for (const c of clients ?? []) {
-    const r = await syncClient(c.id, c.sheet_id, trigger);
-    results.push({ client: c.name, ok: r.ok, error: r.error });
-  }
-  return results;
+  if (error) throw new Error(`clients read: ${error.message}`);
+  return data ?? [];
+}
+
+/**
+ * Janitor: a run killed by the platform (60s ceiling) never reaches syncClient's
+ * catch, so its sync_runs row is stuck at status='running' forever. Mark such
+ * rows as errors so the "N green days" gate reads clean. finished_at stays
+ * NULL — the run genuinely never finished.
+ */
+export async function markStaleRuns(
+  db: ReturnType<typeof createAdminSupabase> = createAdminSupabase(),
+  staleMinutes = 10,
+): Promise<void> {
+  const cutoff = new Date(Date.now() - staleMinutes * 60_000).toISOString();
+  await db.from("sync_runs")
+    .update({ status: "error", error: "killed before completion (marked stale by sync janitor)" })
+    .eq("status", "running")
+    .lt("started_at", cutoff);
+}
+
+/**
+ * Fan the daily sync out: one worker invocation per client (GET
+ * /api/sync?clientId=…), each with its own 60s budget — the Hobby ceiling a
+ * single sequential 8-client run outgrew. Workers write their own sync_runs
+ * rows; this only aggregates their HTTP outcomes. fetchImpl is injectable for
+ * tests.
+ */
+export async function fanOutSync(
+  origin: string,
+  clients: ActiveClient[],
+  secret: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<{ client: string; ok: boolean; error?: string }[]> {
+  const settled = await Promise.allSettled(clients.map(async (c) => {
+    const res = await fetchImpl(`${origin}/api/sync?clientId=${encodeURIComponent(c.id)}`, {
+      headers: { authorization: `Bearer ${secret}` },
+    });
+    const body = (await res.json().catch(() => ({}))) as { error?: string };
+    return { client: c.name, ok: res.ok, error: body.error };
+  }));
+  return settled.map((s, i) =>
+    s.status === "fulfilled"
+      ? s.value
+      : {
+          client: clients[i].name,
+          ok: false,
+          error: s.reason instanceof Error ? s.reason.message : String(s.reason),
+        },
+  );
 }
 
 function* chunks<T>(arr: T[], size: number): Generator<T[]> {
