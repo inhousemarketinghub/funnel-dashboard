@@ -27,8 +27,12 @@ const S_ZH: Record<string, string> = {
   "Failed to upload logo: ": "上传 Logo 失败:",
   // Data connection
   "Data Connection": "数据连接",
-  "This project reads from the Google Sheet below.": "本项目的数据来自下面这个 Google Sheet。",
+  "This project reads from the Google Sheet below. Changing it re-points every number — only managers can edit.": "本项目的数据来自下面这个 Google Sheet。更换后所有数字都会指向新表格 —— 仅管理权限可编辑。",
   "Open Google Sheet": "打开 Google Sheet",
+  "Paste a Google Sheet link or ID": "粘贴 Google Sheet 链接或 ID",
+  "Save Link": "保存链接",
+  "Sheet link updated": "表格链接已更新",
+  "Failed to update sheet link": "更新表格链接失败",
   // Team
   "Team & Access": "团队与权限",
   "Manage who can view or manage this project.": "管理谁可以查看或管理这个项目。",
@@ -48,6 +52,8 @@ export function SettingsClient({ lang }: { lang: Lang }) {
 
   const [name, setName] = useState("");
   const [sheetId, setSheetId] = useState<string | null>(null);
+  const [sheetUrlInput, setSheetUrlInput] = useState("");
+  const [savingSheet, setSavingSheet] = useState(false);
   const [savingName, setSavingName] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -60,6 +66,7 @@ export function SettingsClient({ lang }: { lang: Lang }) {
         setName(data.name ?? "");
         setLogoUrl(data.logo_url ?? null);
         setSheetId(data.sheet_id ?? null);
+        setSheetUrlInput(data.sheet_id ? `https://docs.google.com/spreadsheets/d/${data.sheet_id}` : "");
       }
     })();
   }, [clientId]);
@@ -79,6 +86,27 @@ export function SettingsClient({ lang }: { lang: Lang }) {
       toast.error(`${tl("Failed to update name")}: ${err instanceof Error ? err.message : ""}`);
     } finally {
       setSavingName(false);
+    }
+  }
+
+  async function handleSaveSheet() {
+    setSavingSheet(true);
+    try {
+      const res = await fetch("/api/client-settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientId, sheetUrl: sheetUrlInput }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+      setSheetId(data.sheet_id);
+      setSheetUrlInput(`https://docs.google.com/spreadsheets/d/${data.sheet_id}`);
+      toast.success(tl("Sheet link updated"));
+      router.refresh();
+    } catch (err) {
+      toast.error(`${tl("Failed to update sheet link")}: ${err instanceof Error ? err.message : ""}`);
+    } finally {
+      setSavingSheet(false);
     }
   }
 
@@ -180,24 +208,30 @@ export function SettingsClient({ lang }: { lang: Lang }) {
       {/* Data connection */}
       <div className={CARD}>
         <h2 className={H2}>{tl("Data Connection")}</h2>
-        <p className={HINT}>{tl("This project reads from the Google Sheet below.")}</p>
-        {sheetId && (
-          <a
-            href={`https://docs.google.com/spreadsheets/d/${sheetId}`}
-            target="_blank"
-            rel="noreferrer"
-            className="topbar-btn inline-flex"
-          >
-            {tl("Open Google Sheet")}
-          </a>
-        )}
+        <p className={HINT}>{tl("This project reads from the Google Sheet below. Changing it re-points every number — only managers can edit.")}</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            className={`${FIELD} w-full max-w-[440px]`}
+            value={sheetUrlInput}
+            onChange={(e) => setSheetUrlInput(e.target.value)}
+            placeholder={tl("Paste a Google Sheet link or ID")}
+          />
+          <button className="topbar-btn" onClick={handleSaveSheet} disabled={savingSheet || !sheetUrlInput.trim()}>
+            {savingSheet ? tl("Saving...") : tl("Save Link")}
+          </button>
+          {sheetId && (
+            <a href={`https://docs.google.com/spreadsheets/d/${sheetId}`} target="_blank" rel="noreferrer" className="topbar-btn inline-flex">
+              {tl("Open Google Sheet")}
+            </a>
+          )}
+        </div>
       </div>
 
       {/* Team & access */}
       <div className={CARD}>
         <h2 className={H2}>{tl("Team & Access")}</h2>
         <p className={HINT}>{tl("Manage who can view or manage this project.")}</p>
-        <Link href="/projects/access" className="topbar-btn inline-flex">
+        <Link href={`/projects/access?back=/${clientId}/settings`} className="topbar-btn inline-flex">
           {tl("Manage Access")}
         </Link>
       </div>

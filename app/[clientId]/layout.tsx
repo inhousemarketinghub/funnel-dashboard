@@ -17,6 +17,14 @@ export default async function ClientLayout({ children, params }: { children: Rea
   const perms = await getProjectPermissions(clientId);
   const canSettings = perms.includes("edit_settings");
 
+  // Accessible projects for the sidebar's quick switcher (RLS scopes the list
+  // to what this user may see).
+  const { data: projectList } = await supabase
+    .from("clients")
+    .select("id, name, logo_url")
+    .eq("status", "active")
+    .order("name");
+
   return (
     <div>
       <div className="bauhaus-stripe"><div/><div/><div/><div/></div>
@@ -30,6 +38,7 @@ export default async function ClientLayout({ children, params }: { children: Rea
           email={email}
           canSettings={canSettings}
           lang={lang}
+          projects={projectList ?? []}
         />
         <div className="min-w-0 flex-1">
           <MobileNav
