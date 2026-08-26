@@ -10,7 +10,7 @@ import type { Lang } from "@/lib/i18n";
 // the rest of Settings (keyed by the English source string).
 const P_ZH: Record<string, string> = {
   "Project Profile": "项目档案",
-  "Client-specific rules live here instead of in code. Fields marked Phase 2 take effect once the database pipeline is switched on.": "客户的特殊规则记在这里,不再写死在代码里。标注 Phase 2 的项目会在数据库管道启用后生效。",
+  "Client-specific rules live here instead of in code. Most fields are not active yet — they take effect in a later upgrade.": "客户的特殊规则记在这里,不再写死在代码里。标注「暂未启用」的设置会在后续升级中生效。",
   "Funnel type": "漏斗类型",
   "Auto (infer from sheet headers)": "自动(按表头推断)",
   "Appointment": "预约型 (appointment)",
@@ -25,13 +25,13 @@ const P_ZH: Record<string, string> = {
   "Remove": "移除",
   "Data source": "数据源",
   "Google Sheets (current)": "Google Sheets(现行)",
-  "Database mirror — enabled per client in Phase 3": "数据库镜像 —— Phase 3 逐客户启用",
+  "Database mirror (not active yet)": "数据库镜像(暂未启用)",
   "Save Profile": "保存档案",
   "Saving...": "保存中...",
   "Profile saved": "档案已保存",
   "Failed to save profile": "档案保存失败",
   "Failed to load profile": "档案读取失败",
-  "Phase 2": "Phase 2",
+  "Not active yet": "暂未启用",
 };
 
 const METRIC_LABELS: Record<AliasMetric, string> = {
@@ -113,17 +113,21 @@ export function ProfileEditor({ clientId, lang }: { clientId: string; lang: Lang
   if (loading) return null;
 
   return (
-    <div className="mb-6 bg-[var(--bg2)] border border-[var(--border)] rounded-[10px] p-6">
-      <h2 className="font-semibold text-[15px] tracking-tight text-[var(--t1)] mb-1">{tl("Project Profile")}</h2>
-      <p className="text-[12px] text-[var(--t4)] mb-5">
-        {tl("Client-specific rules live here instead of in code. Fields marked Phase 2 take effect once the database pipeline is switched on.")}
+    <details className="mb-6 bg-[var(--bg2)] border border-[var(--border)] rounded-[10px] p-6 group">
+      <summary className="cursor-pointer list-none select-none">
+        <span className="font-semibold text-[15px] tracking-tight text-[var(--t1)]">{tl("Project Profile")}</span>
+        <span className="ml-2 text-[12px] text-[var(--t4)] group-open:hidden">▸</span>
+        <span className="ml-2 text-[12px] text-[var(--t4)] hidden group-open:inline">▾</span>
+      </summary>
+      <p className="text-[12px] text-[var(--t4)] mt-1 mb-5">
+        {tl("Client-specific rules live here instead of in code. Most fields are not active yet — they take effect in a later upgrade.")}
       </p>
 
       <div className="flex flex-col gap-5">
         {/* Funnel type */}
         <div>
           <label className="block text-[12px] font-medium text-[var(--t3)] mb-1.5">
-            {tl("Funnel type")}<span className={PHASE2}>{tl("Phase 2")}</span>
+            {tl("Funnel type")}<span className={PHASE2}>{tl("Not active yet")}</span>
           </label>
           <select className={FIELD} value={funnelType} onChange={(e) => setFunnelType(e.target.value as typeof funnelType)}>
             <option value="">{tl("Auto (infer from sheet headers)")}</option>
@@ -146,7 +150,7 @@ export function ProfileEditor({ clientId, lang }: { clientId: string; lang: Lang
         {/* Column aliases */}
         <div>
           <label className="block text-[12px] font-medium text-[var(--t3)] mb-1.5">
-            {tl("Column aliases")}<span className={PHASE2}>{tl("Phase 2")}</span>
+            {tl("Column aliases")}<span className={PHASE2}>{tl("Not active yet")}</span>
           </label>
           <p className="text-[11px] text-[var(--t4)] mb-2">{tl("Teach the parser this client's column names, e.g. orders = Signed Up")}</p>
           <div className="flex flex-col gap-2">
@@ -187,7 +191,7 @@ export function ProfileEditor({ clientId, lang }: { clientId: string; lang: Lang
           <label className="block text-[12px] font-medium text-[var(--t3)] mb-1.5">{tl("Data source")}</label>
           <div className="flex items-center gap-2 text-[13px] text-[var(--t2)]">
             <span className="inline-block rounded-full bg-[var(--bg3)] px-3 py-1">
-              {dataSource === "db" ? tl("Database mirror — enabled per client in Phase 3") : tl("Google Sheets (current)")}
+              {dataSource === "db" ? tl("Database mirror (not active yet)") : tl("Google Sheets (current)")}
             </span>
           </div>
         </div>
@@ -198,6 +202,6 @@ export function ProfileEditor({ clientId, lang }: { clientId: string; lang: Lang
           </button>
         </div>
       </div>
-    </div>
+    </details>
   );
 }

@@ -123,9 +123,6 @@ export default async function DiagnosticsPage({ params }: { params: Promise<{ cl
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <Link href={`/${clientId}`} className="text-[13px] text-[var(--t3)] no-underline hover:text-[var(--t1)]">
-            ← {tl("Dashboard")}
-          </Link>
           <h1 className="mt-1 text-[22px] font-semibold text-[var(--t1)]">{tl("Data Diagnostics")}</h1>
           <div className="text-[13px] text-[var(--t3)]">
             {client.name}

@@ -383,12 +383,6 @@ export function SettingsClient({ lang }: { lang: Lang }) {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
-          <Link
-            href={`/${clientId}`}
-            className="text-sm text-[var(--t3)] hover:text-[var(--t1)] transition-colors"
-          >
-            &larr; {tl("Dashboard")}
-          </Link>
           <h1 className="font-heading font-bold text-2xl text-[var(--t1)] dark:text-[var(--t1)] tracking-tight">
             {tl("Settings")}
           </h1>

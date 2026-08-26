@@ -246,7 +246,6 @@ export default async function DashboardPage({
           </div>
         </div>
         <div className="flex items-start gap-2">
-          <Link href={`/${clientId}/trends`} className="topbar-btn">{t(lang, "trends")}</Link>
           {canReport && <MonthPickerDialog clientId={clientId} lang={lang} />}
           <Suspense>
             <DateRangePicker clientId={clientId} lang={lang} />
