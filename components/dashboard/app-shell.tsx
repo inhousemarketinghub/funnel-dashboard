@@ -43,12 +43,21 @@ export function AppShell({
         >
           {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
         </button>
-        {/* Collapsed sidebar hides the client name — surface it at the top of
-            the content area (the spot the owner marked) so you always know
-            which project you're looking at. */}
+        {/* Collapsed sidebar hides the client identity — surface logo + name
+            above the page title, inside the SAME container as the page content
+            so it left-aligns with "Performance Overview" exactly. */}
         {collapsed && (
-          <div className="absolute left-11 top-2 z-40 hidden md:flex h-7 items-center text-[13px] font-semibold text-[var(--t1)]">
-            {sidebar.clientName}
+          <div className="hidden md:block">
+            <div className="mx-auto flex max-w-[1280px] items-center gap-2.5 px-4 pt-6 sm:px-8">
+              {sidebar.logoUrl ? (
+                <img src={sidebar.logoUrl} alt="" className="h-7 w-7 rounded-[6px] border border-[var(--border)] bg-white object-contain p-[2px]" />
+              ) : (
+                <span className="flex h-7 w-7 items-center justify-center rounded-[6px] bg-[var(--sand)] font-heading text-[13px] font-semibold text-[var(--t2)]">
+                  {sidebar.clientName.charAt(0)}
+                </span>
+              )}
+              <span className="text-[14px] font-semibold text-[var(--t1)]">{sidebar.clientName}</span>
+            </div>
           </div>
         )}
         {children}
