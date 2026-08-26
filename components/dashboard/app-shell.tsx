@@ -48,7 +48,7 @@ export function AppShell({
             so it left-aligns with "Performance Overview" exactly. */}
         {collapsed && (
           <div className="hidden md:block">
-            <div className="mx-auto flex max-w-[1280px] items-center gap-2.5 px-4 pt-6 sm:px-8">
+            <div className="mx-auto -mb-3.5 flex max-w-[1280px] items-center gap-2.5 px-4 pt-6 sm:px-8">
               {sidebar.logoUrl ? (
                 <img src={sidebar.logoUrl} alt="" className="h-7 w-7 rounded-[6px] border border-[var(--border)] bg-white object-contain p-[2px]" />
               ) : (
