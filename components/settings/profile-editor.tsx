@@ -113,13 +113,9 @@ export function ProfileEditor({ clientId, lang }: { clientId: string; lang: Lang
   if (loading) return null;
 
   return (
-    <details className="mb-6 bg-[var(--bg2)] border border-[var(--border)] rounded-[10px] p-6 group">
-      <summary className="cursor-pointer list-none select-none">
-        <span className="font-semibold text-[15px] tracking-tight text-[var(--t1)]">{tl("Project Profile")}</span>
-        <span className="ml-2 text-[12px] text-[var(--t4)] group-open:hidden">▸</span>
-        <span className="ml-2 text-[12px] text-[var(--t4)] hidden group-open:inline">▾</span>
-      </summary>
-      <p className="text-[12px] text-[var(--t4)] mt-1 mb-5">
+    <div className="mb-6 bg-[var(--bg2)] border border-[var(--border)] rounded-[10px] p-6">
+      <h2 className="font-semibold text-[15px] tracking-tight text-[var(--t1)] mb-1">{tl("Project Profile")}</h2>
+      <p className="text-[12px] text-[var(--t4)] mb-5">
         {tl("Client-specific rules live here instead of in code. Most fields are not active yet — they take effect in a later upgrade.")}
       </p>
 
@@ -202,6 +198,6 @@ export function ProfileEditor({ clientId, lang }: { clientId: string; lang: Lang
           </button>
         </div>
       </div>
-    </details>
+    </div>
   );
 }

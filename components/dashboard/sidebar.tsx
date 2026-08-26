@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, TrendingUp, Settings, Activity, ArrowLeftRight } from "lucide-react";
+import { LayoutDashboard, TrendingUp, Settings, Activity, ArrowLeftRight, Calculator, SlidersHorizontal } from "lucide-react";
 import { LanguageToggle } from "./language-toggle";
 import { ThemeToggle } from "./theme-toggle";
 import { LogoutButton } from "./logout-button";
@@ -38,10 +38,14 @@ export function Sidebar({ clientId, clientName, logoUrl, email, canSettings, lan
     { href: `/${clientId}`, labelKey: "overviewTab", icon: LayoutDashboard, exact: true },
     { href: `/${clientId}/trends`, labelKey: "trends", icon: TrendingUp },
   ];
+  const planningItems: NavItem[] = canSettings
+    ? [{ href: `/${clientId}/projection`, labelKey: "adsProjection", icon: Calculator }]
+    : [];
   const adminItems: NavItem[] = canSettings
     ? [
-        { href: `/${clientId}/settings`, labelKey: "settings", icon: Settings },
+        { href: `/${clientId}/customization`, labelKey: "projectCustomization", icon: SlidersHorizontal },
         { href: `/${clientId}/diagnostics`, labelKey: "diagnostics", icon: Activity },
+        { href: `/${clientId}/settings`, labelKey: "settings", icon: Settings },
       ]
     : [];
 
@@ -96,6 +100,12 @@ export function Sidebar({ clientId, clientName, logoUrl, email, canSettings, lan
       {/* Nav groups */}
       {groupLabel("navData")}
       <nav className="flex flex-col gap-0.5">{dataItems.map(renderItem)}</nav>
+      {planningItems.length > 0 && (
+        <>
+          {groupLabel("navPlanning")}
+          <nav className="flex flex-col gap-0.5">{planningItems.map(renderItem)}</nav>
+        </>
+      )}
       {adminItems.length > 0 && (
         <>
           {groupLabel("navAdmin")}

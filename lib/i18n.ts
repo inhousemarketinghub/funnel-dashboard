@@ -112,8 +112,11 @@ const D: Dict = {
   // ── Top nav / layout ──
   projectOverview: { en: "Project Overview", zh: "项目总览" },
   settings: { en: "Settings", zh: "设置" },
-  diagnostics: { en: "Diagnostics", zh: "数据诊断" },
+  diagnostics: { en: "Data Diagnostics", zh: "数据诊断" },
   switchClient: { en: "Switch client", zh: "切换客户" },
+  adsProjection: { en: "Ads Projection", zh: "广告推演" },
+  projectCustomization: { en: "Project Customization", zh: "项目定制" },
+  navPlanning: { en: "Planning", zh: "规划" },
   navData: { en: "Data", zh: "数据" },
   navAdmin: { en: "Admin", zh: "管理" },
   notTracked: { en: "Not tracked", zh: "未追踪" },
