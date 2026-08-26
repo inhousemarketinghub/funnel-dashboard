@@ -9,6 +9,7 @@ import {
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
+import { MonthPickerDialog } from "./month-picker-dialog";
 import { LanguageToggle } from "./language-toggle";
 import { ThemeToggle } from "./theme-toggle";
 import { LogoutButton } from "./logout-button";
@@ -26,6 +27,7 @@ export interface SidebarProps {
   logoUrl?: string | null;
   email?: string | null;
   canSettings: boolean;
+  canReport: boolean;
   lang: Lang;
   projects: ProjectItem[];
   collapsed: boolean;
@@ -45,7 +47,7 @@ interface NavItem {
  * brand block is a project quick-switcher; collapse state persists in
  * localStorage. Class `app-sidebar` is referenced by the print rules.
  */
-export function Sidebar({ clientId, clientName, logoUrl, email, canSettings, lang, projects, collapsed }: SidebarProps) {
+export function Sidebar({ clientId, clientName, logoUrl, email, canSettings, canReport, lang, projects, collapsed }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -155,7 +157,10 @@ export function Sidebar({ clientId, clientName, logoUrl, email, canSettings, lan
 
       {/* Nav groups */}
       {groupLabel("navData")}
-      <nav className="flex flex-col gap-0.5">{dataItems.map(renderItem)}</nav>
+      <nav className="flex flex-col gap-0.5">
+        {dataItems.map(renderItem)}
+        {canReport && <MonthPickerDialog clientId={clientId} lang={lang} variant="nav" collapsed={collapsed} />}
+      </nav>
       {planningItems.length > 0 && (
         <>
           {groupLabel("navPlanning")}

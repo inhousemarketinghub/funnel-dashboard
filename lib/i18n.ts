@@ -115,6 +115,7 @@ const D: Dict = {
   diagnostics: { en: "Data Diagnostics", zh: "数据诊断" },
   switchClient: { en: "Switch client", zh: "切换客户" },
   adsProjection: { en: "Ads Projection", zh: "广告推演" },
+  monthlyReport: { en: "Monthly Report", zh: "月度报告" },
   projectCustomization: { en: "Project Customization", zh: "项目定制" },
   navPlanning: { en: "Planning", zh: "规划" },
   navData: { en: "Data", zh: "数据" },

@@ -43,6 +43,14 @@ export function AppShell({
         >
           {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
         </button>
+        {/* Collapsed sidebar hides the client name — surface it at the top of
+            the content area (the spot the owner marked) so you always know
+            which project you're looking at. */}
+        {collapsed && (
+          <div className="absolute left-11 top-2 z-40 hidden md:flex h-7 items-center text-[13px] font-semibold text-[var(--t1)]">
+            {sidebar.clientName}
+          </div>
+        )}
         {children}
       </div>
     </div>
