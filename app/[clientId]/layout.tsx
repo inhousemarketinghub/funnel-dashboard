@@ -15,8 +15,7 @@ export default async function ClientLayout({ children, params }: { children: Rea
 
   const { email } = await getUserRole();
   const perms = await getProjectPermissions(clientId);
-  const canSettings = perms.includes("edit_settings");
-  const canReport = perms.includes("view_report");
+  const features = perms;
 
   // Accessible projects for the sidebar's quick switcher (RLS scopes the list
   // to what this user may see).
@@ -37,8 +36,7 @@ export default async function ClientLayout({ children, params }: { children: Rea
           clientName: client.name,
           logoUrl: client.logo_url,
           email,
-          canSettings,
-          canReport,
+          features,
           lang,
           projects: projectList ?? [],
         }}
@@ -48,7 +46,7 @@ export default async function ClientLayout({ children, params }: { children: Rea
           clientName={client.name}
           logoUrl={client.logo_url}
           email={email}
-          canSettings={canSettings}
+          features={features}
           lang={lang}
         />
         <main className="mx-auto max-w-[1280px] px-4 sm:px-8 pt-7 pb-20">{children}</main>

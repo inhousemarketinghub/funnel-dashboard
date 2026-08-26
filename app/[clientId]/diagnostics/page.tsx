@@ -98,7 +98,7 @@ const PILL = "inline-block rounded-full px-2 py-[1px] text-[11px] font-medium";
 export default async function DiagnosticsPage({ params }: { params: Promise<{ clientId: string }> }) {
   const { clientId } = await params;
   const perms = await getProjectPermissions(clientId);
-  if (!perms.includes("edit_settings")) redirect(`/${clientId}`);
+  if (!perms.includes("view_diagnostics")) redirect(`/${clientId}`);
 
   const lang: Lang = normalizeLang((await cookies()).get(LANG_COOKIE)?.value);
   const tl = (s: string) => (lang === "zh" && DIAG_ZH[s]) || s;

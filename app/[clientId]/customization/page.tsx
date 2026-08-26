@@ -9,7 +9,7 @@ import { CustomizationClient } from "./customization-client";
 export default async function CustomizationPage({ params }: { params: Promise<{ clientId: string }> }) {
   const { clientId } = await params;
   const perms = await getProjectPermissions(clientId);
-  if (!perms.includes("edit_settings")) redirect(`/${clientId}`);
+  if (!perms.includes("edit_customization")) redirect(`/${clientId}`);
 
   const lang = normalizeLang((await cookies()).get(LANG_COOKIE)?.value);
   return <CustomizationClient lang={lang} />;

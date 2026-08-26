@@ -9,8 +9,8 @@ import { ProjectionClient } from "./projection-client";
 export default async function ProjectionPage({ params }: { params: Promise<{ clientId: string }> }) {
   const { clientId } = await params;
   const perms = await getProjectPermissions(clientId);
-  if (!perms.includes("edit_settings")) redirect(`/${clientId}`);
+  if (!perms.includes("view_projection")) redirect(`/${clientId}`);
 
   const lang = normalizeLang((await cookies()).get(LANG_COOKIE)?.value);
-  return <ProjectionClient lang={lang} />;
+  return <ProjectionClient lang={lang} canSave={perms.includes("save_projection")} />;
 }

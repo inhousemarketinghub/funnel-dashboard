@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase/server";
-import { getUserRole } from "@/lib/auth";
+import { getUserRole, getProjectPermissions } from "@/lib/auth";
 import { fetchKPIData, fetchDerivedKPI, writeKPIValues, detectBrandsOrdered } from "@/lib/sheets";
 
 // GET /api/kpi?clientId=xxx&brand=yyy
@@ -12,6 +12,10 @@ export async function GET(req: NextRequest) {
 
     const clientId = req.nextUrl.searchParams.get("clientId");
     if (!clientId) return NextResponse.json({ error: "clientId required" }, { status: 400 });
+    const perms = await getProjectPermissions(clientId);
+    if (!perms.includes("view_projection")) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     const supabase = await createServerSupabase();
     const { data: client } = await supabase
@@ -51,14 +55,18 @@ export async function GET(req: NextRequest) {
 // Writes KPI values to Google Sheet + Supabase
 export async function POST(req: NextRequest) {
   try {
-    const { role, memberRole } = await getUserRole();
-    if (!role || memberRole === "viewer") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    const { role } = await getUserRole();
+    if (!role) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const { clientId, fields, brand } = await req.json();
     if (!clientId || !fields) {
       return NextResponse.json({ error: "clientId and fields required" }, { status: 400 });
+    }
+    // Writing targets back to the Google Sheet is its own permission —
+    // viewing the calculators does not imply it.
+    const perms = await getProjectPermissions(clientId);
+    if (!perms.includes("save_projection")) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const supabase = await createServerSupabase();

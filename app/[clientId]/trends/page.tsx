@@ -9,7 +9,8 @@ import {
   type Granularity,
   type DateRangeObj,
 } from "@/lib/dates";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { getProjectPermissions } from "@/lib/auth";
 import { cookies } from "next/headers";
 import { normalizeLang, LANG_COOKIE } from "@/lib/i18n";
 import { TrendsClient } from "./trends-client";
@@ -63,6 +64,9 @@ export default async function TrendsPage({
   const supabase = await createServerSupabase();
   const { data: client } = await supabase.from("clients").select("*").eq("id", clientId).single();
   if (!client) notFound();
+
+  const perms = await getProjectPermissions(clientId);
+  if (!perms.includes("view_trends")) redirect(`/${clientId}`);
 
   const lang = normalizeLang((await cookies()).get(LANG_COOKIE)?.value);
   const brands = await detectBrandsOrdered(client.sheet_id);

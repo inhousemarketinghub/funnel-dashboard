@@ -168,7 +168,7 @@ function fieldMapFor(funnelType: "appointment" | "walkin"): Record<string, Field
   return Object.fromEntries([...base, CPL_FIELD].map((f) => [f.key, f]));
 }
 
-export function ProjectionClient({ lang }: { lang: Lang }) {
+export function ProjectionClient({ lang, canSave = true }: { lang: Lang; canSave?: boolean }) {
   const { clientId } = useParams<{ clientId: string }>();
   const tl = (s: string) => (lang === "zh" && SETTINGS_ZH[s]) || s;
 
@@ -498,16 +498,19 @@ export function ProjectionClient({ lang }: { lang: Lang }) {
             </div>
           </div>
 
-          {/* Save Button */}
-          <div className="flex justify-end mb-12">
-            <Button
-              onClick={handleSave}
-              disabled={saving}
-              className="bg-[var(--blue)] hover:bg-[#A34D2F] text-white px-6"
-            >
-              {saving ? tl("Syncing...") : tl("Save & Sync to Sheet")}
-            </Button>
-          </div>
+          {/* Save Button — save_projection only; viewers of the calculators
+              without it get a read-only planning tool */}
+          {canSave && (
+            <div className="flex justify-end mb-12">
+              <Button
+                onClick={handleSave}
+                disabled={saving}
+                className="bg-[var(--blue)] hover:bg-[#A34D2F] text-white px-6"
+              >
+                {saving ? tl("Syncing...") : tl("Save & Sync to Sheet")}
+              </Button>
+            </div>
+          )}
         </>
       )}
     </div>

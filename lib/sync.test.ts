@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { diffDailyMetrics } from "./sync";
+import { describe, it, expect, vi } from "vitest";
+import { diffDailyMetrics, fanOutSync, markStaleRuns } from "./sync";
 import { extractLeadRows, parseCSVLine } from "./sheets";
 
 const M = (over: Partial<Record<string, number>> = {}) => ({
@@ -67,5 +67,65 @@ oops,Instagram,李四,0456,Amy,Ben,,No,,0,Carress
     const { quarantined } = extractLeadRows(rows);
     expect(quarantined).toHaveLength(1);
     expect(quarantined[0]).toMatchObject({ rowIndex: 3, reason: "unparseable_lead_date", sample: { date: "oops" } });
+  });
+});
+
+describe("fanOutSync", () => {
+  const clients = [
+    { id: "aaa", name: "Rygis", sheet_id: "s1" },
+    { id: "bbb", name: "2990's", sheet_id: "s2" },
+  ];
+
+  it("hits one worker URL per client, carrying the cron bearer", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true }) });
+    const out = await fanOutSync("https://x.app", clients, "sec", fetchImpl as never);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "https://x.app/api/sync?clientId=aaa",
+      { headers: { authorization: "Bearer sec" } },
+    );
+    expect(out).toEqual([
+      { client: "Rygis", ok: true, error: undefined },
+      { client: "2990's", ok: true, error: undefined },
+    ]);
+  });
+
+  it("a worker's HTTP 500 becomes ok:false with its error message", async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) })
+      .mockResolvedValueOnce({ ok: false, json: async () => ({ error: "boom" }) });
+    const out = await fanOutSync("https://x.app", clients, "sec", fetchImpl as never);
+    expect(out[1]).toEqual({ client: "2990's", ok: false, error: "boom" });
+  });
+
+  it("a network throw fails that client only, not the whole batch", async () => {
+    const fetchImpl = vi.fn()
+      .mockRejectedValueOnce(new Error("ECONNRESET"))
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) });
+    const out = await fanOutSync("https://x.app", clients, "sec", fetchImpl as never);
+    expect(out[0]).toEqual({ client: "Rygis", ok: false, error: "ECONNRESET" });
+    expect(out[1].ok).toBe(true);
+  });
+});
+
+describe("markStaleRuns", () => {
+  it("only touches running rows older than the cutoff", async () => {
+    const lt = vi.fn().mockResolvedValue({});
+    const eq = vi.fn().mockReturnValue({ lt });
+    const update = vi.fn().mockReturnValue({ eq });
+    const from = vi.fn().mockReturnValue({ update });
+    const before = Date.now();
+    await markStaleRuns({ from } as never, 10);
+    expect(from).toHaveBeenCalledWith("sync_runs");
+    expect(update).toHaveBeenCalledWith({
+      status: "error",
+      error: expect.stringContaining("janitor"),
+    });
+    expect(eq).toHaveBeenCalledWith("status", "running");
+    const [col, cutoffIso] = lt.mock.calls[0] as [string, string];
+    expect(col).toBe("started_at");
+    // cutoff ≈ now - 10min (allow the test's own runtime as slack)
+    expect(Date.parse(cutoffIso)).toBeGreaterThanOrEqual(before - 10 * 60_000 - 1000);
+    expect(Date.parse(cutoffIso)).toBeLessThanOrEqual(Date.now() - 10 * 60_000 + 1000);
   });
 });

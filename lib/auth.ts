@@ -3,7 +3,21 @@ import type { MemberRole } from "./types";
 
 export type UserRole = "owner" | "user" | null;
 
-const ALL_PERMISSIONS = ["view_dashboard", "view_report", "edit_settings", "manage_access"];
+// Feature keys — one per gated surface. view_dashboard is implicit for anyone
+// assigned to a project; the rest come from the member's role checklist
+// (roles.permissions) editable in Manage Access → Roles.
+export const FEATURE_KEYS = [
+  "view_dashboard",
+  "view_trends",
+  "view_report",
+  "view_projection",
+  "save_projection",
+  "edit_customization",
+  "view_diagnostics",
+  "edit_settings",
+  "manage_access",
+] as const;
+const ALL_PERMISSIONS = [...FEATURE_KEYS];
 
 export async function getUserRole(): Promise<{ email: string | null; role: UserRole; agencyId: string | null; memberRole: MemberRole | null }> {
   const supabase = await createServerSupabase();
@@ -67,10 +81,26 @@ export async function getProjectPermissions(clientId: string): Promise<string[]>
   const supabase = await createServerSupabase();
   const { data } = await supabase
     .from("project_access")
-    .select("permissions")
+    .select("permissions, role_id, roles(permissions)")
     .eq("client_id", clientId)
     .eq("agency_id", agencyId)
     .single();
 
-  return (data?.permissions as string[]) || ["view_dashboard"];
+  if (!data) return ["view_dashboard"];
+
+  // Role-based resolution: the member's role defines their feature checklist.
+  const rolePerms = (data.roles as { permissions?: unknown } | null)?.permissions;
+  if (Array.isArray(rolePerms)) {
+    return ["view_dashboard", ...rolePerms.filter((p): p is string => typeof p === "string")];
+  }
+
+  // Legacy fallback (rows created before the roles migration): the old flat
+  // permission array, extended so pre-roles semantics keep working — trends
+  // was never gated, and edit_settings implied every admin surface.
+  const legacy = (data.permissions as string[]) || [];
+  const out = new Set<string>(["view_dashboard", "view_trends", ...legacy]);
+  if (legacy.includes("edit_settings")) {
+    for (const k of ["view_projection", "save_projection", "edit_customization", "view_diagnostics"]) out.add(k);
+  }
+  return [...out];
 }
