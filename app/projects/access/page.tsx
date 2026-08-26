@@ -56,15 +56,16 @@ function AccessPageInner() {
   const backParam = searchParams.get("back");
   const backHref = backParam && backParam.startsWith("/") && !backParam.startsWith("//") ? backParam : "/projects";
   const initialProject = searchParams.get("project") || "";
+  const initialUser = searchParams.get("user") || "";
   const initialName = searchParams.get("name") || "";
 
-  const [tab, setTab] = useState<"project" | "user" | "roles">("project");
+  const [tab, setTab] = useState<"project" | "user" | "roles">(initialUser ? "user" : "project");
   const [agencies, setAgencies] = useState<Agency[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [allAccess, setAllAccess] = useState<AccessRecord[]>([]);
   const [selectedProject, setSelectedProject] = useState(initialProject);
-  const [selectedUser, setSelectedUser] = useState("");
+  const [selectedUser, setSelectedUser] = useState(initialUser);
   const [search, setSearch] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());

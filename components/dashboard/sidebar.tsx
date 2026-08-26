@@ -26,8 +26,7 @@ export interface SidebarProps {
   clientName: string;
   logoUrl?: string | null;
   email?: string | null;
-  canSettings: boolean;
-  canReport: boolean;
+  features: string[];
   lang: Lang;
   projects: ProjectItem[];
   collapsed: boolean;
@@ -47,24 +46,23 @@ interface NavItem {
  * brand block is a project quick-switcher; collapse state persists in
  * localStorage. Class `app-sidebar` is referenced by the print rules.
  */
-export function Sidebar({ clientId, clientName, logoUrl, email, canSettings, canReport, lang, projects, collapsed }: SidebarProps) {
+export function Sidebar({ clientId, clientName, logoUrl, email, features, lang, projects, collapsed }: SidebarProps) {
+  const can = (k: string) => features.includes(k);
   const pathname = usePathname();
   const router = useRouter();
 
   const dataItems: NavItem[] = [
     { href: `/${clientId}`, labelKey: "overviewTab", icon: LayoutDashboard, exact: true },
-    { href: `/${clientId}/trends`, labelKey: "trends", icon: TrendingUp },
+    ...(can("view_trends") ? [{ href: `/${clientId}/trends`, labelKey: "trends", icon: TrendingUp }] : []),
   ];
-  const planningItems: NavItem[] = canSettings
+  const planningItems: NavItem[] = can("view_projection")
     ? [{ href: `/${clientId}/projection`, labelKey: "adsProjection", icon: Calculator }]
     : [];
-  const adminItems: NavItem[] = canSettings
-    ? [
-        { href: `/${clientId}/customization`, labelKey: "projectCustomization", icon: SlidersHorizontal },
-        { href: `/${clientId}/diagnostics`, labelKey: "diagnostics", icon: Activity },
-        { href: `/${clientId}/settings`, labelKey: "settings", icon: Settings },
-      ]
-    : [];
+  const adminItems: NavItem[] = [
+    ...(can("edit_customization") ? [{ href: `/${clientId}/customization`, labelKey: "projectCustomization", icon: SlidersHorizontal }] : []),
+    ...(can("view_diagnostics") ? [{ href: `/${clientId}/diagnostics`, labelKey: "diagnostics", icon: Activity }] : []),
+    ...(can("edit_settings") ? [{ href: `/${clientId}/settings`, labelKey: "settings", icon: Settings }] : []),
+  ];
 
   function isActive(item: NavItem) {
     return item.exact ? pathname === item.href : pathname.startsWith(item.href);
@@ -159,7 +157,7 @@ export function Sidebar({ clientId, clientName, logoUrl, email, canSettings, can
       {groupLabel("navData")}
       <nav className="flex flex-col gap-0.5">
         {dataItems.map(renderItem)}
-        {canReport && <MonthPickerDialog clientId={clientId} lang={lang} variant="nav" collapsed={collapsed} />}
+        {can("view_report") && <MonthPickerDialog clientId={clientId} lang={lang} variant="nav" collapsed={collapsed} />}
       </nav>
       {planningItems.length > 0 && (
         <>

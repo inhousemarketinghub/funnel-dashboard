@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { MemberCard } from "@/components/team/member-card";
 import { InviteDialog } from "@/components/team/invite-dialog";
 import { LogoutButton } from "@/components/dashboard/logout-button";
 import type { MemberInfo, MemberRole, PendingInvitation } from "@/lib/types";
@@ -11,6 +10,7 @@ import { teamRoleSummary } from "@/lib/team-summary";
 
 export default function TeamPage() {
   const [members, setMembers] = useState<MemberInfo[]>([]);
+  const [accessSummary, setAccessSummary] = useState<Record<string, { count: number; roles: string[] }>>({});
   const [invitations, setInvitations] = useState<PendingInvitation[]>([]);
   const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,6 +33,20 @@ export default function TeamPage() {
 
       setMembers(membersData);
       setInvitations(invitationsData);
+
+      // Per-member role summary from the role-based access system
+      const { data: acc } = await supabase
+        .from("project_access")
+        .select("agency_id, roles(name)");
+      const summary: Record<string, { count: number; roles: string[] }> = {};
+      for (const a of acc ?? []) {
+        const key = a.agency_id as string;
+        const roleName = (a.roles as { name?: string } | null)?.name;
+        summary[key] ??= { count: 0, roles: [] };
+        summary[key].count++;
+        if (roleName && !summary[key].roles.includes(roleName)) summary[key].roles.push(roleName);
+      }
+      setAccessSummary(summary);
 
       // Fetch clients list from supabase directly
       const { data: { user } } = await supabase.auth.getUser();
@@ -61,24 +75,6 @@ export default function TeamPage() {
     loadData();
   }, [loadData]);
 
-  async function handleRoleChange(memberId: string, newRole: MemberRole) {
-    await fetch("/api/team", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ memberId, newRole }),
-    });
-    await loadData();
-  }
-
-  async function handleClientChange(memberId: string, clientIds: string[]) {
-    await fetch("/api/team", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ memberId, clientIds }),
-    });
-    await loadData();
-  }
-
   async function handleRemove(memberId: string) {
     const confirmed = window.confirm(
       "Are you sure you want to remove this team member? They will lose access to all assigned clients."
@@ -93,7 +89,7 @@ export default function TeamPage() {
     await loadData();
   }
 
-  async function handleInvite(email: string, role: MemberRole, clientIds: string[]) {
+  async function handleInvite(email: string, role: string, clientIds: string[]) {
     const res = await fetch("/api/invitations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -184,16 +180,38 @@ export default function TeamPage() {
           </div>
         ) : members.length > 0 ? (
           <div className="flex flex-col gap-3 mb-8">
-            {members.map((member) => (
-              <MemberCard
-                key={member.id}
-                member={member}
-                allClients={clients}
-                onRoleChange={handleRoleChange}
-                onClientChange={handleClientChange}
-                onRemove={handleRemove}
-              />
-            ))}
+            {members.map((member) => {
+              const sum = accessSummary[member.id];
+              const isOwner = member.role === "owner";
+              return (
+                <div key={member.id} className="card-base" style={{ padding: 18 }}>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-[14px] font-medium text-[var(--t1)] truncate">{member.email}</div>
+                      <div className="text-[12px] text-[var(--t4)] mt-0.5">
+                        {isOwner
+                          ? "Owner · full access to all projects"
+                          : sum
+                            ? `${sum.count} project${sum.count === 1 ? "" : "s"}${sum.roles.length ? ` · ${sum.roles.join(", ")}` : ""}`
+                            : "No projects assigned"}
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-3">
+                      {isOwner ? (
+                        <span className="rounded-full bg-[var(--yellow-bg)] px-3 py-1 text-[11px] font-medium text-[var(--yellow)]">Owner</span>
+                      ) : (
+                        <>
+                          <Link href={`/projects/access?user=${member.id}&back=/settings/team`} className="topbar-btn" style={{ padding: "8px 16px" }}>
+                            Manage Access
+                          </Link>
+                          <button onClick={() => handleRemove(member.id)} className="text-[11px] text-[var(--red)] hover:underline">Remove</button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div className="text-center py-12 text-[14px] text-[var(--t3)] mb-8">

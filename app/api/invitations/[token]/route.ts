@@ -57,11 +57,16 @@ export async function POST(
       agencyId = newAgency.id;
     }
 
-    // Determine permissions based on role
-    const permissions =
-      invitation.role === "manager"
-        ? ["view_dashboard", "view_report", "edit_settings"]
-        : ["view_dashboard", "view_report"];
+    // Resolve the invited role from the roles table (invitation.role stores
+    // the role NAME). Legacy invitations ("manager"/"viewer") match built-ins
+    // case-insensitively; unknown names fall back to Viewer-equivalent.
+    const { data: roleRow } = await supabase
+      .from("roles")
+      .select("id, permissions")
+      .ilike("name", invitation.role)
+      .maybeSingle();
+    const rolePerms: string[] = Array.isArray(roleRow?.permissions) ? roleRow.permissions : [];
+    const permissions = ["view_dashboard", ...["view_report", "edit_settings", "manage_access"].filter((k) => rolePerms.includes(k))];
 
     // Create project_access records for each client_id
     const clientIds: string[] = invitation.client_ids ?? [];
@@ -70,6 +75,7 @@ export async function POST(
         client_id: clientId,
         agency_id: agencyId,
         role: invitation.role,
+        role_id: roleRow?.id ?? null,
         permissions,
       }));
 
