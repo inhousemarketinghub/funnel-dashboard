@@ -2,7 +2,7 @@ import { createServerSupabase } from "@/lib/supabase/server";
 import { getUserRole, getProjectPermissions } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
-import { Sidebar } from "@/components/dashboard/sidebar";
+import { AppShell } from "@/components/dashboard/app-shell";
 import { MobileNav } from "@/components/dashboard/mobile-nav";
 import { normalizeLang, LANG_COOKIE } from "@/lib/i18n";
 
@@ -30,28 +30,27 @@ export default async function ClientLayout({ children, params }: { children: Rea
       <div className="bauhaus-stripe"><div/><div/><div/><div/></div>
       {/* Desktop: ERP-style left sidebar; Mobile: unchanged hamburger nav.
           children render once — the sidebar hides itself below md via CSS. */}
-      <div className="md:flex">
-        <Sidebar
+      <AppShell
+        sidebar={{
+          clientId,
+          clientName: client.name,
+          logoUrl: client.logo_url,
+          email,
+          canSettings,
+          lang,
+          projects: projectList ?? [],
+        }}
+      >
+        <MobileNav
           clientId={clientId}
           clientName={client.name}
           logoUrl={client.logo_url}
           email={email}
           canSettings={canSettings}
           lang={lang}
-          projects={projectList ?? []}
         />
-        <div className="min-w-0 flex-1">
-          <MobileNav
-            clientId={clientId}
-            clientName={client.name}
-            logoUrl={client.logo_url}
-            email={email}
-            canSettings={canSettings}
-            lang={lang}
-          />
-          <main className="mx-auto max-w-[1280px] px-4 sm:px-8 pt-7 pb-20">{children}</main>
-        </div>
-      </div>
+        <main className="mx-auto max-w-[1280px] px-4 sm:px-8 pt-7 pb-20">{children}</main>
+      </AppShell>
     </div>
   );
 }

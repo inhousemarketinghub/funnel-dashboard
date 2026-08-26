@@ -1,11 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, TrendingUp, Settings, Activity, Calculator,
-  SlidersHorizontal, LayoutGrid, ChevronsUpDown, PanelLeftClose, PanelLeftOpen, Check,
+  SlidersHorizontal, LayoutGrid, ChevronsUpDown, Check,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
@@ -21,7 +20,7 @@ interface ProjectItem {
   logo_url?: string | null;
 }
 
-interface Props {
+export interface SidebarProps {
   clientId: string;
   clientName: string;
   logoUrl?: string | null;
@@ -29,6 +28,7 @@ interface Props {
   canSettings: boolean;
   lang: Lang;
   projects: ProjectItem[];
+  collapsed: boolean;
 }
 
 interface NavItem {
@@ -39,29 +39,15 @@ interface NavItem {
   exact?: boolean;
 }
 
-const COLLAPSE_KEY = "sidebar_collapsed";
-
 /**
  * Desktop-only left sidebar (ERP-style). Mobile keeps MobileNav untouched.
  * Colors ride the pre-existing --sidebar-* variables (theme-adaptive). The
  * brand block is a project quick-switcher; collapse state persists in
  * localStorage. Class `app-sidebar` is referenced by the print rules.
  */
-export function Sidebar({ clientId, clientName, logoUrl, email, canSettings, lang, projects }: Props) {
+export function Sidebar({ clientId, clientName, logoUrl, email, canSettings, lang, projects, collapsed }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const [collapsed, setCollapsed] = useState(false);
-
-  // Read persisted state after mount (SSR always renders expanded).
-  useEffect(() => {
-    if (localStorage.getItem(COLLAPSE_KEY) === "1") setCollapsed(true);
-  }, []);
-  function toggleCollapsed() {
-    setCollapsed((c) => {
-      localStorage.setItem(COLLAPSE_KEY, c ? "0" : "1");
-      return !c;
-    });
-  }
 
   const dataItems: NavItem[] = [
     { href: `/${clientId}`, labelKey: "overviewTab", icon: LayoutDashboard, exact: true },
@@ -123,7 +109,7 @@ export function Sidebar({ clientId, clientName, logoUrl, email, canSettings, lan
 
   return (
     <aside
-      className={`app-sidebar hidden md:flex shrink-0 flex-col sticky top-[3px] h-[calc(100dvh-3px)] z-[90] bg-[var(--sidebar)] border-r border-[var(--sidebar-border)] py-4 overflow-y-auto transition-[width] duration-200 ${
+      className={`app-sidebar hidden md:flex shrink-0 flex-col sticky top-[3px] h-[calc(100dvh-3px)] z-30 bg-[var(--sidebar)] border-r border-[var(--sidebar-border)] py-4 overflow-y-auto transition-[width] duration-200 ${
         collapsed ? "w-[64px] px-2" : "w-[232px] px-3"
       }`}
     >
@@ -209,15 +195,6 @@ export function Sidebar({ clientId, clientName, logoUrl, email, canSettings, lan
             </div>
           </>
         )}
-        <button
-          onClick={toggleCollapsed}
-          className={`flex items-center gap-2.5 rounded-[8px] px-3 py-2 text-[12px] text-[var(--t4)] transition-colors hover:bg-[var(--sidebar-accent)] hover:text-[var(--t1)] ${
-            collapsed ? "justify-center px-0 w-full" : ""
-          }`}
-        >
-          {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-          {!collapsed && (lang === "zh" ? "收起侧栏" : "Collapse")}
-        </button>
       </div>
     </aside>
   );
