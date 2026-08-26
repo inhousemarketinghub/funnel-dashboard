@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import type { OnboardingState } from "@/lib/types";
 
 const INDUSTRIES = ["Beauty", "Education", "Property", "F&B", "Health", "Other"];
+const PRESETS = INDUSTRIES.filter((i) => i !== "Other");
 
 interface Props {
   state: OnboardingState;
@@ -17,8 +18,15 @@ interface Props {
 export function StepBasicInfo({ state, setState, next }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // "Other" is a mode, not a value: picking it reveals a free-text field and
+  // whatever is typed becomes the stored industry.
+  const isCustom = state.industry !== "" && !PRESETS.includes(state.industry);
   function toggleIndustry(ind: string) {
-    setState((s) => ({ ...s, industry: s.industry === ind ? "" : ind }));
+    if (ind === "Other") {
+      setState((s) => ({ ...s, industry: isCustom ? "" : "Other" }));
+    } else {
+      setState((s) => ({ ...s, industry: s.industry === ind ? "" : ind }));
+    }
   }
 
   function handleFileDrop(e: React.DragEvent<HTMLDivElement>) {
@@ -69,7 +77,7 @@ export function StepBasicInfo({ state, setState, next }: Props) {
         <Label className="text-[var(--t2)] text-[13px] font-medium">Industry</Label>
         <div className="flex flex-wrap gap-2">
           {INDUSTRIES.map((ind) => {
-            const active = state.industry === ind;
+            const active = ind === "Other" ? isCustom : state.industry === ind;
             return (
               <button
                 key={ind}
@@ -87,6 +95,15 @@ export function StepBasicInfo({ state, setState, next }: Props) {
             );
           })}
         </div>
+        {isCustom && (
+          <Input
+            placeholder="Type your industry, e.g. Fitness"
+            value={state.industry === "Other" ? "" : state.industry}
+            onChange={(e) => setState((s) => ({ ...s, industry: e.target.value || "Other" }))}
+            className="mt-2 max-w-[280px] border-[var(--border)] focus-visible:ring-[var(--blue)]"
+            autoFocus
+          />
+        )}
       </div>
 
       {/* Logo Upload */}

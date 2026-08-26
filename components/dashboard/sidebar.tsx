@@ -61,7 +61,6 @@ export function Sidebar({ clientId, clientName, logoUrl, email, features, lang, 
   const adminItems: NavItem[] = [
     ...(can("edit_customization") ? [{ href: `/${clientId}/customization`, labelKey: "projectCustomization", icon: SlidersHorizontal }] : []),
     ...(can("view_diagnostics") ? [{ href: `/${clientId}/diagnostics`, labelKey: "diagnostics", icon: Activity }] : []),
-    ...(can("edit_settings") ? [{ href: `/${clientId}/settings`, labelKey: "settings", icon: Settings }] : []),
   ];
 
   function isActive(item: NavItem) {
@@ -113,6 +112,18 @@ export function Sidebar({ clientId, clientName, logoUrl, email, features, lang, 
         collapsed ? "w-[64px] px-2" : "w-[232px] px-3"
       }`}
     >
+      {/* Project Overview — top exit, above the brand block */}
+      <Link
+        href="/projects"
+        title={collapsed ? t(lang, "projectOverview") : undefined}
+        className={`mb-2 flex items-center gap-2.5 rounded-[8px] px-3 py-1.5 text-[12px] text-[var(--t4)] no-underline transition-colors hover:bg-[var(--sidebar-accent)] hover:text-[var(--t1)] ${
+          collapsed ? "justify-center px-0" : ""
+        }`}
+      >
+        <LayoutGrid className="h-4 w-4 shrink-0" />
+        {!collapsed && t(lang, "projectOverview")}
+      </Link>
+
       {/* Brand block = project quick-switcher dropdown */}
       <DropdownMenu>
         <DropdownMenuTrigger
@@ -176,16 +187,22 @@ export function Sidebar({ clientId, clientName, logoUrl, email, features, lang, 
 
       {/* Bottom: overview of all projects, toggles, identity, collapse */}
       <div className={`flex flex-col gap-2 border-t border-[var(--sidebar-border)] pt-3 ${collapsed ? "items-center" : ""}`}>
-        <Link
-          href="/projects"
-          title={collapsed ? t(lang, "projectOverview") : undefined}
-          className={`flex items-center gap-2.5 rounded-[8px] px-3 py-2 text-[13px] font-medium text-[var(--t2)] no-underline transition-colors hover:bg-[var(--sidebar-accent)] ${
-            collapsed ? "justify-center px-0 w-full" : ""
-          }`}
-        >
-          <LayoutGrid className="h-4 w-4 shrink-0" />
-          {!collapsed && t(lang, "projectOverview")}
-        </Link>
+        {can("edit_settings") && (
+          <Link
+            href={`/${clientId}/settings`}
+            title={collapsed ? t(lang, "settings") : undefined}
+            className={`flex items-center gap-2.5 rounded-[8px] px-3 py-2 text-[13px] font-medium no-underline transition-colors ${
+              collapsed ? "justify-center px-0 w-full" : ""
+            } ${
+              pathname.startsWith(`/${clientId}/settings`)
+                ? "bg-[var(--sidebar-primary)] text-[var(--sidebar-primary-foreground)]"
+                : "text-[var(--t2)] hover:bg-[var(--sidebar-accent)]"
+            }`}
+          >
+            <Settings className="h-4 w-4 shrink-0" />
+            {!collapsed && t(lang, "settings")}
+          </Link>
+        )}
         {!collapsed && (
           <>
             <div className="flex items-center gap-2 px-3">

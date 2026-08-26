@@ -176,5 +176,5 @@ export interface OnboardingState {
   scanResult: import("@/lib/sheet-scanner").SheetScanResult | null;
   columnMapping: ColumnMapping | null;
   kpiConfig: Partial<KPIConfig>;
-  invites: { email: string; role: MemberRole }[];
+  invites: { email: string; role: string }[]; // role = roles.name (custom roles supported)
 }
