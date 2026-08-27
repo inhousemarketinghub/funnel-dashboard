@@ -281,11 +281,20 @@ export async function fanOutSync(
   fetchImpl: typeof fetch = fetch,
 ): Promise<{ client: string; ok: boolean; error?: string }[]> {
   const settled = await Promise.allSettled(clients.map(async (c) => {
+    // redirect:"manual" + the body.ok check: a worker response that isn't our
+    // JSON contract (e.g. a deployment-protection 302/SSO login page) must
+    // count as failure, never as a silent success.
     const res = await fetchImpl(`${origin}/api/sync?clientId=${encodeURIComponent(c.id)}`, {
       headers: { authorization: `Bearer ${secret}` },
+      redirect: "manual",
     });
-    const body = (await res.json().catch(() => ({}))) as { error?: string };
-    return { client: c.name, ok: res.ok, error: body.error };
+    const body = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+    const ok = res.ok && body?.ok === true;
+    return {
+      client: c.name,
+      ok,
+      error: ok ? undefined : body?.error ?? `unexpected worker response (HTTP ${res.status})`,
+    };
   }));
   return settled.map((s, i) =>
     s.status === "fulfilled"
