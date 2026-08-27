@@ -17,9 +17,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { FileText } from "lucide-react";
 import { t, type Lang } from "@/lib/i18n";
 
-export function MonthPickerDialog({ clientId, lang = "en" }: { clientId: string; lang?: Lang }) {
+export function MonthPickerDialog({ clientId, lang = "en", variant = "button", collapsed = false }: { clientId: string; lang?: Lang; variant?: "button" | "nav"; collapsed?: boolean }) {
   const MONTHS = Array.from({ length: 12 }, (_, i) =>
     new Intl.DateTimeFormat(lang === "zh" ? "zh-CN" : "en-US", { month: "long" }).format(new Date(2000, i, 1)),
   );
@@ -39,9 +40,19 @@ export function MonthPickerDialog({ clientId, lang = "en" }: { clientId: string;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger className="topbar-btn">
-        {t(lang, "monthlyPerformanceOverview")}
-      </DialogTrigger>
+      {variant === "nav" ? (
+        <DialogTrigger
+          title={collapsed ? t(lang, "monthlyReport") : undefined}
+          className={`flex w-full items-center gap-2.5 rounded-[8px] px-3 py-2 text-[13px] font-medium text-[var(--t2)] transition-colors hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)] ${collapsed ? "justify-center px-0" : ""}`}
+        >
+          <FileText className="h-4 w-4 shrink-0" />
+          {!collapsed && t(lang, "monthlyReport")}
+        </DialogTrigger>
+      ) : (
+        <DialogTrigger className="topbar-btn">
+          {t(lang, "monthlyPerformanceOverview")}
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-[360px]">
         <DialogHeader>
           <DialogTitle className="font-heading text-[20px] font-semibold tracking-tight">

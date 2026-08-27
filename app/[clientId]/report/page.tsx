@@ -248,7 +248,6 @@ export default async function ReportPage({
   return (
     <div className="min-h-dvh bg-[var(--bg)] print:bg-white" style={{ transition: "background 500ms ease" }}>
       <style>{`@media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } .no-print { display: none !important; } .page-break { page-break-before: always; } }`}</style>
-      <div className="bauhaus-stripe"><div /><div /><div /><div /></div>
 
       <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 32px" }}>
         {/* Header */}

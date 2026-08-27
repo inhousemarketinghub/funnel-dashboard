@@ -1,329 +1,116 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
-import { useParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
-import { ProfileEditor } from "@/components/settings/profile-editor";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { toast } from "sonner";
-import { Info } from "lucide-react";
-import {
-  Tooltip,
-  TooltipProvider,
-  TooltipTrigger,
-  TooltipContent,
-} from "@/components/ui/tooltip";
-import { describeDerived } from "@/lib/derived-formulas";
-import { computeSettingsDerived, completeInputs, type CalculatorMode } from "@/lib/kpi-calculator";
-import { type Lang } from "@/lib/i18n";
+import { createClient } from "@/lib/supabase/client";
+import type { Lang } from "@/lib/i18n";
 
-// Settings is an admin-only page with self-contained strings, so its zh labels
-// live here (keyed by the English source) rather than in the shared lib/i18n dict.
-const SETTINGS_ZH: Record<string, string> = {
-  // Field / calculator / derived labels
-  "Targeted Sales": "目标销售额", "Targeted AOV": "目标 AOV", "Targeted CPA": "目标 CPA",
-  "Targeted CPA %": "目标 CPA %", "Targeted Conversion Rate": "目标转化率",
-  "Targeted Show Up Rate": "目标出席率", "Targeted Appointment Rate": "目标预约率",
-  "Targeted Respond Rate": "目标回复率", "Targeted Visit Rate": "目标到访率",
-  "Targeted CPL (Incl SST)": "目标 CPL(含 SST)", "Targeted Order": "目标订单数",
-  "CPL (Incl SST)": "CPL(含 SST)", "CP.Acquisition (Incl SST)": "获客成本(含 SST)",
-  "FB Leads Inquiry": "FB 询问线索", "CP.Visit (Incl SST)": "每次到访成本(含 SST)",
-  "Visit": "到访", "CP.Show Up (Incl SST)": "每次出席成本(含 SST)", "Show Up": "出席",
-  "CP.Appointment (Incl SST)": "每次预约成本(含 SST)", "Appointment": "预约",
-  "CP.Contact Given (Incl SST)": "每次联系成本(含 SST)", "Contact Given": "已联系",
-  "Monthly Ad Spend (Incl SST)": "每月广告花费(含 SST)", "Monthly Ad Spend (Excl SST)": "每月广告花费(不含 SST)",
-  "Targeted Daily Ad Spend (Incl SST)": "目标每日广告花费(含 SST)", "Targeted Daily Ad Spend (Excl SST)": "目标每日广告花费(不含 SST)",
-  "CPL": "CPL", "Visit Rate": "到访率", "Appointment Rate": "预约率", "CPA %": "CPA %",
-  // Chrome
-  "Dashboard": "仪表盘", "Settings": "设置", "Client Logo": "客户 Logo",
+// Slim general settings: project identity + connections. Planning tools live
+// in Ads Projection; client-specific parsing rules in Project Customization.
+const S_ZH: Record<string, string> = {
+  "Settings": "设置",
+  // Project name
+  "Project Name": "项目名称",
+  "Shown everywhere — sidebar, overview cards, reports.": "显示在侧栏、总览卡片、月报等所有地方。",
+  "Save Name": "保存名称",
+  "Saving...": "保存中…",
+  "Name updated": "名称已更新",
+  "Failed to update name": "更新名称失败",
+  // Logo
+  "Client Logo": "客户 Logo",
   "Upload Logo": "上传 Logo", "Uploading...": "上传中…", "Remove Logo": "移除 Logo", "No Logo": "无 Logo",
   "PNG, JPG, or SVG. Max 2MB.": "PNG、JPG 或 SVG,最大 2MB。",
-  "Loading KPI from Google Sheet...": "正在从 Google Sheet 加载 KPI…",
-  "Brand": "品牌", "Calculator": "计算器", "KPI Targets": "KPI 目标",
-  "Synced from Google Sheet": "来自 Google Sheet", "Result": "结果",
-  "Auto-calculated from the inputs above — this is the target that gets saved.": "根据上方输入自动计算 —— 这是将被保存的目标值。",
-  "Derived Values": "派生数值", "Auto-calculated": "自动计算",
-  "Daily Ad Spend Budget": "每日广告预算", "Current Daily Ad Spend": "当前每日广告花费",
-  "Actual Daily Ad Spend": "实际每日广告花费", "(Excluded 8% SST)": "(不含 8% SST)", "(Included 8% SST)": "(含 8% SST)",
-  "Save & Sync to Sheet": "保存并同步到表格", "Syncing...": "同步中…",
-  // Toasts
-  "Failed to load KPI data": "加载 KPI 数据失败", "Failed to load KPI": "加载 KPI 失败",
-  "Save failed": "保存失败", "KPI synced to Google Sheet": "KPI 已同步到 Google Sheet",
-  "Failed to save": "保存失败", "Failed to update logo URL": "更新 Logo 链接失败",
+  "Failed to update logo URL": "更新 Logo 链接失败",
   "Logo uploaded": "Logo 已上传", "Failed to remove logo": "移除 Logo 失败", "Logo removed": "Logo 已移除",
   "Failed to upload logo: ": "上传 Logo 失败:",
+  // Data connection
+  "Data Connection": "数据连接",
+  "This project reads from the Google Sheet below. Changing it re-points every number — only managers can edit.": "本项目的数据来自下面这个 Google Sheet。更换后所有数字都会指向新表格 —— 仅管理权限可编辑。",
+  "Open Google Sheet": "打开 Google Sheet",
+  "Paste a Google Sheet link or ID": "粘贴 Google Sheet 链接或 ID",
+  "Save Link": "保存链接",
+  "Sheet link updated": "表格链接已更新",
+  "Failed to update sheet link": "更新表格链接失败",
+  // Team
+  "Team & Access": "团队与权限",
+  "Manage who can view or manage this project.": "管理谁可以查看或管理这个项目。",
+  "Manage Access": "管理权限",
 };
 
-// ── Editable field definitions by funnel type ────────────────
-
-interface FieldDef {
-  key: string;
-  label: string;
-  step: string;
-  prefix?: string;
-  suffix?: string;
-}
-
-const APPOINTMENT_FIELDS: FieldDef[] = [
-  { key: "sales", label: "Targeted Sales", step: "100", prefix: "RM" },
-  { key: "aov", label: "Targeted AOV", step: "1", prefix: "RM" },
-  { key: "cpa_pct", label: "Targeted CPA", step: "0.1", suffix: "%" },
-  { key: "conv_rate", label: "Targeted Conversion Rate", step: "1", suffix: "%" },
-  { key: "showup_rate", label: "Targeted Show Up Rate", step: "1", suffix: "%" },
-  { key: "appt_rate", label: "Targeted Appointment Rate", step: "1", suffix: "%" },
-  { key: "respond_rate", label: "Targeted Respond Rate", step: "1", suffix: "%" },
-];
-
-const WALKIN_FIELDS: FieldDef[] = [
-  { key: "sales", label: "Targeted Sales", step: "100", prefix: "RM" },
-  { key: "aov", label: "Targeted AOV", step: "1", prefix: "RM" },
-  { key: "cpa_pct", label: "Targeted CPA", step: "0.1", suffix: "%" },
-  { key: "conv_rate", label: "Targeted Conversion Rate", step: "1", suffix: "%" },
-  { key: "respond_rate", label: "Targeted Visit Rate", step: "1", suffix: "%" },
-];
-
-// ── Helpers ──────────────────────────────────────────────────
-
-function fmtRM(v: number) {
-  return `RM${v.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-// ── Derived value display definition ────────────────────────
-
-interface DerivedMetric {
-  label: string;
-  key: string;
-  format: "rm" | "count" | "pct" | "number";
-  funnelFilter?: "walkin" | "appointment";
-}
-
-const DERIVED_METRICS: DerivedMetric[] = [
-  { label: "Targeted Order", key: "orders", format: "count" },
-  { label: "CPL (Incl SST)", key: "cpl", format: "rm" },
-  { label: "CP.Acquisition (Incl SST)", key: "cp_acquisition", format: "rm" },
-  { label: "FB Leads Inquiry", key: "fb_leads", format: "count" },
-  { label: "CP.Visit (Incl SST)", key: "cp_visit", format: "rm", funnelFilter: "walkin" },
-  { label: "Visit", key: "target_visit", format: "count", funnelFilter: "walkin" },
-  { label: "CP.Show Up (Incl SST)", key: "cp_showup", format: "rm", funnelFilter: "appointment" },
-  { label: "Show Up", key: "target_showup", format: "count", funnelFilter: "appointment" },
-  { label: "CP.Appointment (Incl SST)", key: "cp_appointment", format: "rm", funnelFilter: "appointment" },
-  { label: "Appointment", key: "target_appt", format: "count", funnelFilter: "appointment" },
-  { label: "CP.Contact Given (Incl SST)", key: "cp_contact", format: "rm", funnelFilter: "appointment" },
-  { label: "Contact Given", key: "target_contact", format: "count", funnelFilter: "appointment" },
-  { label: "Monthly Ad Spend (Incl SST)", key: "monthly_ad_incl", format: "rm" },
-  { label: "Monthly Ad Spend (Excl SST)", key: "monthly_ad_excl", format: "rm" },
-  { label: "Targeted Daily Ad Spend (Incl SST)", key: "daily_ad_targeted_incl", format: "rm" },
-  { label: "Targeted Daily Ad Spend (Excl SST)", key: "daily_ad_targeted_excl", format: "rm" },
-];
-
-function formatDerived(val: number, format: DerivedMetric["format"]) {
-  if (format === "rm") return fmtRM(val);
-  if (format === "pct") return `${val.toFixed(2)}%`;
-  if (format === "count") return String(Math.round(val));
-  return val.toFixed(2);
-}
-
-// ── Calculator tabs (walk-in) ────────────────────────────────
-// Each tab solves a different unknown from the same funnel equation: the unknown
-// moves to a read-only "result", and CPL becomes an editable input instead.
-
-const CPL_FIELD: FieldDef = { key: "cpl", label: "Targeted CPL (Incl SST)", step: "0.01", prefix: "RM" };
-
-interface CalcDef {
-  mode: CalculatorMode;
-  label: string;
-  inputKeys: string[];
-  output: { key: string; label: string; format: "rm" | "pct" };
-}
-
-const WALKIN_CALCS: CalcDef[] = [
-  { mode: "cpl", label: "CPL", inputKeys: ["sales", "aov", "cpa_pct", "conv_rate", "respond_rate"],
-    output: { key: "cpl", label: "Targeted CPL (Incl SST)", format: "rm" } },
-  { mode: "visit_rate", label: "Visit Rate", inputKeys: ["sales", "aov", "cpa_pct", "conv_rate", "cpl"],
-    output: { key: "respond_rate", label: "Targeted Visit Rate", format: "pct" } },
-  { mode: "cpa", label: "CPA %", inputKeys: ["sales", "aov", "conv_rate", "respond_rate", "cpl"],
-    output: { key: "cpa_pct", label: "Targeted CPA %", format: "pct" } },
-];
-
-const APPOINTMENT_CALCS: CalcDef[] = [
-  { mode: "cpl", label: "CPL",
-    inputKeys: ["sales", "aov", "cpa_pct", "conv_rate", "showup_rate", "appt_rate", "respond_rate"],
-    output: { key: "cpl", label: "Targeted CPL (Incl SST)", format: "rm" } },
-  { mode: "appt_rate", label: "Appointment Rate",
-    inputKeys: ["sales", "aov", "cpa_pct", "conv_rate", "showup_rate", "respond_rate", "cpl"],
-    output: { key: "appt_rate", label: "Targeted Appointment Rate", format: "pct" } },
-  { mode: "cpa", label: "CPA %",
-    inputKeys: ["sales", "aov", "conv_rate", "showup_rate", "appt_rate", "respond_rate", "cpl"],
-    output: { key: "cpa_pct", label: "Targeted CPA %", format: "pct" } },
-];
-
-// Field definitions indexed by key, per funnel (respond_rate's label differs by funnel).
-function fieldMapFor(funnelType: "appointment" | "walkin"): Record<string, FieldDef> {
-  const base = funnelType === "walkin" ? WALKIN_FIELDS : APPOINTMENT_FIELDS;
-  return Object.fromEntries([...base, CPL_FIELD].map((f) => [f.key, f]));
-}
+const CARD = "mb-6 bg-[var(--bg2)] border border-[var(--border)] rounded-[10px] p-6";
+const H2 = "font-semibold text-[15px] tracking-tight text-[var(--t1)] mb-1";
+const HINT = "text-[12px] text-[var(--t4)] mb-4";
+const FIELD =
+  "text-[13px] py-[6px] px-3 rounded-[6px] border border-[var(--border)] bg-[var(--bg1)] text-[var(--t1)] outline-none focus:border-[var(--border-hover)]";
 
 export function SettingsClient({ lang }: { lang: Lang }) {
   const { clientId } = useParams<{ clientId: string }>();
-  const tl = (s: string) => (lang === "zh" && SETTINGS_ZH[s]) || s;
+  const router = useRouter();
+  const tl = (s: string) => (lang === "zh" && S_ZH[s]) || s;
 
-  // Core state
-  const [form, setForm] = useState<Record<string, number>>({});
-  const [sheetDerived, setSheetDerived] = useState<Record<string, number>>({});
-  const [funnelType, setFunnelType] = useState<"appointment" | "walkin">("appointment");
-  const [brands, setBrands] = useState<string[]>([]);
-  const [selectedBrand, setSelectedBrand] = useState<string>("");
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-
-  // Logo state (language is now a per-viewer setting on the dashboard, not here)
+  const [name, setName] = useState("");
+  const [sheetId, setSheetId] = useState<string | null>(null);
+  const [sheetUrlInput, setSheetUrlInput] = useState("");
+  const [savingSheet, setSavingSheet] = useState(false);
+  const [savingName, setSavingName] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
-  // Active calculator tab — both funnels have CPL / rate / CPA calculators.
-  const [calcMode, setCalcMode] = useState<CalculatorMode>("cpl");
-  const calcsForFunnel = funnelType === "walkin" ? WALKIN_CALCS : APPOINTMENT_CALCS;
-  const activeCalc = calcsForFunnel.find((c) => c.mode === calcMode) ?? calcsForFunnel[0];
-
-  // Editable inputs = the active calculator's fields.
-  const fields = activeCalc.inputKeys
-    .map((k) => fieldMapFor(funnelType)[k])
-    .filter(Boolean);
-
-  // Fill in the calculator's solved unknown so the whole derived set stays consistent.
-  const completeForm = useMemo(
-    () => completeInputs(activeCalc.mode, funnelType, form),
-    [activeCalc.mode, funnelType, form],
-  );
-
-  // ── Real-time derived values ──────────────────────────────
-  // All formulas live in lib/kpi-calculator — full precision, no intermediate
-  // rounding, so Settings matches the Google Sheet exactly. Rounding happens
-  // only at display time (see formatDerived).
-  const derived = useMemo(() => {
-    const now = new Date();
-    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    return computeSettingsDerived(completeForm, funnelType, daysInMonth);
-  }, [completeForm, funnelType]);
-
-  // Derived grid hides CPL — it's the calculator's input or its headline result.
-  const visibleDerived = DERIVED_METRICS.filter(
-    (m) => (!m.funnelFilter || m.funnelFilter === funnelType) && m.key !== "cpl",
-  );
-
-  // The highlighted result for the active calculator.
-  const resultValue =
-    activeCalc.output.key === "cpl"
-      ? derived.cpl
-      : completeForm[activeCalc.output.key] ?? 0;
-
-  // ── Fetch logo & language on mount ────────────────────────
   useEffect(() => {
-    async function fetchClientSettings() {
+    (async () => {
       const supabase = createClient();
-      const { data } = await supabase.from("clients").select("logo_url").eq("id", clientId).single();
-      if (data?.logo_url) setLogoUrl(data.logo_url);
-    }
-    fetchClientSettings();
+      const { data } = await supabase.from("clients").select("name, logo_url, sheet_id").eq("id", clientId).single();
+      if (data) {
+        setName(data.name ?? "");
+        setLogoUrl(data.logo_url ?? null);
+        setSheetId(data.sheet_id ?? null);
+        setSheetUrlInput(data.sheet_id ? `https://docs.google.com/spreadsheets/d/${data.sheet_id}` : "");
+      }
+    })();
   }, [clientId]);
 
-  // ── Fetch KPI from Google Sheet ───────────────────────────
-  useEffect(() => {
-    async function fetchKPI() {
-      setLoading(true);
-      try {
-        const params = new URLSearchParams({ clientId });
-        if (selectedBrand) params.set("brand", selectedBrand);
-
-        const res = await fetch(`/api/kpi?${params}`);
-        if (!res.ok) throw new Error(tl("Failed to load KPI data"));
-        const data = await res.json();
-
-        setFunnelType(data.funnelType || "appointment");
-        if (data.brands?.length > 0) {
-          setBrands(data.brands);
-          if (!selectedBrand) setSelectedBrand(data.brands[0]);
-        }
-
-        // Populate editable form fields
-        const kpi = data.kpi || {};
-        const editableKeys = (data.funnelType === "walkin" ? WALKIN_FIELDS : APPOINTMENT_FIELDS).map((f) => f.key);
-        const formValues: Record<string, number> = {};
-        for (const key of editableKeys) {
-          formValues[key] = kpi[key] ?? 0;
-        }
-        // Use excluded SST value from derived data for Daily Ad Spend Budget
-        const derivedData = data.derived || {};
-        formValues.daily_ad = derivedData.daily_ad_current_excl ?? kpi.daily_ad ?? 0;
-        // Seed CPL so the Visit Rate / CPA calculators have a sensible starting target.
-        formValues.cpl = kpi.cpl ?? derivedData.cpl ?? 0;
-        setForm(formValues);
-
-        setSheetDerived(derivedData);
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : tl("Failed to load KPI"));
-      }
-      setLoading(false);
-    }
-    fetchKPI();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clientId, selectedBrand]);
-
-  // ── Re-fetch derived values from sheet ─────────────────────
-  async function refreshDerived() {
-    const params = new URLSearchParams({ clientId });
-    if (selectedBrand) params.set("brand", selectedBrand);
-    const res = await fetch(`/api/kpi?${params}`);
-    if (res.ok) {
-      const data = await res.json();
-      setSheetDerived(data.derived || {});
-    }
-  }
-
-  // ── Save to Google Sheet + Supabase ───────────────────────
-  async function handleSave() {
-    setSaving(true);
+  async function handleSaveName() {
+    setSavingName(true);
     try {
-      const res = await fetch("/api/kpi", {
-        method: "POST",
+      const res = await fetch("/api/client-settings", {
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          clientId,
-          fields: completeForm,
-          brand: selectedBrand || undefined,
-        }),
+        body: JSON.stringify({ clientId, name }),
       });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || tl("Save failed"));
-      }
-
-      toast.success(tl("KPI synced to Google Sheet"));
-
-      // Re-fetch derived values — sheet formulas recalculate after write
-      await refreshDerived();
+      if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || `HTTP ${res.status}`);
+      toast.success(tl("Name updated"));
+      router.refresh(); // sidebar + server-rendered name pick it up
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : tl("Failed to save"));
+      toast.error(`${tl("Failed to update name")}: ${err instanceof Error ? err.message : ""}`);
+    } finally {
+      setSavingName(false);
     }
-    setSaving(false);
   }
 
-  function handleChange(key: string, value: string) {
-    setForm((prev) => ({ ...prev, [key]: value === "" ? 0 : Number(value) }));
+  async function handleSaveSheet() {
+    setSavingSheet(true);
+    try {
+      const res = await fetch("/api/client-settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientId, sheetUrl: sheetUrlInput }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+      setSheetId(data.sheet_id);
+      setSheetUrlInput(`https://docs.google.com/spreadsheets/d/${data.sheet_id}`);
+      toast.success(tl("Sheet link updated"));
+      router.refresh();
+    } catch (err) {
+      toast.error(`${tl("Failed to update sheet link")}: ${err instanceof Error ? err.message : ""}`);
+    } finally {
+      setSavingSheet(false);
+    }
   }
 
-  // ── Logo handlers ─────────────────────────────────────────
+  // ── Logo handlers (moved verbatim from the old combined Settings) ──
   async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -340,10 +127,8 @@ export function SettingsClient({ lang }: { lang: Lang }) {
     }
 
     const { data: urlData } = supabase.storage.from("logos").getPublicUrl(path);
-    // We re-use the same storage path (`${clientId}.${ext}`) with upsert, so overwriting
-    // returns a byte-identical URL — the browser/CDN keeps serving the cached old image.
-    // A fresh ?v= per upload busts that cache everywhere the logo renders (this preview,
-    // the topbar, dashboard cards, mobile nav).
+    // Re-using the same storage path with upsert returns a byte-identical URL —
+    // a fresh ?v= per upload busts browser/CDN caches everywhere it renders.
     const publicUrl = `${urlData.publicUrl}?v=${Date.now()}`;
 
     const { error: updateErr } = await supabase.from("clients").update({ logo_url: publicUrl }).eq("id", clientId);
@@ -361,13 +146,11 @@ export function SettingsClient({ lang }: { lang: Lang }) {
     setUploading(true);
     const supabase = createClient();
     const urlParts = logoUrl.split("/logos/");
-    // Drop any ?v= cache-buster before deriving the storage object name, otherwise
-    // remove() targets a path that doesn't exist and the file is orphaned.
+    // Drop any ?v= cache-buster before deriving the storage object name.
     const filePath = urlParts[urlParts.length - 1]?.split("?")[0];
     if (filePath) {
       await supabase.storage.from("logos").remove([filePath]);
     }
-
     const { error } = await supabase.from("clients").update({ logo_url: null }).eq("id", clientId);
     if (error) {
       toast.error(tl("Failed to remove logo"));
@@ -380,24 +163,25 @@ export function SettingsClient({ lang }: { lang: Lang }) {
 
   return (
     <div>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-4">
-          <Link
-            href={`/${clientId}`}
-            className="text-sm text-[var(--t3)] hover:text-[var(--t1)] transition-colors"
-          >
-            &larr; {tl("Dashboard")}
-          </Link>
-          <h1 className="font-heading font-bold text-2xl text-[var(--t1)] dark:text-[var(--t1)] tracking-tight">
-            {tl("Settings")}
-          </h1>
+      <div className="mb-8">
+        <h1 className="font-heading font-bold text-2xl text-[var(--t1)] tracking-tight">{tl("Settings")}</h1>
+      </div>
+
+      {/* Project name */}
+      <div className={CARD}>
+        <h2 className={H2}>{tl("Project Name")}</h2>
+        <p className={HINT}>{tl("Shown everywhere — sidebar, overview cards, reports.")}</p>
+        <div className="flex items-center gap-2">
+          <input className={`${FIELD} w-full max-w-[360px]`} value={name} onChange={(e) => setName(e.target.value)} maxLength={80} />
+          <button className="topbar-btn" onClick={handleSaveName} disabled={savingName || !name.trim()}>
+            {savingName ? tl("Saving...") : tl("Save Name")}
+          </button>
         </div>
       </div>
 
-      {/* Logo Upload */}
-      <div className="mb-6 bg-[var(--bg2)] border border-[var(--border)] rounded-[10px] p-6">
-        <h2 className="font-semibold text-[15px] tracking-tight text-[var(--t1)] dark:text-[var(--t1)] mb-4">{tl("Client Logo")}</h2>
+      {/* Logo */}
+      <div className={CARD}>
+        <h2 className={`${H2} mb-4`}>{tl("Client Logo")}</h2>
         <div className="flex items-center gap-5">
           {logoUrl ? (
             <img src={logoUrl} alt="Logo" className="w-20 h-20 rounded-[10px] object-contain border border-[var(--border)] bg-white p-1" />
@@ -409,20 +193,10 @@ export function SettingsClient({ lang }: { lang: Lang }) {
           <div className="flex flex-col gap-2">
             <label className="topbar-btn inline-flex cursor-pointer">
               {uploading ? tl("Uploading...") : tl("Upload Logo")}
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleLogoUpload}
-                className="hidden"
-                disabled={uploading}
-              />
+              <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" disabled={uploading} />
             </label>
             {logoUrl && (
-              <button
-                onClick={handleLogoDelete}
-                disabled={uploading}
-                className="text-[12px] text-[var(--red)] hover:underline text-left cursor-pointer"
-              >
+              <button onClick={handleLogoDelete} disabled={uploading} className="text-[12px] text-[var(--red)] hover:underline text-left cursor-pointer">
                 {tl("Remove Logo")}
               </button>
             )}
@@ -431,204 +205,36 @@ export function SettingsClient({ lang }: { lang: Lang }) {
         </div>
       </div>
 
-      {/* Project Profile（项目档案）*/}
-      <ProfileEditor clientId={clientId} lang={lang} />
-
-      {/* KPI Content */}
-      {loading ? (
-        <div className="text-center text-[var(--t3)] py-12">{tl("Loading KPI from Google Sheet...")}</div>
-      ) : (
-        <>
-          {/* Brand Selector (multi-brand only) */}
-          {brands.length > 1 && (
-            <div className="mb-6">
-              <Label className="text-sm text-[var(--t3)] mb-2">{tl("Brand")}</Label>
-              <Select
-                value={selectedBrand}
-                onValueChange={(val) => { if (val) setSelectedBrand(val); }}
-              >
-                <SelectTrigger className="w-[220px] border-[var(--border)] focus-visible:ring-[var(--blue)]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {brands.map((b) => (
-                    <SelectItem key={b} value={b}>{b}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+      {/* Data connection */}
+      <div className={CARD}>
+        <h2 className={H2}>{tl("Data Connection")}</h2>
+        <p className={HINT}>{tl("This project reads from the Google Sheet below. Changing it re-points every number — only managers can edit.")}</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            className={`${FIELD} w-full max-w-[440px]`}
+            value={sheetUrlInput}
+            onChange={(e) => setSheetUrlInput(e.target.value)}
+            placeholder={tl("Paste a Google Sheet link or ID")}
+          />
+          <button className="topbar-btn" onClick={handleSaveSheet} disabled={savingSheet || !sheetUrlInput.trim()}>
+            {savingSheet ? tl("Saving...") : tl("Save Link")}
+          </button>
+          {sheetId && (
+            <a href={`https://docs.google.com/spreadsheets/d/${sheetId}`} target="_blank" rel="noreferrer" className="topbar-btn inline-flex">
+              {tl("Open Google Sheet")}
+            </a>
           )}
+        </div>
+      </div>
 
-          {/* Calculator tabs */}
-          <div className="mb-6">
-            <div className="text-[11px] font-label uppercase tracking-wider text-[var(--t4)] mb-2">
-              {tl("Calculator")}
-            </div>
-            <div className="inline-flex gap-1 p-1 bg-[var(--sand)] rounded-[10px]">
-              {calcsForFunnel.map((c) => (
-                  <button
-                    key={c.mode}
-                    onClick={() => setCalcMode(c.mode)}
-                    className={`px-4 py-1.5 rounded-[7px] text-[13px] font-medium transition-colors cursor-pointer ${
-                      calcMode === c.mode
-                        ? "bg-[var(--bg2)] text-[var(--t1)] shadow-sm"
-                        : "text-[var(--t3)] hover:text-[var(--t1)]"
-                    }`}
-                  >
-                    {tl(c.label)}
-                  </button>
-                ))}
-              </div>
-            </div>
-          {/* Section 1: KPI Targets (editable) */}
-          <div className="bg-[var(--bg2)] border border-[var(--border)] rounded-[10px] p-6 mb-6">
-            <div className="flex items-center gap-3 mb-4">
-              <h2 className="font-bold text-[15px] tracking-tight text-[var(--t1)] dark:text-[var(--t1)]">
-                {tl("KPI Targets")}
-              </h2>
-              <span className="text-[10px] font-label uppercase tracking-wider text-[var(--blue)] bg-[var(--blue)]/10 px-2 py-0.5 rounded-full">
-                {tl("Synced from Google Sheet")}
-              </span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-              {fields.map((field) => (
-                <div key={field.key}>
-                  <Label className="text-sm text-[var(--t3)] mb-1">
-                    {tl(field.label)}
-                    {field.prefix && (
-                      <span className="text-xs text-[var(--t3)]/60 ml-1">({field.prefix})</span>
-                    )}
-                    {field.suffix && (
-                      <span className="text-xs text-[var(--t3)]/60 ml-1">({field.suffix})</span>
-                    )}
-                  </Label>
-                  <Input
-                    type="number"
-                    step={field.step}
-                    min="0"
-                    value={form[field.key] || ""}
-                    onChange={(e) => handleChange(field.key, e.target.value)}
-                    className="num border-[var(--border)] focus-visible:ring-[var(--blue)]"
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Calculator result */}
-          <div className="bg-[var(--blue)]/5 border border-[var(--blue)]/30 rounded-[10px] p-6 mb-6">
-            <div className="text-[11px] font-label uppercase tracking-wider text-[var(--blue)] mb-1">
-              {tl(activeCalc.output.label)} &mdash; {tl("Result")}
-            </div>
-              <div className="num text-[28px] font-bold text-[var(--t1)]">
-                {activeCalc.output.format === "rm"
-                  ? fmtRM(resultValue)
-                  : `${resultValue.toFixed(2)}%`}
-              </div>
-              <p className="text-[12px] text-[var(--t3)] mt-1">
-                {tl("Auto-calculated from the inputs above — this is the target that gets saved.")}
-              </p>
-            </div>
-
-          {/* Section 2: Derived Values (read-only, from sheet formulas) */}
-          <div className="bg-[var(--bg2)] border border-[var(--border)] rounded-[10px] p-6 mb-6 opacity-80">
-            <h2 className="font-bold text-[15px] tracking-tight text-[var(--t1)] dark:text-[var(--t1)] mb-4">
-              {tl("Derived Values")}
-              <span className="text-[10px] font-label uppercase tracking-wider text-[var(--t4)] ml-2">{tl("Auto-calculated")}</span>
-            </h2>
-            <TooltipProvider>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                {visibleDerived.map((m) => {
-                  const explain = describeDerived(
-                    m.key,
-                    completeForm,
-                    funnelType,
-                    derived as Record<string, number>,
-                  );
-                  const valueText = formatDerived(
-                    (derived as Record<string, number>)[m.key] ?? 0,
-                    m.format,
-                  );
-                  return (
-                    <Tooltip key={m.key}>
-                      <TooltipTrigger
-                        render={<div className="text-left cursor-help group" />}
-                      >
-                        <div className="flex items-center gap-1 text-[11px] text-[var(--t4)] uppercase tracking-wider mb-1">
-                          {tl(m.label)}
-                          <Info className="w-3 h-3 opacity-40 group-hover:opacity-80 transition-opacity" />
-                        </div>
-                        <div className="num text-[15px] font-semibold text-[var(--t1)]">
-                          {valueText}
-                        </div>
-                      </TooltipTrigger>
-                      {explain && (
-                        <TooltipContent>
-                          <div className="font-semibold text-[13px] text-[var(--t1)] mb-1.5">
-                            {explain.title}
-                          </div>
-                          <div className="text-[12px] text-muted-foreground leading-relaxed">
-                            {explain.formula}
-                          </div>
-                          <div className="num text-[12px] text-[var(--t2)] mt-1.5">
-                            = {explain.substituted}
-                          </div>
-                          <div className="num text-[13px] font-semibold text-[var(--t1)] mt-0.5">
-                            = {explain.result}
-                          </div>
-                        </TooltipContent>
-                      )}
-                    </Tooltip>
-                  );
-                })}
-              </div>
-            </TooltipProvider>
-          </div>
-
-          {/* Section 3: Daily Ad Spend Budget */}
-          <div className="bg-[var(--bg2)] border border-[var(--border)] rounded-[10px] p-6 mb-6">
-            <h2 className="font-bold text-[15px] tracking-tight text-[var(--t1)] dark:text-[var(--t1)] mb-4">
-              {tl("Daily Ad Spend Budget")}
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <Label className="text-sm text-[var(--t3)] mb-1">
-                  {tl("Current Daily Ad Spend")}
-                  <span className="text-xs text-[var(--t3)]/60 ml-1">{tl("(Excluded 8% SST)")}</span>
-                </Label>
-                <Input
-                  type="number"
-                  step="10"
-                  min="0"
-                  value={form.daily_ad || ""}
-                  onChange={(e) => handleChange("daily_ad", e.target.value)}
-                  className="num border-[var(--border)] focus-visible:ring-[var(--blue)]"
-                />
-              </div>
-              <div>
-                <div className="text-sm text-[var(--t3)] mb-1">
-                  {tl("Actual Daily Ad Spend")}
-                  <span className="text-xs text-[var(--t3)]/60 ml-1">{tl("(Included 8% SST)")}</span>
-                </div>
-                <div className="num text-[20px] font-semibold text-[var(--t1)] mt-1.5">
-                  {fmtRM(derived.daily_ad_actual_incl ?? 0)}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Save Button */}
-          <div className="flex justify-end mb-12">
-            <Button
-              onClick={handleSave}
-              disabled={saving}
-              className="bg-[var(--blue)] hover:bg-[#A34D2F] text-white px-6"
-            >
-              {saving ? tl("Syncing...") : tl("Save & Sync to Sheet")}
-            </Button>
-          </div>
-        </>
-      )}
+      {/* Team & access */}
+      <div className={CARD}>
+        <h2 className={H2}>{tl("Team & Access")}</h2>
+        <p className={HINT}>{tl("Manage who can view or manage this project.")}</p>
+        <Link href={`/projects/access?back=/${clientId}/settings`} className="topbar-btn inline-flex">
+          {tl("Manage Access")}
+        </Link>
+      </div>
     </div>
   );
 }

@@ -1,18 +1,23 @@
 "use client";
 
-import { useState } from "react";
-import type { MemberRole } from "@/lib/types";
+import { useState, useEffect } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 interface InviteDialogProps {
   clients: { id: string; name: string }[];
   open: boolean;
   onClose: () => void;
-  onInvite: (email: string, role: MemberRole, clientIds: string[]) => Promise<void>;
+  onInvite: (email: string, role: string, clientIds: string[]) => Promise<void>;
 }
 
 export function InviteDialog({ clients, open, onClose, onInvite }: InviteDialogProps) {
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState<MemberRole>("viewer");
+  const [role, setRole] = useState<string>("Viewer");
+  const [roleOptions, setRoleOptions] = useState<{ name: string; permissions: string[] }[]>([]);
+  useEffect(() => {
+    createClient().from("roles").select("name, permissions").order("built_in", { ascending: false }).order("created_at")
+      .then(({ data }) => setRoleOptions((data ?? []).map((r) => ({ name: r.name, permissions: (r.permissions as string[]) || [] }))));
+  }, []);
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
   const [sending, setSending] = useState(false);
 
@@ -30,7 +35,7 @@ export function InviteDialog({ clients, open, onClose, onInvite }: InviteDialogP
     try {
       await onInvite(email, role, selectedClients);
       setEmail("");
-      setRole("viewer");
+      setRole("Viewer");
       setSelectedClients([]);
       onClose();
     } finally {
@@ -86,26 +91,24 @@ export function InviteDialog({ clients, open, onClose, onInvite }: InviteDialogP
             Role
           </label>
           <div className="grid grid-cols-2 gap-2">
-            {(["manager", "viewer"] as const).map((r) => (
+            {roleOptions.map((r) => (
               <button
-                key={r}
-                onClick={() => setRole(r)}
+                key={r.name}
+                onClick={() => setRole(r.name)}
                 className="flex flex-col gap-0.5 p-3 rounded-xl text-left transition-all"
                 style={{
-                  border: role === r ? "1.5px solid var(--blue)" : "1.5px solid var(--border)",
-                  background: role === r ? "var(--blue-bg)" : "var(--bg)",
+                  border: role === r.name ? "1.5px solid var(--blue)" : "1.5px solid var(--border)",
+                  background: role === r.name ? "var(--blue-bg)" : "var(--bg)",
                 }}
               >
                 <span
-                  className="font-label text-[12px] font-semibold capitalize"
-                  style={{ color: role === r ? "var(--blue)" : "var(--t1)" }}
+                  className="font-label text-[12px] font-semibold"
+                  style={{ color: role === r.name ? "var(--blue)" : "var(--t1)" }}
                 >
-                  {r}
+                  {r.name}
                 </span>
                 <span className="text-[11px]" style={{ color: "var(--t3)" }}>
-                  {r === "manager"
-                    ? "Can view dashboards, reports, and edit settings"
-                    : "Can view dashboards and reports only"}
+                  {r.permissions.length === 0 ? "Overview dashboard only" : `Overview + ${r.permissions.length} feature${r.permissions.length === 1 ? "" : "s"}`}
                 </span>
               </button>
             ))}

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import type { OnboardingState, MemberRole } from "@/lib/types";
 
@@ -56,8 +57,15 @@ export function WizardShell({ children }: WizardShellProps) {
         <div />
       </div>
 
+      {/* Exit back to Project Overview */}
+      <div className="pt-6 px-6 max-w-[640px] mx-auto">
+        <Link href="/projects" className="text-[13px] text-[var(--t3)] hover:text-[var(--t1)] transition-colors no-underline">
+          &larr; Back to Project Overview
+        </Link>
+      </div>
+
       {/* Progress bar */}
-      <div className="pt-8 pb-0 px-6 flex justify-center">
+      <div className="pt-2 pb-0 px-6 flex justify-center">
         <div className="w-full max-w-2xl mt-6">
           <div className="flex items-center">
             {STEPS.map((label, idx) => {

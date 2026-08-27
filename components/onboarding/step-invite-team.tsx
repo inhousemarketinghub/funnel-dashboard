@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { OnboardingState, MemberRole } from "@/lib/types";
+import type { OnboardingState } from "@/lib/types";
 
 interface Props {
   state: OnboardingState;
@@ -22,7 +23,12 @@ export function StepInviteTeam({
   completing,
 }: Props) {
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState<MemberRole>("viewer");
+  const [role, setRole] = useState<string>("Viewer");
+  const [roleOptions, setRoleOptions] = useState<string[]>(["Viewer"]);
+  useEffect(() => {
+    createClient().from("roles").select("name").order("built_in", { ascending: false }).order("created_at")
+      .then(({ data }) => { if (data?.length) setRoleOptions(data.map((r) => r.name)); });
+  }, []);
   const [emailError, setEmailError] = useState<string | null>(null);
 
   function validateEmail(val: string): boolean {
@@ -92,12 +98,11 @@ export function StepInviteTeam({
           {/* Role selector */}
           <select
             value={role}
-            onChange={(e) => setRole(e.target.value as MemberRole)}
+            onChange={(e) => setRole(e.target.value)}
             className="border rounded-[6px] px-2 text-[13px] bg-[var(--bg2)] text-[var(--t1)] focus:outline-none focus:ring-2 focus:ring-[var(--blue)] transition-colors"
             style={{ borderColor: "var(--border)", minWidth: 110 }}
           >
-            <option value="viewer">Viewer</option>
-            <option value="manager">Manager</option>
+            {roleOptions.map((r) => <option key={r} value={r}>{r}</option>)}
           </select>
           <Button
             onClick={handleAdd}

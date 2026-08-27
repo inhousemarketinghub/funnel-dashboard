@@ -13,7 +13,7 @@ interface Props {
   clientName: string;
   logoUrl?: string | null;
   email?: string | null;
-  canSettings: boolean;
+  features: string[];
   lang: Lang;
 }
 
@@ -26,7 +26,7 @@ const ITEM =
  * Settings / theme / sign out). Replaces the desktop topbar below md, which
  * eliminates the cramped, overlapping wrapped bar.
  */
-export function MobileNav({ clientId, clientName, logoUrl, email, canSettings, lang }: Props) {
+export function MobileNav({ clientId, clientName, logoUrl, email, features, lang }: Props) {
   return (
     <div
       className="md:hidden sticky top-[3px] z-[101] flex h-[52px] items-center justify-between gap-2 px-4"
@@ -62,11 +62,19 @@ export function MobileNav({ clientId, clientName, logoUrl, email, canSettings, l
         />
         <PopoverContent align="end" sideOffset={6} className="w-52 p-1.5">
           <div className="flex flex-col gap-0.5">
-            <Link href={`/${clientId}/trends`} className={ITEM}>{t(lang, "trends")}</Link>
-            {canSettings && (
+            {features.includes("view_trends") && (
+              <Link href={`/${clientId}/trends`} className={ITEM}>{t(lang, "trends")}</Link>
+            )}
+            {features.includes("view_projection") && (
+              <Link href={`/${clientId}/projection`} className={ITEM}>{t(lang, "adsProjection")}</Link>
+            )}
+            {features.includes("edit_customization") && (
+              <Link href={`/${clientId}/customization`} className={ITEM}>{t(lang, "projectCustomization")}</Link>
+            )}
+            {features.includes("view_diagnostics") && (
               <Link href={`/${clientId}/diagnostics`} className={ITEM}>{t(lang, "diagnostics")}</Link>
             )}
-            {canSettings && (
+            {features.includes("edit_settings") && (
               <Link href={`/${clientId}/settings`} className={ITEM}>{t(lang, "settings")}</Link>
             )}
             <Link href="/projects" className={ITEM}>{t(lang, "projectOverview")}</Link>

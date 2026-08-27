@@ -471,7 +471,7 @@
 
 /* ── Print styles ── */
 @media print {
-  .topbar, .theme-toggle, .topbar-btn, .bauhaus-stripe { display: none; }
+  .topbar, .theme-toggle, .topbar-btn, .bauhaus-stripe, .app-sidebar { display: none; }
   body { background: white; color: #111; }
 }
 

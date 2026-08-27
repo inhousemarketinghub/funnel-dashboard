@@ -17,7 +17,7 @@ export async function PUT(req: NextRequest) {
   if (!clientId) return NextResponse.json({ error: "clientId required" }, { status: 400 });
 
   const perms = await getProjectPermissions(clientId);
-  if (!perms.includes("edit_settings")) {
+  if (!perms.includes("edit_customization")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

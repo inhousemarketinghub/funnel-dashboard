@@ -49,7 +49,7 @@ export default async function ClientsPage() {
                 direct load of this post-login landing page honors the saved theme. */}
             <ThemeToggle />
             {isOwnerOrManager && (
-              <Link href="/settings/team" className="topbar-btn">
+              <Link href="/projects/access?back=/projects" className="topbar-btn">
                 Access Management
               </Link>
             )}
