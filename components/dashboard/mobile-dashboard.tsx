@@ -163,13 +163,13 @@ export function MobileDashboard({
                 <button
                   key={k.label}
                   onClick={() => setSelected(k)}
-                  className="card-base relative text-left"
+                  className="card-base relative text-left @container"
                   style={{ padding: 14, borderLeft: `3px solid ${k.notTracked ? "var(--t4)" : statusColor(k.value)}` }}
                 >
                   <div className="font-label mb-1 truncate text-[10px] uppercase tracking-wider text-[var(--t4)]">
                     {k.label}
                   </div>
-                  <div className={`num text-[20px] font-bold leading-tight ${k.notTracked ? "text-[var(--t4)]" : "text-[var(--t1)]"}`}>
+                  <div className={`num text-[clamp(14px,10cqw,20px)] font-bold leading-tight ${k.notTracked ? "text-[var(--t4)]" : "text-[var(--t1)]"}`}>
                     {k.notTracked ? t(lang, "notTracked") : k.actual}
                   </div>
                   <div className="mt-1 text-[10px]" style={{ color: k.notTracked ? "var(--t4)" : statusColor(k.value) }}>

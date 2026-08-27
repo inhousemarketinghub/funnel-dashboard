@@ -107,7 +107,7 @@ export function FunnelFlow({ metrics, funnelType = "appointment", lang = "en", t
   }
 
   return (
-    <div ref={ref} className="flex gap-3 sm:gap-4 items-start">
+    <div ref={ref} className="flex flex-wrap gap-3 sm:gap-4 items-start">
       {/* Left labels */}
       <div className="flex flex-col" style={{ paddingTop: 8 }}>
         {STEPS.map((step, i) => {
