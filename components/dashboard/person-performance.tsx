@@ -19,9 +19,11 @@ interface Props {
   /** Enable the source filter dropdown (needs the route to rebuild on ?source=) */
   clientId?: string;
   availableSources?: string[];
+  /** Sources currently in effect (URL selection OR profile default) */
+  activeSources?: string[];
 }
 
-export function PersonPerformance({ appointmentPersons, salesPersons, kpi, brandBreakdowns = {}, hasMultiBrand = false, funnelType = "appointment", lang = "en", clientId, availableSources = [] }: Props) {
+export function PersonPerformance({ appointmentPersons, salesPersons, kpi, brandBreakdowns = {}, hasMultiBrand = false, funnelType = "appointment", lang = "en", clientId, availableSources = [], activeSources }: Props) {
   const [selectedAppt, setSelectedAppt] = useState("all");
   const [selectedSales, setSelectedSales] = useState("all");
   const isWalkin = funnelType === "walkin";
@@ -78,7 +80,7 @@ export function PersonPerformance({ appointmentPersons, salesPersons, kpi, brand
       {/* Source filter — URL-driven, so the server re-aggregates on change */}
       {clientId && availableSources.length > 0 && (
         <div className="flex justify-end mb-3 -mt-1">
-          <SourceFilter clientId={clientId} availableSources={availableSources} lang={lang} />
+          <SourceFilter clientId={clientId} availableSources={availableSources} activeSources={activeSources} lang={lang} />
         </div>
       )}
       {/* ── Appointment Setter Section ── */}

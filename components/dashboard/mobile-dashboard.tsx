@@ -49,6 +49,7 @@ interface Props {
   sheetId: string;
   fetchedAtLabel: string | null;
   lang: Lang;
+  activeSources?: string[];
 }
 
 const TABS = [
@@ -78,7 +79,7 @@ const TAB_LABEL_KEYS: Record<TabKey, string> = {
 export function MobileDashboard({
   tm, lm, kpi, mom, insights, personData, funnelType, kpiItems,
   thisRangeLabel, prevRangeLabel, clientId, brands, hasMultiBrand, canReport,
-  brandPerformance, sheetId, fetchedAtLabel, lang,
+  brandPerformance, sheetId, fetchedAtLabel, lang, activeSources,
 }: Props) {
   const [tab, setTab] = useState<TabKey>("overview");
   const [selected, setSelected] = useState<KpiItem | null>(null);
@@ -204,6 +205,7 @@ export function MobileDashboard({
               lang={lang}
               clientId={clientId}
               availableSources={personData.availableSources}
+              activeSources={activeSources}
             />
           </div>
         )}
