@@ -36,7 +36,7 @@ export function DonutChart({ data, label, title, hoverFn }: {
 
   return (
     <div className="relative">
-      {title && <div className="font-label text-[9px] uppercase tracking-widest text-[var(--t4)] mb-2">{title}</div>}
+      {title && <div className="font-label text-[9px] uppercase tracking-wider break-words text-[var(--t4)] mb-2">{title}</div>}
       <div className="flex items-center gap-3">
         <svg ref={svgRef} viewBox="0 0 120 120" style={{ width: 90, height: 90, transform: "rotate(-90deg)", flexShrink: 0 }}>
           <circle cx="60" cy="60" r="46" fill="none" stroke="var(--sand)" strokeWidth="12" />
@@ -78,9 +78,10 @@ export function DonutChart({ data, label, title, hoverFn }: {
 
 export function Metric({ label, value, text, sub }: { label: string; value?: number; text?: string; sub?: string }) {
   return (
-    <div className="bg-[var(--bg3)] rounded-[8px] p-[10px]" style={{ transition: "background 500ms ease" }}>
-      <div className="text-[9px] text-[var(--t4)] uppercase tracking-wider mb-[3px]">{label}</div>
-      <div className="num text-[16px] font-semibold text-[var(--t1)]">{text ?? value?.toLocaleString() ?? "0"}</div>
+    <div className="bg-[var(--bg3)] rounded-[8px] p-[10px] @container" style={{ transition: "background 500ms ease" }}>
+      {/* Long labels wrap (never clip); values shrink with the cell width */}
+      <div className="text-[9px] text-[var(--t4)] uppercase tracking-wider mb-[3px] break-words [overflow-wrap:anywhere]">{label}</div>
+      <div className="num text-[clamp(11px,14cqw,16px)] font-semibold text-[var(--t1)]">{text ?? value?.toLocaleString() ?? "0"}</div>
       {sub && <div className="text-[10px] text-[var(--t3)] mt-[2px]">{sub}</div>}
     </div>
   );

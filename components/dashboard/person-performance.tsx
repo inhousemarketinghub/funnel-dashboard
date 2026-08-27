@@ -94,7 +94,7 @@ export function PersonPerformance({ appointmentPersons, salesPersons, kpi, brand
           </div>
           <div className="flex gap-5 flex-wrap">
             <div className="flex-1 min-w-0 sm:min-w-[320px]">
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-[8px]">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-[8px]">
                 <Metric label={t(lang, "contactGiven")} value={selectedApptData.contactGiven} />
                 <Metric label={t(lang, "appointment")} value={selectedApptData.appointment} />
                 <Metric label={t(lang, "showUp")} value={selectedApptData.showUp}
@@ -128,7 +128,7 @@ export function PersonPerformance({ appointmentPersons, salesPersons, kpi, brand
         </div>
 
         {/* Metrics */}
-        <div className={`grid grid-cols-2 md:grid-cols-3 ${isWalkin ? "lg:grid-cols-5" : "lg:grid-cols-7"} gap-[8px] mb-5`}>
+        <div className={`grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 ${isWalkin ? "xl:grid-cols-5" : "xl:grid-cols-7"} gap-[8px] mb-5`}>
           <Metric label={isWalkin ? t(lang, "visit") : t(lang, "estShowUpShort")} value={selectedSalesData.appointment} />
           {!isWalkin && <Metric label={t(lang, "showUp")} value={selectedSalesData.showUp} />}
           {!isWalkin && <Metric label={t(lang, "showUpRate")} text={`${selectedSalesData.showUpRate.toFixed(1)}%`} />}
