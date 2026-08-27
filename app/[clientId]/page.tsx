@@ -21,6 +21,7 @@ import { BlurText } from "@/components/animations/blur-text";
 import { ScrollReveal } from "@/components/animations/scroll-reveal";
 import { Stagger } from "@/components/animations/stagger";
 import type { KPIConfig } from "@/lib/types";
+import { parseProfile } from "@/lib/profile";
 import { generateInsights } from "@/lib/insights";
 import { SummaryCards } from "@/components/dashboard/summary-cards";
 import { MobileDashboard } from "@/components/dashboard/mobile-dashboard";
@@ -66,11 +67,19 @@ export default async function DashboardPage({
   const selectedBrand = brandParam && brandParam !== "Overall" ? brandParam : brands.length === 1 ? brands[0] : undefined;
 
   // Person-performance source filter: ?source=Facebook,Instagram (comma-joined).
-  // Only the team section consumes this — funnel cards stay untouched.
+  // No param → the profile's Paid Ads sources apply as the per-client DEFAULT
+  // scope; ?source=all explicitly clears it. Only the team section consumes
+  // this — funnel cards stay untouched.
+  const profile = parseProfile(client.profile);
   const sourceParam = Array.isArray(sp.source) ? sp.source[0] : sp.source;
-  const selectedSources = sourceParam
-    ? sourceParam.split(",").map((s) => s.trim()).filter(Boolean)
-    : undefined;
+  const selectedSources =
+    sourceParam === "all"
+      ? undefined
+      : sourceParam
+        ? sourceParam.split(",").map((s) => s.trim()).filter(Boolean)
+        : profile.paid_sources?.length
+          ? profile.paid_sources
+          : undefined;
 
   let perfResult: PerfResult = { data: [], funnelType: "appointment", tracked: { appointment: true, est_showup: true, showup: true } };
   let sheetKPI: KPIConfig | null = null;
@@ -326,6 +335,7 @@ export default async function DashboardPage({
               lang={lang}
               clientId={clientId}
               availableSources={personData.availableSources}
+              activeSources={selectedSources}
             />
           </div>
         </CardReveal>

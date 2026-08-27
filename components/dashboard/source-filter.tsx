@@ -16,6 +16,9 @@ interface Props {
   clientId: string;
   /** Distinct Source values from the lead tab, most frequent first */
   availableSources: string[];
+  /** Sources currently in effect server-side (URL selection OR profile default).
+   *  Lets the checkmarks reflect a profile-applied default when the URL is bare. */
+  activeSources?: string[];
   lang?: Lang;
 }
 
@@ -26,12 +29,13 @@ interface Props {
  * server recomputes the aggregation. Options come from the sheet's actual
  * Source values, so new sources (TikTok, Google…) appear with zero code.
  */
-export function SourceFilter({ clientId, availableSources, lang = "en" }: Props) {
+export function SourceFilter({ clientId, availableSources, activeSources, lang = "en" }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
 
   const raw = searchParams.get("source") || "";
+  const isExplicitAll = raw === "all";
   // Optimistic selection: checkmarks must flip the instant the user clicks.
   // The URL only commits AFTER the server re-renders the whole page (sheet
   // fetches included — seconds), and a menu that shows nothing for seconds
@@ -40,10 +44,15 @@ export function SourceFilter({ clientId, availableSources, lang = "en" }: Props)
   // and the URL becomes the source of truth again. No effects needed.
   const [optimistic, setOptimistic] = useState<{ raw: string; sel: Set<string> } | null>(null);
   const urlSelected = new Set(
-    raw.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean),
+    isExplicitAll ? [] : raw.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean),
   );
-  const selected = optimistic && optimistic.raw === raw ? optimistic.sel : urlSelected;
-  const allSelected = selected.size === 0; // no param = all sources
+  // Bare URL + profile default → checkmarks show the default in effect
+  const baseSelected = !raw && activeSources?.length
+    ? new Set(activeSources.map((s) => s.toLowerCase()))
+    : urlSelected;
+  const selected = optimistic && optimistic.raw === raw ? optimistic.sel : baseSelected;
+  const allSelected = selected.size === 0;
+  const hasProfileDefault = (activeSources?.length ?? 0) > 0;
 
   if (availableSources.length === 0) return null;
 
@@ -52,7 +61,9 @@ export function SourceFilter({ clientId, availableSources, lang = "en" }: Props)
     const params = new URLSearchParams(searchParams.toString());
     // Selecting everything (or nothing) = unfiltered → drop the param entirely
     if (next.size === 0 || next.size >= availableSources.length) {
-      params.delete("source");
+      // A client with a profile default needs an explicit "all" to escape it
+      if (hasProfileDefault) params.set("source", "all");
+      else params.delete("source");
     } else {
       const labels = availableSources.filter((s) => next.has(s.toLowerCase()));
       params.set("source", labels.join(","));

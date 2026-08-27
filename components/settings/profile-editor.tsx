@@ -16,6 +16,7 @@ const P_ZH: Record<string, string> = {
   "Appointment": "预约型 (appointment)",
   "Walk-in": "到店型 (walk-in)",
   "Paid Ads sources": "Paid Ads 来源清单",
+  "Active — the Team section defaults to these sources; viewers can still switch to All.": "已生效 —— 团队业绩默认按这些来源统计,看的人仍可手动切回全部。",
   "Comma-separated, e.g. Facebook, Instagram, WhatsApp": "逗号分隔,例如 Facebook, Instagram, WhatsApp",
   "Column aliases": "列别名",
   "Teach the parser this client's column names, e.g. orders = Signed Up": "告诉程式这个客户的列叫什么,例如 orders = Signed Up",
@@ -135,6 +136,7 @@ export function ProfileEditor({ clientId, lang }: { clientId: string; lang: Lang
         {/* Paid sources */}
         <div>
           <label className="block text-[12px] font-medium text-[var(--t3)] mb-1.5">{tl("Paid Ads sources")}</label>
+          <p className="text-[11px] text-[var(--green)] mb-1.5">{tl("Active — the Team section defaults to these sources; viewers can still switch to All.")}</p>
           <input
             className={`${FIELD} w-full max-w-[420px]`}
             value={paidSources}
