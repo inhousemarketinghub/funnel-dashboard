@@ -40,7 +40,16 @@ export async function GET(req: NextRequest) {
   try {
     await markStaleRuns();
     const clients = await listActiveClients();
-    const results = await fanOutSync(req.nextUrl.origin, clients, secret);
+    // Workers must be called through the PUBLIC production host. The request's
+    // own origin resolves to the deployment-specific *.vercel.app URL, which
+    // sits behind Vercel's deployment protection (302 → SSO login) — the
+    // 2026-08-27 08:30 cron dispatched 8 workers that way and zero reached the
+    // app. VERCEL_PROJECT_PRODUCTION_URL is the unprotected production alias;
+    // req.nextUrl.origin remains the fallback for local dev.
+    const prodHost = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+    const base = prodHost ? `https://${prodHost}` : req.nextUrl.origin;
+    const results = await fanOutSync(base, clients, secret);
+    console.log(`sync dispatch via ${base}:`, JSON.stringify(results));
     const failed = results.filter((r) => !r.ok);
     return NextResponse.json({ synced: results.length, failed }, { status: failed.length ? 500 : 200 });
   } catch (err) {

@@ -82,7 +82,7 @@ describe("fanOutSync", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(2);
     expect(fetchImpl).toHaveBeenCalledWith(
       "https://x.app/api/sync?clientId=aaa",
-      { headers: { authorization: "Bearer sec" } },
+      { headers: { authorization: "Bearer sec" }, redirect: "manual" },
     );
     expect(out).toEqual([
       { client: "Rygis", ok: true, error: undefined },
@@ -105,6 +105,17 @@ describe("fanOutSync", () => {
     const out = await fanOutSync("https://x.app", clients, "sec", fetchImpl as never);
     expect(out[0]).toEqual({ client: "Rygis", ok: false, error: "ECONNRESET" });
     expect(out[1].ok).toBe(true);
+  });
+
+  it("non-contract responses (SSO 302, HTML 200) never read as success", async () => {
+    // Regression for 2026-08-27: workers dispatched to the deployment-protected
+    // origin got a login page back; a 200 HTML body must not count as synced.
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce({ ok: false, status: 302, json: async () => { throw new Error("no json"); } })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => { throw new Error("html, not json"); } });
+    const out = await fanOutSync("https://x.app", clients, "sec", fetchImpl as never);
+    expect(out[0]).toEqual({ client: "Rygis", ok: false, error: "unexpected worker response (HTTP 302)" });
+    expect(out[1]).toEqual({ client: "2990's", ok: false, error: "unexpected worker response (HTTP 200)" });
   });
 });
 
