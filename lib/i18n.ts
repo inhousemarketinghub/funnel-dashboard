@@ -132,6 +132,7 @@ const D: Dict = {
   refresh: { en: "Refresh", zh: "刷新" },
   refreshing: { en: "Refreshing…", zh: "刷新中…" },
   dataUpdatedAt: { en: "Updated at", zh: "数据更新于" },
+  dataAsOf: { en: "Data as of", zh: "数据截至" },
 
   // ── Month picker / report ──
   monthlyPerformanceOverview: { en: "Monthly Performance Overview", zh: "月度业绩报告" },

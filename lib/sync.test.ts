@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { diffDailyMetrics, fanOutSync, markStaleRuns } from "./sync";
+import { diffDailyMetrics, fanOutSync, markStaleRuns, recentSuccessWithin } from "./sync";
 import { extractLeadRows, parseCSVLine } from "./sheets";
 
 const M = (over: Partial<Record<string, number>> = {}) => ({
@@ -138,5 +138,23 @@ describe("markStaleRuns", () => {
     // cutoff ≈ now - 10min (allow the test's own runtime as slack)
     expect(Date.parse(cutoffIso)).toBeGreaterThanOrEqual(before - 10 * 60_000 - 1000);
     expect(Date.parse(cutoffIso)).toBeLessThanOrEqual(Date.now() - 10 * 60_000 + 1000);
+  });
+});
+
+describe("recentSuccessWithin", () => {
+  const dbWith = (finished_at: string | null) => {
+    const maybeSingle = vi.fn().mockResolvedValue({ data: finished_at ? { finished_at } : null });
+    const limit = vi.fn().mockReturnValue({ maybeSingle });
+    const order = vi.fn().mockReturnValue({ limit });
+    const eq2 = vi.fn().mockReturnValue({ order });
+    const eq1 = vi.fn().mockReturnValue({ eq: eq2 });
+    const select = vi.fn().mockReturnValue({ eq: eq1 });
+    return { from: vi.fn().mockReturnValue({ select }) };
+  };
+
+  it("true within the window, false outside or when never synced", async () => {
+    expect(await recentSuccessWithin("c", 120, dbWith(new Date(Date.now() - 30_000).toISOString()) as never)).toBe(true);
+    expect(await recentSuccessWithin("c", 120, dbWith(new Date(Date.now() - 300_000).toISOString()) as never)).toBe(false);
+    expect(await recentSuccessWithin("c", 120, dbWith(null) as never)).toBe(false);
   });
 });

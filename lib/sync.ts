@@ -270,6 +270,25 @@ export async function markStaleRuns(
 }
 
 /**
+ * True when the client's latest successful sync finished within `seconds` —
+ * the refresh/staleness throttle (repeated triggers become cheap no-ops
+ * instead of stampeding Google reads).
+ */
+export async function recentSuccessWithin(
+  clientId: string,
+  seconds: number,
+  db: ReturnType<typeof createAdminSupabase> = createAdminSupabase(),
+): Promise<boolean> {
+  const { data } = await db.from("sync_runs")
+    .select("finished_at")
+    .eq("client_id", clientId).eq("status", "success")
+    .order("finished_at", { ascending: false })
+    .limit(1).maybeSingle();
+  if (!data?.finished_at) return false;
+  return Date.now() - Date.parse(String(data.finished_at)) < seconds * 1000;
+}
+
+/**
  * Fan the daily sync out: one worker invocation per client (GET
  * /api/sync?clientId=…), each with its own 60s budget — the Hobby ceiling a
  * single sequential 8-client run outgrew. Workers write their own sync_runs
