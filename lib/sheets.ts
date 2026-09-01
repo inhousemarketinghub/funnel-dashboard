@@ -1,5 +1,6 @@
 import type { DailyMetric, Lead, KPIConfig } from "./types";
 import { getSheetsAccessToken } from "./google-auth";
+import { formatDateParam } from "./dates";
 
 const SHEETS_API = "https://sheets.googleapis.com/v4/spreadsheets";
 
@@ -1126,7 +1127,11 @@ export async function fetchPerformanceData(sheetId: string, brandName?: string):
       // Merge by date: sum metrics for the same date across brands
       const byDate = new Map<string, DailyMetric>();
       for (const row of allData) {
-        const key = row.date.toISOString().slice(0, 10);
+        // formatDateParam (local getters), NOT toISOString: row.date is a
+        // local-midnight Date, so toISOString shifts the key back a day on any
+        // machine east of UTC (latent on Vercel/UTC, live on MYT local dev and
+        // the reconciliation script).
+        const key = formatDateParam(row.date);
         if (byDate.has(key)) {
           const existing = byDate.get(key)!;
           existing.ad_spend += row.ad_spend;

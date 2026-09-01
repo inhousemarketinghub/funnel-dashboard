@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { getUserRole, getProjectPermissions } from "@/lib/auth";
+import { todayKL } from "@/lib/dates";
 import { fetchKPIData, fetchDerivedKPI, writeKPIValues, detectBrandsOrdered } from "@/lib/sheets";
 
 // GET /api/kpi?clientId=xxx&brand=yyy
@@ -94,7 +95,7 @@ export async function POST(req: NextRequest) {
     const orders = aov > 0 ? Math.round(sales / aov) : 0;
     const dailyAdExcl = fields.daily_ad ?? 0;
     const dailyAdIncl = dailyAdExcl * 1.08;
-    const now = new Date();
+    const now = todayKL();
     const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     const adSpend = dailyAdIncl * daysInMonth;
     const roas = adSpend > 0 ? sales / adSpend : 0;

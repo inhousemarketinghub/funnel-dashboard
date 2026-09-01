@@ -2,7 +2,7 @@ import { createServerSupabase } from "@/lib/supabase/server";
 import { fetchPerformanceData, fetchLeadData, countEstShowUp, fetchKPIData, detectBrandsOrdered, fetchOverallKPI } from "@/lib/sheets";
 import { computeMetrics, computeMoM, computeAchievement, budgetScenario, computeWeeklyBreakdown } from "@/lib/metrics";
 import { fmtRM, fmtROAS, fmtPct } from "@/lib/utils";
-import { resolveSearchParams, getPreviousPeriod, formatRangeLabel, formatDateDisplay } from "@/lib/dates";
+import { resolveSearchParams, getPreviousPeriod, formatRangeLabel, formatDateDisplay, todayKL } from "@/lib/dates";
 import type { KPIConfig, FunnelMetrics, MoMResult, Achievement } from "@/lib/types";
 import { PrintButton } from "@/components/dashboard/print-button";
 import { KPIChart } from "@/components/dashboard/kpi-chart";
@@ -254,7 +254,7 @@ export default async function ReportPage({
         <header className="py-[72px] pb-[40px] border-b-2 border-[var(--t1)]">
           <div className="flex items-center gap-[10px] mb-5">
             <span className="tag tag-blue">PERFORMANCE REPORT</span>
-            <span className="text-[12px] text-[var(--t3)]">{formatDateDisplay(new Date())}</span>
+            <span className="text-[12px] text-[var(--t3)]">{formatDateDisplay(todayKL())}</span>
           </div>
           <h1 className="font-heading text-[clamp(36px,5vw,48px)] font-semibold leading-[1.08] tracking-tight text-[var(--t1)] mb-2">{client.name}</h1>
           <p className="text-[16px] text-[var(--t2)] font-light">{thisLabel} vs {prevLabel}</p>
@@ -308,7 +308,7 @@ export default async function ReportPage({
         <footer className="py-10 flex justify-between items-center">
           <div className="text-[12px] text-[var(--t4)]">
             <span className="font-label text-[10px] uppercase tracking-widest">Generated</span>
-            <span className="ml-[6px]">{formatDateDisplay(new Date())}</span>
+            <span className="ml-[6px]">{formatDateDisplay(todayKL())}</span>
           </div>
         </footer>
         <PrintButton />

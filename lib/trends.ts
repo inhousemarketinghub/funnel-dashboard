@@ -1,6 +1,6 @@
 import { fetchPerformanceData } from "./sheets";
 import { computeMetrics } from "./metrics";
-import { MONTH_NAMES, isPartialRange, formatWeekLabel, type Granularity } from "./dates";
+import { MONTH_NAMES, isPartialRange, formatWeekLabel, todayKL, type Granularity } from "./dates";
 import type { FunnelMetrics } from "./types";
 
 export type { Granularity };
@@ -27,7 +27,7 @@ function zeroMetrics(): FunnelMetrics {
   };
 }
 
-export function getWeekRanges(from: Date, to: Date, now: Date = new Date()): TrendRange[] {
+export function getWeekRanges(from: Date, to: Date, now: Date = todayKL()): TrendRange[] {
   const ranges: TrendRange[] = [];
   const cursor = new Date(from);
   while (cursor.getTime() <= to.getTime()) {
@@ -45,7 +45,7 @@ export function getWeekRanges(from: Date, to: Date, now: Date = new Date()): Tre
   return ranges;
 }
 
-export function getMonthRanges(from: Date, to: Date, now: Date = new Date()): TrendRange[] {
+export function getMonthRanges(from: Date, to: Date, now: Date = todayKL()): TrendRange[] {
   const ranges: TrendRange[] = [];
   const cursor = new Date(from.getFullYear(), from.getMonth(), 1);
   const endCursor = new Date(to.getFullYear(), to.getMonth(), 1);
@@ -108,7 +108,7 @@ export async function fetchTrends(opts: {
   now?: Date;
 }): Promise<TrendBundle> {
   const funnelType = opts.funnelType ?? "appointment";
-  const now = opts.now ?? new Date();
+  const now = opts.now ?? todayKL();
   const currentRanges = opts.granularity === "weekly"
     ? getWeekRanges(opts.from, opts.to, now)
     : getMonthRanges(opts.from, opts.to, now);
