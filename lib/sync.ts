@@ -202,8 +202,10 @@ export async function syncClient(
             appointment_person: r.appointment_person,
             sales_person: r.sales_person,
             appointment_date: r.appointment_date ? formatDateParam(r.appointment_date) : null,
+            appointment_marked: r.appointment_marked,
             showed_up: r.showed_up,
             purchase_date: r.purchase_date ? formatDateParam(r.purchase_date) : null,
+            purchase_marked: r.purchase_marked,
             sales: r.sales,
           })));
           if (error) throw new Error(`lead_rows insert: ${error.message}`);
@@ -215,7 +217,7 @@ export async function syncClient(
           })));
         }
         await db.from("client_states").upsert(
-          { client_id: clientId, lead_hash: hash, updated_at: new Date().toISOString() },
+          { client_id: clientId, lead_hash: hash, lead_appointment_col: extraction.appointment_col, updated_at: new Date().toISOString() },
           { onConflict: "client_id" },
         );
         stats.lead_rows = extraction.rows.length;
