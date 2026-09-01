@@ -12,6 +12,7 @@ import {
   type SheetTab, type TabRule, type PerfDiagnosis, type TrackedMetrics,
 } from "./sheets";
 import { scanSheet } from "./sheet-scanner";
+import { todayKL } from "./dates";
 import { computeMetrics } from "./metrics";
 import type { DailyMetric, FunnelMetrics } from "./types";
 
@@ -117,7 +118,7 @@ export function runSanityChecks(
 export async function buildDiagnosticsReport(
   sheetId: string,
   dbFunnelType: string | null,
-  now: Date = new Date(),
+  now: Date = todayKL(),
 ): Promise<DiagnosticsReport> {
   const [allTabs, scan, fetchedAt] = await Promise.all([
     listSheetTabs(sheetId),

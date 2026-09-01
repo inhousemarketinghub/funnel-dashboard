@@ -45,9 +45,27 @@ export function formatRangeLabel(from: Date, to: Date): string {
   return `${fromStr} \u2013 ${toStr}`;
 }
 
+// ── Timezone (Asia/Kuala_Lumpur) ─────────────────────────────────
+//
+// Vercel runs in UTC, so a bare `new Date()` flips "today" at 08:00 MYT —
+// between midnight and 8am Malaysia time every "this month / today" boundary
+// pointed at yesterday (C-tier PRD problem #5). todayKL() pins boundary
+// computations to the Malaysia calendar day regardless of server timezone.
+// MYT has no DST. Display-time formatting stays with Intl at the call sites.
+
+const KL_DATE_FMT = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Kuala_Lumpur", year: "numeric", month: "2-digit", day: "2-digit",
+});
+
+/** Local-midnight Date of the current Asia/Kuala_Lumpur calendar day. */
+export function todayKL(now: Date = new Date()): Date {
+  const [y, m, d] = KL_DATE_FMT.format(now).split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
 // ── Defaults & Previous Period ──────────────────────────────────
 
-export function getDefaultRange(granularity?: Granularity, now: Date = new Date()): DateRangeObj {
+export function getDefaultRange(granularity?: Granularity, now: Date = todayKL()): DateRangeObj {
   if (granularity === "weekly") {
     const thisSunday = getSundayOf(now);
     const fourWeeksAgoMonday = new Date(thisSunday);
@@ -132,7 +150,7 @@ export const WEEKLY_PRESETS: readonly DatePreset[] = [
   { label: "Last 26 weeks", value: "last-26w" },
 ];
 
-export function getPresetRange(preset: string, now: Date = new Date()): DateRangeObj {
+export function getPresetRange(preset: string, now: Date = todayKL()): DateRangeObj {
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
   switch (preset) {
@@ -240,7 +258,7 @@ export function snapToGranularity(
   };
 }
 
-export function isPartialRange(to: Date, now: Date = new Date()): boolean {
+export function isPartialRange(to: Date, now: Date = todayKL()): boolean {
   return to.getTime() > now.getTime();
 }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getMondayOf, getSundayOf, snapToGranularity, isPartialRange, formatWeekLabel, getDefaultRange, getPresetRange, getPreviousPeriodByGranularity, MONTHLY_PRESETS, WEEKLY_PRESETS } from "../dates";
+import { MONTHLY_PRESETS, WEEKLY_PRESETS, formatDateParam, formatWeekLabel, getDefaultRange, getMondayOf, getPresetRange, getPreviousPeriodByGranularity, getSundayOf, isPartialRange, snapToGranularity, todayKL } from "../dates";
 
 describe("getMondayOf", () => {
   it("returns same date when input is Monday", () => {
@@ -257,5 +257,21 @@ describe("Trends presets", () => {
     const r = getPresetRange("ytd", now);
     expect(r.from).toEqual(new Date(2026, 0, 1));
     expect(r.to).toEqual(new Date(2026, 3, 30));
+  });
+});
+
+describe("todayKL", () => {
+  it("UTC evening rolls to the next KL calendar day", () => {
+    // 2026-08-31T17:30Z = 2026-09-01 01:30 MYT — the broken 00:00-08:00 window
+    expect(formatDateParam(todayKL(new Date(Date.UTC(2026, 7, 31, 17, 30))))).toBe("2026-09-01");
+  });
+  it("UTC morning stays on the same KL day", () => {
+    // 2026-09-01T05:00Z = 13:00 MYT
+    expect(formatDateParam(todayKL(new Date(Date.UTC(2026, 8, 1, 5, 0))))).toBe("2026-09-01");
+  });
+  it("getDefaultRange in the 00:00-08:00 MYT window uses the KL month", () => {
+    const r = getDefaultRange(undefined, todayKL(new Date(Date.UTC(2026, 7, 31, 17, 30))));
+    expect(formatDateParam(r.from)).toBe("2026-09-01");
+    expect(formatDateParam(r.to)).toBe("2026-09-01");
   });
 });

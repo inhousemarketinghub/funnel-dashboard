@@ -1,10 +1,11 @@
 import { createServerSupabase } from "@/lib/supabase/server";
 import { fetchPerformanceData, fetchKPIData } from "@/lib/sheets";
 import { computeMetrics, computeAchievement } from "@/lib/metrics";
+import { todayKL } from "@/lib/dates";
 import type { ClientOverview, OverviewStats } from "@/lib/types";
 
 function currentMonthRange(): { start: Date; end: Date } {
-  const now = new Date();
+  const now = todayKL();
   const start = new Date(now.getFullYear(), now.getMonth(), 1);
   const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
   return { start, end };
