@@ -1,6 +1,7 @@
 import { createServerSupabase } from "@/lib/supabase/server";
 import { getProjectPermissions } from "@/lib/auth";
-import { fetchPerformanceData, fetchKPIData, fetchPersonData, detectBrandsOrdered, fetchOverallKPI, fetchBrandPerformance, getDataFetchedAt } from "@/lib/sheets";
+import { fetchKPIData, fetchOverallKPI, fetchBrandPerformance } from "@/lib/sheets";
+import { getPerformanceData, getPersonData, getFreshness, getBrands, resolveDataSource } from "@/lib/data-source";
 import type { PersonData, PerfResult, BrandPerformanceData } from "@/lib/sheets";
 import { BrandSelector } from "@/components/dashboard/brand-selector";
 import { computeMetrics, computeMoM, computeAchievement } from "@/lib/metrics";
@@ -60,12 +61,6 @@ export default async function DashboardPage({
     const { data } = await supabase.from("kpi_configs").select("*").eq("client_id", clientId).order("month", { ascending: false }).limit(1).single();
     kpiRow = data;
   }
-  // Brand detection (ordered by KPI tab)
-  const brands = await detectBrandsOrdered(client.sheet_id);
-  const brandParam = sp.brand as string | undefined;
-  // "Overall" or no selection = no brand filter (aggregate all)
-  const selectedBrand = brandParam && brandParam !== "Overall" ? brandParam : brands.length === 1 ? brands[0] : undefined;
-
   // Person-performance source filter: ?source=Facebook,Instagram (comma-joined).
   // No param → the profile's Paid Ads sources apply as the per-client DEFAULT
   // scope; ?source=all explicitly clears it. Only the team section consumes
@@ -81,6 +76,22 @@ export default async function DashboardPage({
           ? profile.paid_sources
           : undefined;
 
+  // Data-source mode: profile.data_source, plus the admin-only ?ds= override
+  // for production test-drives (edit_settings gate; render-scoped, never stored).
+  const dsParam = Array.isArray(sp.ds) ? sp.ds[0] : sp.ds;
+  let dataSource = resolveDataSource(client);
+  if ((dsParam === "db" || dsParam === "sheets") && dsParam !== dataSource) {
+    const perms = await getProjectPermissions(clientId);
+    if (perms.includes("edit_settings")) dataSource = dsParam;
+  }
+
+  // Brand detection (ordered by KPI tab; db mode reads brand_states so the
+  // page stays alive when Google is unreachable)
+  const brands = await getBrands(client, dataSource);
+  const brandParam = sp.brand as string | undefined;
+  // "Overall" or no selection = no brand filter (aggregate all)
+  const selectedBrand = brandParam && brandParam !== "Overall" ? brandParam : brands.length === 1 ? brands[0] : undefined;
+
   let perfResult: PerfResult = { data: [], funnelType: "appointment", tracked: { appointment: true, est_showup: true, showup: true } };
   let sheetKPI: KPIConfig | null = null;
   let personData: PersonData = { appointmentPersons: [], salesPersons: [], brandBreakdowns: {}, availableSources: [] };
@@ -90,13 +101,28 @@ export default async function DashboardPage({
   let fetchedAt: number | null = null;
   let fetchError: string | null = null;
   try {
-    [perfResult, sheetKPI, personData, brandPerformance, fetchedAt] = await Promise.all([
-      fetchPerformanceData(client.sheet_id, selectedBrand),
-      fetchKPIData(client.sheet_id, selectedBrand),
-      fetchPersonData(client.sheet_id, reportStart, reportEnd, selectedBrand, selectedSources),
-      fetchBrandPerformance(client.sheet_id, reportStart, reportEnd),
-      getDataFetchedAt(client.sheet_id),
-    ]);
+    if (dataSource === "db") {
+      // Funnel + person data come from the mirror; residual sheet reads (KPI
+      // targets, Order-Items brand performance) degrade gracefully so the
+      // dashboard still renders mirror data when Google is unreachable (QA).
+      [perfResult, personData, fetchedAt] = await Promise.all([
+        getPerformanceData(client, "db", selectedBrand),
+        getPersonData(client, "db", reportStart, reportEnd, selectedBrand, selectedSources),
+        getFreshness(client, "db"),
+      ]);
+      [sheetKPI, brandPerformance] = await Promise.all([
+        fetchKPIData(client.sheet_id, selectedBrand).catch(() => null),
+        fetchBrandPerformance(client.sheet_id, reportStart, reportEnd).catch(() => null),
+      ]);
+    } else {
+      [perfResult, sheetKPI, personData, brandPerformance, fetchedAt] = await Promise.all([
+        getPerformanceData(client, "sheets", selectedBrand),
+        fetchKPIData(client.sheet_id, selectedBrand),
+        getPersonData(client, "sheets", reportStart, reportEnd, selectedBrand, selectedSources),
+        fetchBrandPerformance(client.sheet_id, reportStart, reportEnd),
+        getFreshness(client, "sheets"),
+      ]);
+    }
   } catch (err) {
     perfResult = { data: [], funnelType: "appointment", tracked: { appointment: true, est_showup: true, showup: true } };
     fetchError = err instanceof Error ? err.message : "Failed to fetch Google Sheet data";
@@ -104,7 +130,9 @@ export default async function DashboardPage({
 
   // For Overall (multi-brand, no selectedBrand): ALWAYS sum all brand KPIs
   if (brands.length > 1 && !selectedBrand) {
-    sheetKPI = await fetchOverallKPI(client.sheet_id, brands);
+    sheetKPI = dataSource === "db"
+      ? await fetchOverallKPI(client.sheet_id, brands).catch(() => sheetKPI)
+      : await fetchOverallKPI(client.sheet_id, brands);
   }
 
   // KPI: prefer Sheet data, fallback to Supabase, then defaults

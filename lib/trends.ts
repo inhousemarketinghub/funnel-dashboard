@@ -106,6 +106,8 @@ export async function fetchTrends(opts: {
   brandName?: string | null;
   funnelType?: string;
   now?: Date;
+  /** Data-source injection point (Phase 2): defaults to the live-sheet path. */
+  loadPerformanceData?: () => Promise<import("./sheets").PerfResult>;
 }): Promise<TrendBundle> {
   const funnelType = opts.funnelType ?? "appointment";
   const now = opts.now ?? todayKL();
@@ -122,7 +124,9 @@ export async function fetchTrends(opts: {
 
   let allData: import("./types").DailyMetric[] = [];
   try {
-    const perfResult = await fetchPerformanceData(opts.sheetId, opts.brandName ?? undefined);
+    const load = opts.loadPerformanceData
+      ?? (() => fetchPerformanceData(opts.sheetId, opts.brandName ?? undefined));
+    const perfResult = await load();
     allData = perfResult.data;
   } catch (err) {
     console.error("fetchTrends: fetchPerformanceData failed", err);

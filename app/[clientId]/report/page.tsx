@@ -1,5 +1,7 @@
 import { createServerSupabase } from "@/lib/supabase/server";
-import { fetchPerformanceData, fetchLeadData, countEstShowUp, fetchKPIData, detectBrandsOrdered, fetchOverallKPI } from "@/lib/sheets";
+import { countEstShowUp, fetchKPIData, fetchOverallKPI } from "@/lib/sheets";
+import { getPerformanceData, getLeadData, getBrands, resolveDataSource } from "@/lib/data-source";
+import { getProjectPermissions } from "@/lib/auth";
 import { computeMetrics, computeMoM, computeAchievement, budgetScenario, computeWeeklyBreakdown } from "@/lib/metrics";
 import { fmtRM, fmtROAS, fmtPct } from "@/lib/utils";
 import { resolveSearchParams, getPreviousPeriod, formatRangeLabel, formatDateDisplay, todayKL } from "@/lib/dates";
@@ -21,6 +23,14 @@ export default async function ReportPage({
   const { data: client } = await supabase.from("clients").select("*").eq("id", clientId).single();
   if (!client) return <p className="text-[var(--t3)] p-8">Client not found</p>;
 
+  // Data-source mode with the admin-only ?ds= override (edit_settings gate)
+  const dsParam = Array.isArray(sp.ds) ? sp.ds[0] : sp.ds;
+  let dataSource = resolveDataSource(client);
+  if (dsParam === "db" || dsParam === "sheets") {
+    const perms = await getProjectPermissions(clientId);
+    if (perms.includes("edit_settings")) dataSource = dsParam;
+  }
+
   let reportStart: Date, reportEnd: Date;
   if (sp.month && typeof sp.month === "string") {
     const [y, m] = sp.month.split("-").map(Number);
@@ -35,14 +45,16 @@ export default async function ReportPage({
   const thisLabel = formatRangeLabel(reportStart, reportEnd);
   const prevLabel = formatRangeLabel(prevStart, prevEnd);
 
-  const brands = await detectBrandsOrdered(client.sheet_id);
+  const brands = await getBrands(client, dataSource);
   const isMultiBrand = brands.length > 1;
 
-  // Fetch Overall
+  // Fetch Overall (db mode: KPI targets still come from the sheet but degrade
+  // gracefully instead of failing the whole report)
+  const kpiPromise = isMultiBrand ? fetchOverallKPI(client.sheet_id, brands) : fetchKPIData(client.sheet_id);
   const [overallPerf, overallLead, overallKPI] = await Promise.all([
-    fetchPerformanceData(client.sheet_id),
-    fetchLeadData(client.sheet_id),
-    isMultiBrand ? fetchOverallKPI(client.sheet_id, brands) : fetchKPIData(client.sheet_id),
+    getPerformanceData(client, dataSource),
+    getLeadData(client, dataSource),
+    dataSource === "db" ? kpiPromise.catch(() => null) : kpiPromise,
   ]);
   const kpi0: KPIConfig = overallKPI || { sales: 0, orders: 0, aov: 0, cpl: 0, respond_rate: 0, appt_rate: 0, showup_rate: 0, conv_rate: 0, ad_spend: 0, daily_ad: 0, roas: 0, cpa_pct: 0, target_contact: 0, target_appt: 0, target_showup: 0 };
   const ft = overallPerf.funnelType;
@@ -67,9 +79,10 @@ export default async function ReportPage({
   const brandBundles: BrandBundle[] = [];
   if (isMultiBrand) {
     for (const b of brands) {
+      const bkPromise = fetchKPIData(client.sheet_id, b);
       const [bp, bk] = await Promise.all([
-        fetchPerformanceData(client.sheet_id, b),
-        fetchKPIData(client.sheet_id, b),
+        getPerformanceData(client, dataSource, b),
+        dataSource === "db" ? bkPromise.catch(() => null) : bkPromise,
       ]);
       const bkpi = bk || kpi0;
       const d = computeAll(bp.data, bkpi);

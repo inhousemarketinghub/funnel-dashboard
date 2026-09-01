@@ -1,6 +1,6 @@
 import { createServerSupabase } from "@/lib/supabase/server";
 import { fetchTrends } from "@/lib/trends";
-import { detectBrandsOrdered } from "@/lib/sheets";
+import { getPerformanceData, getBrands, resolveDataSource } from "@/lib/data-source";
 import {
   parseDateParam,
   snapToGranularity,
@@ -69,7 +69,13 @@ export default async function TrendsPage({
   if (!perms.includes("view_trends")) redirect(`/${clientId}`);
 
   const lang = normalizeLang((await cookies()).get(LANG_COOKIE)?.value);
-  const brands = await detectBrandsOrdered(client.sheet_id);
+
+  // Data-source mode with the admin-only ?ds= override (perms already loaded)
+  const dsParam = Array.isArray(sp.ds) ? sp.ds[0] : sp.ds;
+  let dataSource = resolveDataSource(client);
+  if ((dsParam === "db" || dsParam === "sheets") && perms.includes("edit_settings")) dataSource = dsParam;
+
+  const brands = await getBrands(client, dataSource);
   const { granularity, range, brand, compare, comparisonRange } = resolveTrendParams(sp);
 
   const bundle = await fetchTrends({
@@ -81,6 +87,7 @@ export default async function TrendsPage({
     comparisonTo: comparisonRange?.to,
     brandName: brand,
     funnelType: client.funnel_type,
+    loadPerformanceData: () => getPerformanceData(client, dataSource, brand ?? undefined),
   });
 
   return (
