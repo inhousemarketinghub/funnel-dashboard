@@ -448,51 +448,71 @@ export interface SyncLeadRow {
   appointment_person: string;
   sales_person: string;
   appointment_date: Date | null;
+  /** appointment-date CELL non-empty — appt-person aggregation counts an
+   *  appointment when the cell is filled, even if it doesn't parse. */
+  appointment_marked: boolean;
   showed_up: boolean;
   purchase_date: Date | null;
+  /** purchase-date CELL non-empty — brand breakdown counts orders by this. */
+  purchase_marked: boolean;
   sales: number;
 }
 
 export interface LeadExtraction {
   rows: SyncLeadRow[];
-  /** rows with content whose main date cell failed to parse */
+  /** content rows where NO date column (lead/appointment/purchase) parsed */
   quarantined: { rowIndex: number; reason: string; sample: Record<string, string> }[];
+  /** whether the tab has an appointment-date column (walk-in funnels don't) —
+   *  mirrored to client_states so the DB read path aggregates the same way */
+  appointment_col: boolean;
+}
+
+/** Map one raw lead-tab row to the shared row model. Returns null for rows too
+ *  short to be content. The row model is the SINGLE input shape for person
+ *  aggregation — the sheet path builds it here, the DB path reads it straight
+ *  from lead_rows (PRD L83: one rule set, no second parser). */
+function toSyncLeadRow(cols: string[], colMap: LeadColumnMap): SyncLeadRow | null {
+  if (!cols || cols.length < 5) return null;
+  const apptCell = colMap.appointmentDate !== null ? (cols[colMap.appointmentDate] || "").trim() : "";
+  const purchaseCell = colMap.purchaseDate !== null ? (cols[colMap.purchaseDate] || "").trim() : "";
+  return {
+    brand: ((colMap.brand !== null ? cols[colMap.brand] : "") || "").trim(),
+    lead_date: parseDate((cols[colMap.date] || "").trim()),
+    source: ((colMap.source !== null ? cols[colMap.source] : "") || "").trim(),
+    appointment_person: ((colMap.appointmentPerson !== null ? cols[colMap.appointmentPerson] : "") || "").trim(),
+    sales_person: ((colMap.salesPerson !== null ? cols[colMap.salesPerson] : "") || "").trim(),
+    appointment_date: apptCell ? parseDate(apptCell) : null,
+    appointment_marked: apptCell !== "",
+    showed_up: colMap.showedUp !== null ? ["yes", "true"].includes((cols[colMap.showedUp] || "").toLowerCase()) : false,
+    purchase_date: purchaseCell ? parseDate(purchaseCell) : null,
+    purchase_marked: purchaseCell !== "",
+    sales: colMap.sales !== null ? parseRM(cols[colMap.sales]) : 0,
+  };
 }
 
 export function extractLeadRows(rows: string[][]): LeadExtraction {
-  if (rows.length < 2) return { rows: [], quarantined: [] };
+  if (rows.length < 2) return { rows: [], quarantined: [], appointment_col: false };
   const colMap = detectLeadColumns(rows[0]);
   const out: SyncLeadRow[] = [];
   const quarantined: LeadExtraction["quarantined"] = [];
   for (let i = 1; i < rows.length; i++) {
-    const cols = rows[i];
-    if (!cols || cols.length < 5) continue;
-    const dateCell = (cols[colMap.date] || "").trim();
-    const person = ((colMap.salesPerson !== null ? cols[colMap.salesPerson] : "") || "").trim()
-      || ((colMap.appointmentPerson !== null ? cols[colMap.appointmentPerson] : "") || "").trim();
-    const source = ((colMap.source !== null ? cols[colMap.source] : "") || "").trim();
-    const leadDate = parseDate(dateCell);
-    if (!leadDate) {
-      // blank filler rows are normal; a row with a person/source but an
-      // unparseable date is data worth flagging, not silently dropping
-      if (dateCell && (person || source)) {
+    const row = toSyncLeadRow(rows[i], colMap);
+    if (!row) continue;
+    if (!row.lead_date && !row.appointment_date && !row.purchase_date) {
+      // No usable date at all. Blank filler rows are normal; a row with a
+      // person/source and an unparseable date is data worth flagging, not
+      // silently dropping. (Rows where an appointment/purchase date DOES
+      // parse are kept with lead_date=null — the aggregators count them.)
+      const dateCell = (rows[i][colMap.date] || "").trim();
+      const person = row.sales_person || row.appointment_person;
+      if (dateCell && (person || row.source)) {
         quarantined.push({ rowIndex: i + 1, reason: "unparseable_lead_date", sample: { date: dateCell } });
       }
       continue;
     }
-    out.push({
-      brand: ((colMap.brand !== null ? cols[colMap.brand] : "") || "").trim(),
-      lead_date: leadDate,
-      source,
-      appointment_person: ((colMap.appointmentPerson !== null ? cols[colMap.appointmentPerson] : "") || "").trim(),
-      sales_person: ((colMap.salesPerson !== null ? cols[colMap.salesPerson] : "") || "").trim(),
-      appointment_date: colMap.appointmentDate !== null ? parseDate(cols[colMap.appointmentDate]) : null,
-      showed_up: colMap.showedUp !== null ? ["yes", "true"].includes((cols[colMap.showedUp] || "").toLowerCase()) : false,
-      purchase_date: colMap.purchaseDate !== null ? parseDate(cols[colMap.purchaseDate]) : null,
-      sales: colMap.sales !== null ? parseRM(cols[colMap.sales]) : 0,
-    });
+    out.push(row);
   }
-  return { rows: out, quarantined };
+  return { rows: out, quarantined, appointment_col: colMap.appointmentDate !== null };
 }
 
 export function parseLeadSalesCSV(csv: string): Lead[] {
@@ -534,26 +554,19 @@ export interface PersonData {
   availableSources: string[];
 }
 
-function aggregateApptPersons(
-  rows: string[][],
-  personCol: number,
-  colMap: LeadColumnMap,
+function aggregateApptPersonsFromRows(
+  rows: SyncLeadRow[],
   startDate?: Date,
   endDate?: Date,
 ): ApptPersonMetrics[] {
   const map = new Map<string, { contacts: number; appts: number; showUps: number; orders: number; sales: number }>();
 
-  for (let i = 1; i < rows.length; i++) {
-    const cols = rows[i];
-    const person = (cols[personCol] || "").trim();
+  for (const r of rows) {
+    const person = r.appointment_person;
     if (!person) continue;
 
-    const leadDate = parseDate(cols[colMap.date]);
-    const leadInRange = !startDate || !endDate || (!!leadDate && leadDate >= startDate && leadDate <= endDate);
-
-    const purchaseDateStr = colMap.purchaseDate !== null ? (cols[colMap.purchaseDate] || "").trim() : "";
-    const purchaseDate = purchaseDateStr ? parseDate(purchaseDateStr) : null;
-    const purchaseInRange = !!purchaseDate && (!startDate || !endDate || (purchaseDate >= startDate && purchaseDate <= endDate));
+    const leadInRange = !startDate || !endDate || (!!r.lead_date && r.lead_date >= startDate && r.lead_date <= endDate);
+    const purchaseInRange = !!r.purchase_date && (!startDate || !endDate || (r.purchase_date >= startDate && r.purchase_date <= endDate));
 
     if (!leadInRange && !purchaseInRange) continue;
 
@@ -562,13 +575,13 @@ function aggregateApptPersons(
 
     if (leadInRange) {
       m.contacts++;
-      if (colMap.appointmentDate !== null && (cols[colMap.appointmentDate] || "").trim()) m.appts++;
-      if (colMap.showedUp !== null && ["yes", "true"].includes((cols[colMap.showedUp] || "").toLowerCase())) m.showUps++;
+      if (r.appointment_marked) m.appts++;
+      if (r.showed_up) m.showUps++;
     }
 
     if (purchaseInRange) {
       m.orders++;
-      m.sales += colMap.sales !== null ? parseRM(cols[colMap.sales]) : 0;
+      m.sales += r.sales;
     }
   }
 
@@ -583,56 +596,42 @@ function aggregateApptPersons(
   })).sort((a, b) => b.contactGiven - a.contactGiven);
 }
 
-function aggregateSalesPersons(
-  rows: string[][],
-  personCol: number,
-  colMap: LeadColumnMap,
+function aggregateSalesPersonsFromRows(
+  rows: SyncLeadRow[],
+  isWalkinFunnel: boolean,
   startDate?: Date,
   endDate?: Date,
 ): SalesPersonMetrics[] {
-  // Sales Person: filter by PURCHASE DATE (not lead date)
-  // This captures all orders closed in the period regardless of when the lead came in
+  // Sales Person: orders filter by PURCHASE DATE (not lead date) — captures
+  // all orders closed in the period regardless of when the lead came in.
   const map = new Map<string, { estShowUp: number; showUps: number; orders: number; sales: number }>();
-  const isWalkinFunnel = colMap.appointmentDate === null;
 
-  // First pass: scan ALL rows for est.show up (appointment date in range) and visits (walk-in)
-  // This matches countEstShowUp logic exactly
-  for (let i = 1; i < rows.length; i++) {
-    const cols = rows[i];
-    const person = (cols[personCol] || "").trim();
+  for (const r of rows) {
+    const person = r.sales_person;
     if (!person) continue;
     if (!map.has(person)) map.set(person, { estShowUp: 0, showUps: 0, orders: 0, sales: 0 });
     const m = map.get(person)!;
 
     if (isWalkinFunnel) {
-      // Walk-in: count leads with leadDate in range
-      const leadDate = parseDate(cols[colMap.date]);
-      if (leadDate && (!startDate || !endDate || (leadDate >= startDate && leadDate <= endDate))) {
+      // Walk-in: count leads with leadDate in range ("Visit")
+      if (r.lead_date && (!startDate || !endDate || (r.lead_date >= startDate && r.lead_date <= endDate))) {
         m.estShowUp++;
       }
-    } else {
+    } else if (r.appointment_date && (!startDate || !endDate || (r.appointment_date >= startDate && r.appointment_date <= endDate))) {
       // Appointment: count leads with appointmentDate in range (same as countEstShowUp)
-      if (colMap.appointmentDate !== null) {
-        const apptDate = parseDate(cols[colMap.appointmentDate]);
-        if (apptDate && (!startDate || !endDate || (apptDate >= startDate && apptDate <= endDate))) {
-          m.estShowUp++;
-        }
-      }
+      m.estShowUp++;
     }
 
     // Show up + orders: filter by leadDate OR purchaseDate in range
-    const leadDate = parseDate(cols[colMap.date]);
-    const leadInRange = leadDate && (!startDate || !endDate || (leadDate >= startDate && leadDate <= endDate));
-    const purchaseDateStr = colMap.purchaseDate !== null ? (cols[colMap.purchaseDate] || "").trim() : "";
-    const purchaseDate = purchaseDateStr ? parseDate(purchaseDateStr) : null;
-    const hasOrderInRange = purchaseDate && (!startDate || !endDate || (purchaseDate >= startDate && purchaseDate <= endDate));
+    const leadInRange = r.lead_date && (!startDate || !endDate || (r.lead_date >= startDate && r.lead_date <= endDate));
+    const hasOrderInRange = r.purchase_date && (!startDate || !endDate || (r.purchase_date >= startDate && r.purchase_date <= endDate));
 
     if (!leadInRange && !hasOrderInRange) continue;
 
-    if (leadInRange && colMap.showedUp !== null && ["yes", "true"].includes((cols[colMap.showedUp] || "").toLowerCase())) m.showUps++;
+    if (leadInRange && r.showed_up) m.showUps++;
     if (hasOrderInRange) {
       m.orders++;
-      m.sales += colMap.sales !== null ? parseRM(cols[colMap.sales]) : 0;
+      m.sales += r.sales;
     }
   }
 
@@ -1210,79 +1209,86 @@ export async function fetchPersonData(sheetId: string, startDate?: Date, endDate
   return buildPersonData(rows, startDate, endDate, brandName, sources);
 }
 
-/** Pure assembly over raw lead-tab rows — exported for tests. */
+/** Pure assembly over raw lead-tab rows — exported for tests. Thin front-end:
+ *  maps sheet rows onto the shared row model, then delegates every aggregation
+ *  decision to buildPersonDataFromRows (the single implementation). */
 export function buildPersonData(rows: string[][], startDate?: Date, endDate?: Date, brandName?: string, sources?: string[]): PersonData {
   if (rows.length < 2) return EMPTY_PERSON_DATA;
 
   const colMap = detectLeadColumns(rows[0]);
-
-  // Filter rows by brand if needed
-  let filteredRows = rows;
-  if (brandName && colMap.brand !== null) {
-    filteredRows = [rows[0], ...rows.slice(1).filter(cols =>
-      (cols[colMap.brand!] || "").toLowerCase().trim() === brandName.toLowerCase()
-    )];
+  const model: SyncLeadRow[] = [];
+  for (let i = 1; i < rows.length; i++) {
+    const r = toSyncLeadRow(rows[i], colMap);
+    if (r) model.push(r);
   }
+
+  return buildPersonDataFromRows(model, {
+    isWalkinFunnel: colMap.appointmentDate === null,
+    startDate, endDate, brandName,
+    // A sheet without a Source column never source-filters (legacy behavior).
+    sources: colMap.source !== null ? sources : undefined,
+  });
+}
+
+/** Person aggregation over the shared row model — the SINGLE implementation
+ *  behind both the live-sheet path (buildPersonData) and the DB mirror path
+ *  (lead_rows records map 1:1 onto SyncLeadRow). */
+export function buildPersonDataFromRows(allRows: SyncLeadRow[], opts: {
+  isWalkinFunnel: boolean;
+  startDate?: Date;
+  endDate?: Date;
+  brandName?: string;
+  sources?: string[];
+}): PersonData {
+  const { isWalkinFunnel, startDate, endDate, brandName, sources } = opts;
+
+  // Brand filter first (matches the sheet path's row pre-filter)
+  let filtered = brandName
+    ? allRows.filter((r) => r.brand.toLowerCase() === brandName.toLowerCase())
+    : allRows;
 
   // Enumerate sources BEFORE source filtering so the filter UI always shows
   // every option; count by frequency so the common ones (FB/IG/…) come first.
-  let availableSources: string[] = [];
-  if (colMap.source !== null) {
-    const freq = new Map<string, { label: string; n: number }>();
-    for (let i = 1; i < filteredRows.length; i++) {
-      const raw = (filteredRows[i][colMap.source] || "").trim();
-      if (!raw) continue;
-      const key = raw.toLowerCase();
-      const e = freq.get(key);
-      if (e) e.n++;
-      else freq.set(key, { label: raw, n: 1 });
-    }
-    availableSources = [...freq.values()].sort((a, b) => b.n - a.n).map((e) => e.label);
+  const freq = new Map<string, { label: string; n: number }>();
+  for (const r of filtered) {
+    if (!r.source) continue;
+    const key = r.source.toLowerCase();
+    const e = freq.get(key);
+    if (e) e.n++;
+    else freq.set(key, { label: r.source, n: 1 });
   }
+  const availableSources = [...freq.values()].sort((a, b) => b.n - a.n).map((e) => e.label);
 
   // Source filter: keep rows whose Source matches any selected value
   // (case-insensitive). Rows with an empty Source are unattributed → excluded.
-  if (sources && sources.length > 0 && colMap.source !== null) {
+  if (sources && sources.length > 0) {
     const wanted = new Set(sources.map((s) => s.toLowerCase().trim()));
-    filteredRows = [filteredRows[0], ...filteredRows.slice(1).filter(cols =>
-      wanted.has((cols[colMap.source!] || "").toLowerCase().trim())
-    )];
+    filtered = filtered.filter((r) => wanted.has(r.source.toLowerCase().trim()));
   }
 
-  const appointmentPersons = colMap.appointmentPerson !== null
-    ? aggregateApptPersons(filteredRows, colMap.appointmentPerson, colMap, startDate, endDate)
-    : [];
+  const appointmentPersons = aggregateApptPersonsFromRows(filtered, startDate, endDate);
+  const salesPersons = aggregateSalesPersonsFromRows(filtered, isWalkinFunnel, startDate, endDate);
 
-  const salesPersons = colMap.salesPerson !== null
-    ? aggregateSalesPersons(filteredRows, colMap.salesPerson, colMap, startDate, endDate)
-    : [];
-
-  // Brand breakdown per Sales Person (only for multi-brand sheets)
+  // Brand breakdown per Sales Person — deliberately over ALL rows (no brand or
+  // source filter): the breakdown exists to show the cross-brand split.
   const brandBreakdowns: Record<string, BrandSalesBreakdown[]> = {};
-  if (colMap.brand !== null && colMap.salesPerson !== null) {
-    for (let i = 1; i < rows.length; i++) {
-      const cols = rows[i];
-      const person = (cols[colMap.salesPerson] || "").trim();
-      const brand = (cols[colMap.brand!] || "").trim();
-      if (!person || !brand) continue;
+  for (const r of allRows) {
+    if (!r.sales_person || !r.brand) continue;
 
-      // Date filter
-      if (startDate && endDate) {
-        const leadDate = parseDate(cols[colMap.date]);
-        const purchaseDate = colMap.purchaseDate !== null ? parseDate(cols[colMap.purchaseDate]) : null;
-        const inRange = (leadDate && leadDate >= startDate && leadDate <= endDate) ||
-          (purchaseDate && purchaseDate >= startDate && purchaseDate <= endDate);
-        if (!inRange) continue;
-      }
+    // Date filter
+    if (startDate && endDate) {
+      const inRange = (r.lead_date && r.lead_date >= startDate && r.lead_date <= endDate) ||
+        (r.purchase_date && r.purchase_date >= startDate && r.purchase_date <= endDate);
+      if (!inRange) continue;
+    }
 
-      if (!brandBreakdowns[person]) brandBreakdowns[person] = [];
-      let entry = brandBreakdowns[person].find(b => b.brand === brand);
-      if (!entry) { entry = { brand, orders: 0, sales: 0 }; brandBreakdowns[person].push(entry); }
+    if (!brandBreakdowns[r.sales_person]) brandBreakdowns[r.sales_person] = [];
+    let entry = brandBreakdowns[r.sales_person].find((b) => b.brand === r.brand);
+    if (!entry) { entry = { brand: r.brand, orders: 0, sales: 0 }; brandBreakdowns[r.sales_person].push(entry); }
 
-      if (colMap.purchaseDate !== null && (cols[colMap.purchaseDate] || "").trim()) {
-        entry.orders++;
-        entry.sales += colMap.sales !== null ? parseRM(cols[colMap.sales]) : 0;
-      }
+    if (r.purchase_marked) {
+      entry.orders++;
+      entry.sales += r.sales;
     }
   }
 
@@ -1354,6 +1360,13 @@ export async function detectBrands(sheetId: string): Promise<string[]> {
 export function countEstShowUp(leads: Lead[], start: Date, end: Date): number {
   return leads.filter((l) =>
     l.appointment_date && l.appointment_date >= start && l.appointment_date <= end
+  ).length;
+}
+
+/** countEstShowUp over the shared row model (DB mirror path). */
+export function countEstShowUpFromRows(rows: SyncLeadRow[], start: Date, end: Date): number {
+  return rows.filter((r) =>
+    r.appointment_date && r.appointment_date >= start && r.appointment_date <= end
   ).length;
 }
 

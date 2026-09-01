@@ -1,8 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  parsePerformanceCSV, parseLeadSalesCSV, countEstShowUp, parseCSVLine,
-  diagnosePerfColumns, deriveTracked, mergeTracked, pickTab, pickPerformanceTab, TAB_RULES,
-  buildPersonData,
+  TAB_RULES, buildPersonData, buildPersonDataFromRows, countEstShowUp, deriveTracked, diagnosePerfColumns, extractLeadRows, mergeTracked, parseCSVLine, parseLeadSalesCSV, parsePerformanceCSV, pickPerformanceTab, pickTab,
 } from "./sheets";
 
 const csvToRows = (csv: string) => csv.trim().split("\n").map((line) => parseCSVLine(line));
@@ -334,5 +332,61 @@ describe("countEstShowUp", () => {
     const april = countEstShowUp(leads, new Date(2026, 3, 1), new Date(2026, 3, 30));
     expect(march).toBe(1);
     expect(april).toBe(1);
+  });
+});
+
+describe("shared lead row model (Phase 2 PR-B)", () => {
+  const csv = `Date,Source,Name,Phone,Appointment Person,Sales Person,Appointment Date,Showed Up,Purchase Date,Sales,Brand
+01/08/2026,Facebook,A,01,Amy,Ali,02/08/2026,Yes,03/08/2026,RM100,Carress
+02/08/2026,Instagram,B,02,Beth,Ben,TBC,No,,0,Couch
+oops,Facebook,C,03,Amy,Ali,,No,05/08/2026,RM50,Carress
+03/08/2026,facebook,E,05,Amy,Cara,04/08/2026,Yes,,0,Carress`;
+  const rows = csv.trim().split("\n").map(parseCSVLine);
+  const s = new Date(2026, 7, 1), e = new Date(2026, 7, 31);
+
+  it("extractLeadRows keeps purchase-dated rows whose lead date fails to parse", () => {
+    const { rows: out, quarantined, appointment_col } = extractLeadRows(rows);
+    expect(appointment_col).toBe(true);
+    const kept = out.find((r) => r.sales === 50);
+    expect(kept).toBeDefined();
+    expect(kept!.lead_date).toBeNull();
+    expect(kept!.purchase_marked).toBe(true);
+    expect(quarantined).toHaveLength(0);
+  });
+
+  it("quarantines only rows where no date column parses", () => {
+    const bad = `Date,Source,Name,Phone,Appointment Person,Sales Person,Appointment Date,Showed Up,Purchase Date,Sales,Brand
+nope,Walkin,D,04,,Dan,,No,,0,Carress`;
+    const { rows: out, quarantined } = extractLeadRows(bad.trim().split("\n").map(parseCSVLine));
+    expect(out).toHaveLength(0);
+    expect(quarantined).toHaveLength(1);
+    expect(quarantined[0].sample.date).toBe("nope");
+  });
+
+  it("marks filled-but-unparseable appointment cells (TBC still counts as an appointment)", () => {
+    const { rows: out } = extractLeadRows(rows);
+    const tbc = out.find((r) => r.appointment_person === "Beth");
+    expect(tbc!.appointment_marked).toBe(true);
+    expect(tbc!.appointment_date).toBeNull();
+    const beth = buildPersonData(rows, s, e).appointmentPersons.find((p) => p.name === "Beth");
+    expect(beth!.appointment).toBe(1);
+  });
+
+  it("sheet path and row-model path produce identical PersonData", () => {
+    const { rows: model } = extractLeadRows(rows);
+    const viaSheet = buildPersonData(rows, s, e, undefined, ["Facebook"]);
+    const viaModel = buildPersonDataFromRows(model, {
+      isWalkinFunnel: false, startDate: s, endDate: e, sources: ["Facebook"],
+    });
+    expect(viaModel).toEqual(viaSheet);
+  });
+
+  it("parity holds for brand-filtered walk-in aggregation too", () => {
+    const { rows: model } = extractLeadRows(rows);
+    const viaSheet = buildPersonData(rows, s, e, "Carress");
+    const viaModel = buildPersonDataFromRows(model, {
+      isWalkinFunnel: false, startDate: s, endDate: e, brandName: "Carress",
+    });
+    expect(viaModel).toEqual(viaSheet);
   });
 });
