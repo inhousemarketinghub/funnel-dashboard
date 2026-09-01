@@ -129,7 +129,7 @@ export default async function DiagnosticsPage({ params }: { params: Promise<{ cl
             {fetchedAtLabel && <> · {tl("Data pulled at")} {fetchedAtLabel} (MYT)</>}
           </div>
         </div>
-        <RefreshButton sheetId={client.sheet_id} fetchedAtLabel={null} lang={lang} />
+        <RefreshButton sheetId={client.sheet_id} clientId={clientId} dataSource="sheets" fetchedAtLabel={null} lang={lang} />
       </div>
 
       {/* Card 1: source tab resolution */}

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUserRole, getProjectPermissions } from "@/lib/auth";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { createAdminSupabase } from "@/lib/supabase/admin";
-import { syncClient, listActiveClients, fanOutSync, markStaleRuns } from "@/lib/sync";
+import { syncClient, listActiveClients, fanOutSync, markStaleRuns, recentSuccessWithin } from "@/lib/sync";
 
 // A single sequential 8-client run outgrew the 60s Hobby ceiling (timed out two
 // days running, 2026-08-25/26). The cron GET is now a dispatcher: it marks
@@ -26,13 +26,19 @@ export async function GET(req: NextRequest) {
   const clientId = req.nextUrl.searchParams.get("clientId");
   if (clientId) {
     // Worker mode: sync exactly one client inside this invocation's own budget.
+    // trigger=stale marks page-load staleness syncs apart from the daily cron
+    // and is throttled — many stale renders must not stampede Google.
+    const trigger = req.nextUrl.searchParams.get("trigger") === "stale" ? ("stale" as const) : ("cron" as const);
+    if (trigger === "stale" && await recentSuccessWithin(clientId, 120)) {
+      return NextResponse.json({ ok: true, skipped: "fresh" });
+    }
     const db = createAdminSupabase();
     const { data: client } = await db.from("clients")
       .select("sheet_id").eq("id", clientId).eq("status", "active").single();
     if (!client?.sheet_id) {
       return NextResponse.json({ error: "Client not found" }, { status: 404 });
     }
-    const result = await syncClient(clientId, client.sheet_id, "cron");
+    const result = await syncClient(clientId, client.sheet_id, trigger);
     return NextResponse.json(result, { status: result.ok ? 200 : 500 });
   }
 
@@ -58,7 +64,8 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST /api/sync { clientId } — manual trigger for signed-in admins
+// POST /api/sync { clientId } — manual trigger for signed-in project members
+// (the refresh button; throttled server-side)
 export async function POST(req: NextRequest) {
   const { role } = await getUserRole();
   if (!role) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -66,9 +73,16 @@ export async function POST(req: NextRequest) {
   const { clientId } = await req.json().catch(() => ({}));
   if (!clientId) return NextResponse.json({ error: "clientId required" }, { status: 400 });
 
+  // Any member with access to this project may refresh it — the button has
+  // always been visible to every viewer (sheets mode never gated it either).
   const perms = await getProjectPermissions(clientId);
-  if (!perms.includes("edit_settings")) {
+  if (perms.length === 0) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  // Refresh throttle: a sync that just succeeded is fresh enough.
+  if (await recentSuccessWithin(clientId, 120)) {
+    return NextResponse.json({ ok: true, skipped: "fresh" });
   }
 
   const supabase = await createServerSupabase();

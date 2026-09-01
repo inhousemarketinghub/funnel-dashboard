@@ -8,6 +8,9 @@ import { t, type Lang } from "@/lib/i18n";
 
 interface Props {
   sheetId: string;
+  clientId: string;
+  /** which pipe fed this page — decides what "refresh" means */
+  dataSource: "sheets" | "db";
   /**
    * Pre-formatted "last pulled from Google" time (Malaysia time), or null when
    * unknown. Formatted on the server so there is no client/server timezone
@@ -17,13 +20,26 @@ interface Props {
   lang: Lang;
 }
 
-export function RefreshButton({ sheetId, fetchedAtLabel, lang }: Props) {
+export function RefreshButton({ sheetId, clientId, dataSource, fetchedAtLabel, lang }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
   function handleRefresh() {
     startTransition(async () => {
-      await refreshSheet(sheetId);
+      if (dataSource === "db") {
+        // db-sourced page: re-sync this client's mirror (throttled server-side),
+        // then re-render from the fresh mirror. Errors surface as unchanged
+        // data; sync_runs has the details.
+        try {
+          await fetch("/api/sync", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ clientId }),
+          });
+        } catch {}
+      } else {
+        await refreshSheet(sheetId);
+      }
       router.refresh();
     });
   }
@@ -47,7 +63,7 @@ export function RefreshButton({ sheetId, fetchedAtLabel, lang }: Props) {
         {isPending ? t(lang, "refreshing") : t(lang, "refresh")}
       </button>
       {fetchedAtLabel && (
-        <span className="text-[11px] text-[var(--t3)] num">{t(lang, "dataUpdatedAt")} {fetchedAtLabel}</span>
+        <span className="text-[11px] text-[var(--t3)] num">{t(lang, dataSource === "db" ? "dataAsOf" : "dataUpdatedAt")} {fetchedAtLabel}</span>
       )}
     </div>
   );

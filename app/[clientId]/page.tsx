@@ -27,6 +27,7 @@ import { generateInsights } from "@/lib/insights";
 import { SummaryCards } from "@/components/dashboard/summary-cards";
 import { MobileDashboard } from "@/components/dashboard/mobile-dashboard";
 import { Suspense } from "react";
+import { after } from "next/server";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { t, normalizeLang, LANG_COOKIE } from "@/lib/i18n";
@@ -149,6 +150,27 @@ export default async function DashboardPage({
         timeZone: "Asia/Kuala_Lumpur", hour: "2-digit", minute: "2-digit", hour12: false,
       }).format(new Date(fetchedAt))
     : null;
+
+  // Staleness-triggered background sync (PRD L86): a db-sourced dashboard
+  // older than 60 min fires one worker refresh AFTER the response is sent —
+  // intra-day freshness without waiting for the daily cron. trigger=stale is
+  // throttled server-side, so concurrent stale renders are cheap no-ops.
+  if (dataSource === "db") {
+    const STALE_MS = 60 * 60 * 1000;
+    const cronSecret = process.env.CRON_SECRET;
+    const prodHost = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+    if (cronSecret && prodHost && (!fetchedAt || Date.now() - fetchedAt > STALE_MS)) {
+      after(async () => {
+        try {
+          await fetch(`https://${prodHost}/api/sync?clientId=${encodeURIComponent(clientId)}&trigger=stale`, {
+            headers: { authorization: `Bearer ${cronSecret}` },
+          });
+        } catch (err) {
+          console.error("stale sync trigger failed", err);
+        }
+      });
+    }
+  }
 
   const perfData = perfResult.data;
   const detectedFunnelType = perfResult.funnelType;
@@ -286,7 +308,7 @@ export default async function DashboardPage({
           <Suspense>
             <DateRangePicker clientId={clientId} lang={lang} />
           </Suspense>
-          <RefreshButton sheetId={client.sheet_id} fetchedAtLabel={fetchedAtLabel} lang={lang} />
+          <RefreshButton sheetId={client.sheet_id} clientId={clientId} dataSource={dataSource} fetchedAtLabel={fetchedAtLabel} lang={lang} />
         </div>
       </div>
 
@@ -410,6 +432,7 @@ export default async function DashboardPage({
             canReport={canReport}
             brandPerformance={brandPerformance}
             sheetId={client.sheet_id}
+            dataSource={dataSource}
             fetchedAtLabel={fetchedAtLabel}
           />
         )}
