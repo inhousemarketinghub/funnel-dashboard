@@ -193,21 +193,25 @@ export async function syncClient(
       } else {
         const extraction = extractLeadRows(rows);
         await db.from("lead_rows").delete().eq("client_id", clientId);
-        for (const chunk of chunks(extraction.rows, 500)) {
-          const { error } = await db.from("lead_rows").insert(chunk.map((r) => ({
-            client_id: clientId,
-            brand: r.brand,
-            lead_date: r.lead_date ? formatDateParam(r.lead_date) : null,
-            source: r.source,
-            appointment_person: r.appointment_person,
-            sales_person: r.sales_person,
-            appointment_date: r.appointment_date ? formatDateParam(r.appointment_date) : null,
-            appointment_marked: r.appointment_marked,
-            showed_up: r.showed_up,
-            purchase_date: r.purchase_date ? formatDateParam(r.purchase_date) : null,
-            purchase_marked: r.purchase_marked,
-            sales: r.sales,
-          })));
+        // row_no preserves sheet order — mirror reads sort by it so tie-order
+        // in person/source aggregation matches the live path exactly.
+        const numbered = extraction.rows.map((r, row_no) => ({
+          client_id: clientId,
+          brand: r.brand,
+          lead_date: r.lead_date ? formatDateParam(r.lead_date) : null,
+          source: r.source,
+          appointment_person: r.appointment_person,
+          sales_person: r.sales_person,
+          appointment_date: r.appointment_date ? formatDateParam(r.appointment_date) : null,
+          appointment_marked: r.appointment_marked,
+          showed_up: r.showed_up,
+          purchase_date: r.purchase_date ? formatDateParam(r.purchase_date) : null,
+          purchase_marked: r.purchase_marked,
+          sales: r.sales,
+          row_no,
+        }));
+        for (const chunk of chunks(numbered, 500)) {
+          const { error } = await db.from("lead_rows").insert(chunk);
           if (error) throw new Error(`lead_rows insert: ${error.message}`);
         }
         if (extraction.quarantined.length > 0) {

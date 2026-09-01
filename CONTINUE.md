@@ -1,48 +1,27 @@
-# Funnel Dashboard — Continuation Guide
+# Continue here
 
-> 新 session 读这个文件即可接续工作。
+Start with **AGENTS.md** (the sheet data contract + hard-won gotchas), then
+the C-tier PRD at `docs/prd/2026-08-23-c-tier-data-foundation.md`. The repo is
+the source of truth for code; project history lives in the owner's Claude
+memory.
 
-## 项目位置
-`/Users/khoweijie/Claude/Project/funnel-dashboard`
+## State (2026-09-01)
 
-## 已完成 ✅
-- Next.js 16 + Tailwind v4 + shadcn/ui (base-nova) + Geist 字体
-- Minimalist Stone + Amber 设计系统 (见 `DESIGN.md`)
-- TypeScript 类型 (`lib/types.ts`) + 工具函数 (`lib/utils.ts`) + 17 tests pass
-- Metrics 计算引擎 (`lib/metrics.ts`) — 从 Python 迁移
-- Google Sheets CSV 解析器 (`lib/sheets.ts`)
-- 日期工具模块 (`lib/dates.ts`) — 解析/格式化/预设/前置时段计算
-- Supabase Auth (email+password) + DB schema (4 tables + RLS)
-- 客户管理页面 (`/clients`, `/clients/new`)
-- **Dashboard 首页** (`/[clientId]`) — 支持任意日期范围选择:
-  - DateRangePicker (预设按钮 + 双月日历)
-  - URL searchParams 驱动 (`?from=YYYY-MM-DD&to=YYYY-MM-DD`)
-  - 自动 previous period 对比
-  - HeroCards + Funnel + Period Comparison Table + KPI Chart
-- Report API (`/api/report/generate`) — 接受 from/to 参数，正确的日期计算
-- Settings 页面 (`/[clientId]/settings`) — KPI 配置编辑 + 月份选择器
-- Dark mode toggle (header ThemeToggle 组件)
-- UI Polish: Apple-like CSS 动画 (fadeInUp, hover-lift, staggered children)
+- **Phase 1 — sheets → Supabase mirror — DONE.** Daily cron 08:30 MYT;
+  dispatcher/worker fan-out (own 60s budget per client, Hobby ceiling);
+  stale-run janitor; audit trail in `data_changes`.
+- **Phase 2 — dual-path reads — DONE.** `lib/data-source.ts` branches on
+  `clients.profile.data_source` (`"sheets"` default | `"db"`); admin-only
+  `?ds=db` test switch; refresh button triggers a mirror sync for db clients;
+  staleness-triggered background sync (>60 min); all today/month boundaries
+  pinned to Asia/Kuala_Lumpur; reconciliation tool
+  (`npx tsx scripts/reconcile.mts`) — **zero-diff verified 2026-09-01 across
+  Rygis + 2990's + Kelana Jaya × Jun/Jul/Aug (1,907 comparisons)**.
+- **Phase 3 — next.** Flip Rygis to `"db"`, 1-week soak, then per-client
+  rollout with owner sign-off; audit surfacing + diagnostics sync-status card.
+  **HARD GATE before any flip: rotate the Supabase service-role key.**
 
-## 已移除 🗑️
-- Weekly/Monthly Report 页面 — 功能已合并到 Dashboard 日期范围选择
+## Login / secrets
 
-## Supabase 配置
-- URL: `https://sqhcagwakxhcwbsytmab.supabase.co`
-- Anon Key: 在 `.env.local` 里
-- 用户已创建: `wjazzz125@gmail.com` / `funnel123`
-- Email confirmation 已关闭
-
-## 可选后续工作 (nice-to-have)
-- 打印/导出按钮 (PDF export via puppeteer or browser print)
-- Client logo upload (Supabase storage)
-- Multi-user access control (invite team members)
-- Real-time data refresh (polling or websocket)
-- Mobile responsive fine-tuning
-
-## 参考文件
-- 设计规范: `DESIGN.md`
-- 完整 spec: `docs/specs/2026-04-02-funnel-dashboard-design.md`
-- 实施计划: `docs/plans/2026-04-02-funnel-dashboard-mvp.md`
-- 测试: `npx vitest run` (17 tests)
-- 构建: `npm run build` (需要 .env.local)
+Credentials and keys live in the owner's password manager and Vercel env —
+never in this repo.

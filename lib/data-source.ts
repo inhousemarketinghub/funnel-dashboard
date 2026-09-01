@@ -133,6 +133,7 @@ async function readLeadModel(clientId: string): Promise<SyncLeadRow[]> {
     db.from("lead_rows")
       .select("brand, lead_date, source, appointment_person, sales_person, appointment_date, appointment_marked, showed_up, purchase_date, purchase_marked, sales")
       .eq("client_id", clientId)
+      .order("row_no", { ascending: true, nullsFirst: false })
       .order("id")
       .range(from, to), "lead_rows");
   return raw.map((r) => ({
