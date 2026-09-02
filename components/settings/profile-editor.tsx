@@ -25,8 +25,8 @@ const P_ZH: Record<string, string> = {
   "Add alias": "+ 添加别名",
   "Remove": "移除",
   "Data source": "数据源",
-  "Google Sheets (current)": "Google Sheets(现行)",
-  "Database mirror (not active yet)": "数据库镜像(暂未启用)",
+  "Database mirror": "数据库镜像",
+  "Takes effect on save, immediately. If anything looks off, switch back to Google Sheets — no residue.": "保存后立即生效。若数字异常，切回 Google Sheets 即可，无残留。",
   "Save Profile": "保存档案",
   "Saving...": "保存中...",
   "Profile saved": "档案已保存",
@@ -184,14 +184,28 @@ export function ProfileEditor({ clientId, lang }: { clientId: string; lang: Lang
           </div>
         </div>
 
-        {/* Data source (display-only until Phase 3) */}
+        {/* Data source — the Phase 3 cutover switch (owner/manager only page) */}
         <div>
           <label className="block text-[12px] font-medium text-[var(--t3)] mb-1.5">{tl("Data source")}</label>
-          <div className="flex items-center gap-2 text-[13px] text-[var(--t2)]">
-            <span className="inline-block rounded-full bg-[var(--bg3)] px-3 py-1">
-              {dataSource === "db" ? tl("Database mirror (not active yet)") : tl("Google Sheets (current)")}
-            </span>
+          <div className="inline-flex overflow-hidden rounded-lg border border-[var(--border)] text-[13px]">
+            {(["sheets", "db"] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setDataSource(v)}
+                className={`px-3 py-1.5 transition-colors ${
+                  dataSource === v
+                    ? "bg-[var(--green)]/15 font-medium text-[var(--green)]"
+                    : "bg-[var(--bg2)] text-[var(--t3)] hover:text-[var(--t1)]"
+                }`}
+              >
+                {v === "db" ? tl("Database mirror") : "Google Sheets"}
+              </button>
+            ))}
           </div>
+          <p className="mt-1.5 text-[12px] text-[var(--t4)]">
+            {tl("Takes effect on save, immediately. If anything looks off, switch back to Google Sheets — no residue.")}
+          </p>
         </div>
 
         <div>
