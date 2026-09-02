@@ -7,6 +7,7 @@ import { createServerSupabase } from "@/lib/supabase/server";
 import { buildDiagnosticsReport, type BrandDiagnosis } from "@/lib/diagnostics";
 import { colToLetter, type SheetTab, type TabRule, type TrackedMetrics } from "@/lib/sheets";
 import { RefreshButton } from "@/components/dashboard/refresh-button";
+import { buildSyncStatus } from "@/lib/sync-status";
 
 // Admin-only page: shows exactly what the parser resolved for this client's
 // sheet — which tabs, which columns (with real header text), funnel-type
@@ -57,7 +58,39 @@ const DIAG_ZH: Record<string, string> = {
   "Appointment": "预约",
   "Est.Show Up": "预计出席",
   "Showed Up": "实际出席",
+  "Sync status": "同步状态",
+  "No syncs recorded yet.": "尚无同步记录。",
+  "Time (MYT)": "时间（MYT）",
+  "Trigger": "触发",
+  "Result": "结果",
+  "Duration": "耗时",
+  "Changes": "变更",
+  "Lead rows": "Lead 行数",
+  "Quarantined": "隔离",
+  "Daily cron": "每日定时",
+  "Manual refresh": "手动刷新",
+  "Staleness": "过期补同步",
+  "Success": "成功",
+  "Error": "失败",
+  "Running": "进行中",
+  "Quarantine": "隔离区",
+  "Empty — every row passed validation.": "空 —— 所有行均通过校验。",
+  "Recent data changes": "近期数据变更（改要留痕）",
+  "None detected.": "暂无。",
 };
+
+const TRIGGER_LABEL: Record<string, string> = {
+  cron: "Daily cron", manual: "Manual refresh", stale: "Staleness",
+};
+const STATUS_LABEL: Record<string, string> = {
+  success: "Success", error: "Error", running: "Running",
+};
+
+const fmtMYT = (iso: string) =>
+  new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kuala_Lumpur", day: "2-digit", month: "2-digit",
+    hour: "2-digit", minute: "2-digit", hour12: false,
+  }).format(new Date(iso));
 
 const METRIC_LABELS: Record<string, string> = {
   date: "Date", adSpend: "Taxed Ad Spend", leadFunnelSpend: "Lead Funnel Spend",
@@ -107,7 +140,10 @@ export default async function DiagnosticsPage({ params }: { params: Promise<{ cl
   const { data: client } = await supabase.from("clients").select("*").eq("id", clientId).single();
   if (!client) notFound();
 
-  const report = await buildDiagnosticsReport(client.sheet_id, client.funnel_type ?? null);
+  const [report, syncStatus] = await Promise.all([
+    buildDiagnosticsReport(client.sheet_id, client.funnel_type ?? null),
+    buildSyncStatus(clientId),
+  ]);
 
   const fetchedAtLabel = report.fetchedAt
     ? new Intl.DateTimeFormat("en-GB", {
@@ -130,6 +166,78 @@ export default async function DiagnosticsPage({ params }: { params: Promise<{ cl
           </div>
         </div>
         <RefreshButton sheetId={client.sheet_id} clientId={clientId} dataSource="sheets" fetchedAtLabel={null} lang={lang} />
+      </div>
+
+      {/* Sync status (Phase 3): the mirror's health at a glance */}
+      <div className="card-base">
+        <h2 className="font-label text-[12px] uppercase tracking-widest text-[var(--t4)] mb-3">{tl("Sync status")}</h2>
+        {syncStatus.runs.length === 0 ? (
+          <div className="text-[13px] text-[var(--t3)]">{tl("No syncs recorded yet.")}</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-[13px]">
+              <thead>
+                <tr className="text-left text-[var(--t4)]">
+                  <th className="font-normal pr-3 pb-1">{tl("Time (MYT)")}</th>
+                  <th className="font-normal pr-3 pb-1">{tl("Trigger")}</th>
+                  <th className="font-normal pr-3 pb-1">{tl("Result")}</th>
+                  <th className="font-normal pr-3 pb-1">{tl("Duration")}</th>
+                  <th className="font-normal pr-3 pb-1">{tl("Changes")}</th>
+                  <th className="font-normal pr-3 pb-1">{tl("Lead rows")}</th>
+                  <th className="font-normal pb-1">{tl("Quarantined")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {syncStatus.runs.map((r, i) => (
+                  <tr key={i} className="border-t border-[var(--border)]">
+                    <td className="pr-3 py-1.5 whitespace-nowrap">{fmtMYT(r.started_at)}</td>
+                    <td className="pr-3 py-1.5 whitespace-nowrap">{tl(TRIGGER_LABEL[r.trigger] ?? r.trigger)}</td>
+                    <td className="pr-3 py-1.5">
+                      <span className={`${PILL} ${r.status === "success" ? "bg-[var(--green)]/15 text-[var(--green)]" : r.status === "running" ? "bg-[var(--yellow)]/15 text-[var(--yellow)]" : "bg-[var(--red)]/15 text-[var(--red)]"}`}>
+                        {tl(STATUS_LABEL[r.status] ?? r.status)}
+                      </span>
+                      {r.error && <div className="mt-1 text-[11px] text-[var(--red)]">{r.error}</div>}
+                    </td>
+                    <td className="pr-3 py-1.5 whitespace-nowrap">{r.seconds !== null ? `${r.seconds}s` : "—"}</td>
+                    <td className="pr-3 py-1.5">{r.changes ?? "—"}</td>
+                    <td className="pr-3 py-1.5">{r.lead_rows ?? "—"}</td>
+                    <td className="py-1.5">{r.quarantined ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <div>
+            <h3 className="font-label text-[11px] uppercase tracking-widest text-[var(--t4)] mb-2">
+              {tl("Quarantine")} · {syncStatus.quarantine.total}
+            </h3>
+            {syncStatus.quarantine.total === 0 ? (
+              <div className="text-[13px] text-[var(--t3)]">{tl("Empty — every row passed validation.")}</div>
+            ) : (
+              <ul className="text-[12.5px] text-[var(--t2)] flex flex-col gap-1">
+                {syncStatus.quarantine.latest.map((q, i) => (
+                  <li key={i}>{q.tab_name} · #{q.row_index ?? "?"} · {q.reason}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div>
+            <h3 className="font-label text-[11px] uppercase tracking-widest text-[var(--t4)] mb-2">{tl("Recent data changes")}</h3>
+            {syncStatus.recentChanges.length === 0 ? (
+              <div className="text-[13px] text-[var(--t3)]">{tl("None detected.")}</div>
+            ) : (
+              <ul className="text-[12.5px] text-[var(--t2)] flex flex-col gap-1">
+                {syncStatus.recentChanges.map((c, i) => (
+                  <li key={i}>
+                    {c.metric_date}{c.brand ? ` · ${c.brand}` : ""} · {c.metric}: {c.old_value ?? "—"} → {c.new_value ?? "—"}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Card 1: source tab resolution */}
