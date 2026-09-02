@@ -15,6 +15,8 @@ import { DateRangePicker } from "./date-range-picker";
 import { BrandSelector } from "./brand-selector";
 import { MonthPickerDialog } from "./month-picker-dialog";
 import { RefreshButton } from "./refresh-button";
+import { DataChangedBadge } from "./data-changed-badge";
+import type { ChangeItem } from "@/lib/report-audit";
 import { Stagger } from "@/components/animations/stagger";
 
 // Matches the kpiItems shape built in app/[clientId]/page.tsx (and KPIChart's).
@@ -41,6 +43,7 @@ interface Props {
   kpiItems: KpiItem[];
   thisRangeLabel: string;
   prevRangeLabel: string;
+  changedSinceReport: ChangeItem[];
   clientId: string;
   brands: string[];
   hasMultiBrand: boolean;
@@ -79,7 +82,7 @@ const TAB_LABEL_KEYS: Record<TabKey, string> = {
 
 export function MobileDashboard({
   tm, lm, kpi, mom, insights, personData, funnelType, kpiItems,
-  thisRangeLabel, prevRangeLabel, clientId, brands, hasMultiBrand, canReport,
+  thisRangeLabel, prevRangeLabel, changedSinceReport, clientId, brands, hasMultiBrand, canReport,
   brandPerformance, sheetId, dataSource, fetchedAtLabel, lang, activeSources,
 }: Props) {
   const [tab, setTab] = useState<TabKey>("overview");
@@ -106,6 +109,7 @@ export function MobileDashboard({
       {/* Date range + brand + monthly report controls */}
       <div className="mb-3 flex flex-col gap-2">
         <div className="num text-[13px] text-[var(--t3)]">{thisRangeLabel}</div>
+        <DataChangedBadge changes={changedSinceReport} lang={lang} />
         <div className="flex flex-wrap items-center gap-2">
           {hasMultiBrand && <BrandSelector clientId={clientId} brands={brands} lang={lang} />}
           <Link href={`/${clientId}/trends`} className="topbar-btn">{t(lang, "trends")}</Link>
