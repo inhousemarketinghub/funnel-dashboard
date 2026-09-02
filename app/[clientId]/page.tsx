@@ -2,6 +2,8 @@ import { createServerSupabase } from "@/lib/supabase/server";
 import { getProjectPermissions } from "@/lib/auth";
 import { fetchKPIData, fetchOverallKPI, fetchBrandPerformance } from "@/lib/sheets";
 import { getPerformanceData, getPersonData, getFreshness, getBrands, resolveDataSource } from "@/lib/data-source";
+import { changesSinceSnapshot } from "@/lib/report-audit";
+import { DataChangedBadge } from "@/components/dashboard/data-changed-badge";
 import type { PersonData, PerfResult, BrandPerformanceData } from "@/lib/sheets";
 import { BrandSelector } from "@/components/dashboard/brand-selector";
 import { computeMetrics, computeMoM, computeAchievement } from "@/lib/metrics";
@@ -184,6 +186,14 @@ export default async function DashboardPage({
   const thisRangeLabel = formatRangeLabel(reportStart, reportEnd);
   const prevRangeLabel = formatRangeLabel(prevStart, prevEnd);
 
+  // ⚠ 数据已更新角标 (PRD §3): meaningful only when viewing a single month —
+  // shows month-M changes detected AFTER month-M's report snapshot.
+  const sameMonth = reportStart.getFullYear() === reportEnd.getFullYear()
+    && reportStart.getMonth() === reportEnd.getMonth();
+  const changedSinceReport = sameMonth
+    ? await changesSinceSnapshot(clientId, reportStart.getFullYear(), reportStart.getMonth() + 1)
+    : [];
+
   // Days in current range for daily avg calculation
   const rangeDays = Math.max(1, Math.round((reportEnd.getTime() - reportStart.getTime()) / (1000 * 60 * 60 * 24)) + 1);
   // Days in the month for pace calculation
@@ -297,6 +307,7 @@ export default async function DashboardPage({
           <SplitText text={t(lang, "performanceOverview")} />
           <div className="flex items-center gap-3 mt-[3px]">
             <p className="text-[14px] text-[var(--t3)] font-light">{thisRangeLabel}</p>
+            <DataChangedBadge changes={changedSinceReport} lang={lang} />
             {brands.length > 0 && (
               <Suspense>
                 <BrandSelector clientId={clientId} brands={brands.length > 1 ? ["Overall", ...brands] : brands} lang={lang} />
@@ -425,6 +436,7 @@ export default async function DashboardPage({
             funnelType={detectedFunnelType || "appointment"}
             kpiItems={kpiItems}
             thisRangeLabel={thisRangeLabel}
+            changedSinceReport={changedSinceReport}
             prevRangeLabel={prevRangeLabel}
             clientId={clientId}
             brands={brands.length > 1 ? ["Overall", ...brands] : brands}

@@ -1,4 +1,6 @@
 import { createServerSupabase } from "@/lib/supabase/server";
+import { after } from "next/server";
+import { writeReportSnapshot } from "@/lib/report-audit";
 import { countEstShowUp, fetchKPIData, fetchOverallKPI } from "@/lib/sheets";
 import { getPerformanceData, getLeadData, getBrands, resolveDataSource } from "@/lib/data-source";
 import { getProjectPermissions } from "@/lib/auth";
@@ -73,6 +75,15 @@ export default async function ReportPage({
   }
 
   const overall = computeAll(overallPerf.data, kpi0);
+
+  // 月报生成时快照当月合计 (PRD §3): the dashboard badge compares later
+  // data_changes against this moment. Fire-and-forget after the response.
+  if (sp.month && typeof sp.month === "string") {
+    const [snapY, snapM] = sp.month.split("-").map(Number);
+    if (snapY && snapM) {
+      after(() => writeReportSnapshot(clientId, snapY, snapM, { metrics: overall.tm, dataSource }));
+    }
+  }
 
   // Per-brand data
   interface BrandBundle { name: string; tm: FunnelMetrics; lm: FunnelMetrics; mom: MoMResult; ach: Achievement; kpi: KPIConfig; weeks: FunnelMetrics[] }
