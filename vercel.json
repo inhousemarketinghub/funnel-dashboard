@@ -4,5 +4,8 @@
       "path": "/api/sync",
       "schedule": "30 0 * * *"
     }
+  ],
+  "regions": [
+    "sin1"
   ]
 }
