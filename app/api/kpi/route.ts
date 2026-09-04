@@ -3,6 +3,9 @@ import { createServerSupabase } from "@/lib/supabase/server";
 import { getUserRole, getProjectPermissions } from "@/lib/auth";
 import { todayKL } from "@/lib/dates";
 import { fetchKPIData, fetchDerivedKPI, writeKPIValues, detectBrandsOrdered } from "@/lib/sheets";
+import { readKPIMirror, pickKPIMirrorEntry } from "@/lib/data-source";
+import { refreshKPIMirror } from "@/lib/sync";
+import { revalidateTag } from "next/cache";
 
 // GET /api/kpi?clientId=xxx&brand=yyy
 // Reads KPI values from Google Sheet for the Settings page
@@ -30,6 +33,25 @@ export async function GET(req: NextRequest) {
     }
 
     const brandParam = req.nextUrl.searchParams.get("brand") || undefined;
+
+    // Mirror-first (speed project C): when the KPI mirror exists it serves
+    // EVERY client regardless of data_source — Projection is the owner's
+    // planning tool, and the mirror refreshes daily plus on every save.
+    // Empty mirror (pre-first-sync) falls through to the live-sheet path.
+    const entries = await readKPIMirror(clientId);
+    if (entries.length > 0) {
+      const named = entries.filter((e) => e.brand !== "").map((e) => e.brand);
+      const isMulti = named.length > 1;
+      const wanted = isMulti ? brandParam : named[0] || undefined;
+      const hit = pickKPIMirrorEntry(entries, wanted);
+      return NextResponse.json({
+        kpi: hit?.kpi ?? {},
+        derived: hit?.derived ?? {},
+        funnelType: client.funnel_type,
+        brands: isMulti ? named : [],
+      });
+    }
+
     const brands = await detectBrandsOrdered(client.sheet_id);
     const isMultiBrand = brands.length > 1;
 
@@ -88,6 +110,17 @@ export async function POST(req: NextRequest) {
 
     // Write to Google Sheet
     await writeKPIValues(client.sheet_id, fields, brandName);
+
+    // Write-through (speed project C): rebuild this client's KPI mirror fresh
+    // so the follow-up GET (refreshDerived) is read-your-own-writes, and bust
+    // the sheet cache for pages still reading the live path — fixes the
+    // longstanding "saved but still seeing old values" staleness.
+    try {
+      await refreshKPIMirror(clientId, client.sheet_id);
+    } catch (err) {
+      console.error("kpi_mirror refresh after save:", err);
+    }
+    revalidateTag(`sheet:${client.sheet_id}`, "max");
 
     // Compute derived values for Supabase cache
     const sales = fields.sales ?? 0;

@@ -892,6 +892,40 @@ export async function fetchDerivedKPI(sheetId: string, brandName?: string): Prom
 
 // ── KPI Cell Address Discovery (for write-back) ─────────────
 
+export interface KPIMirrorEntry {
+  brand: string;
+  kpi: KPIConfig;
+  derived: DerivedKPI;
+  position: number;
+}
+
+/** Parse the whole KPI tab into per-brand mirror entries (pure — the sync
+ *  engine's KPI step and /api/kpi's write-through refresh both feed on this).
+ *  Brand sections are discovered exactly like detectBrandsOrdered ("Brand -
+ *  KPI Stimulator (…)" headers, left-to-right); a tab without section headers
+ *  is a single-brand sheet stored under brand "". */
+export function extractKPIMirror(rows: string[][]): KPIMirrorEntry[] {
+  const ordered: string[] = [];
+  for (let ri = 0; ri < Math.min(5, rows.length); ri++) {
+    for (let ci = 0; ci < (rows[ri]?.length || 0); ci++) {
+      const h = (rows[ri][ci] || "").trim();
+      if ((h.toLowerCase().includes("kpi") || h.toLowerCase().includes("stimulator")) && h.includes(" - ")) {
+        const brand = h.split(" - ")[0].trim();
+        if (brand && !ordered.includes(brand)) ordered.push(brand);
+      }
+    }
+  }
+  if (ordered.length === 0) {
+    return [{ brand: "", kpi: parseKPIRows(rows), derived: parseDerivedKPIRows(rows), position: 0 }];
+  }
+  return ordered.map((brand, position) => ({
+    brand,
+    position,
+    kpi: parseKPIRows(rows, brand),
+    derived: parseDerivedKPIRows(rows, brand),
+  }));
+}
+
 export function colToLetter(col: number): string {
   let s = "";
   let c = col;
@@ -1302,9 +1336,10 @@ export async function fetchKPIData(sheetId: string, brandName?: string): Promise
   return parseKPIRows(rows, brandName);
 }
 
-export async function fetchOverallKPI(sheetId: string, brands: string[]): Promise<KPIConfig> {
-  const kpis = await Promise.all(brands.map((b) => fetchKPIData(sheetId, b)));
-  const valid = kpis.filter((k): k is KPIConfig => k !== null);
+/** Sum/average policy for merging per-brand KPI targets — the SINGLE
+ *  implementation shared by the live path (fetchOverallKPI) and the mirror
+ *  path (lib/data-source.ts getOverallKPI). */
+export function combineKPI(valid: KPIConfig[]): KPIConfig {
   if (valid.length === 0) return { sales: 0, orders: 0, aov: 0, cpl: 0, respond_rate: 0, appt_rate: 0, showup_rate: 0, conv_rate: 0, ad_spend: 0, daily_ad: 0, roas: 0, cpa_pct: 0, target_contact: 0, target_appt: 0, target_showup: 0 };
 
   const sum = (fn: (k: KPIConfig) => number) => valid.reduce((a, k) => a + fn(k), 0);
@@ -1327,6 +1362,11 @@ export async function fetchOverallKPI(sheetId: string, brands: string[]): Promis
     target_appt: sum((k) => k.target_appt),
     target_showup: sum((k) => k.target_showup),
   };
+}
+
+export async function fetchOverallKPI(sheetId: string, brands: string[]): Promise<KPIConfig> {
+  const kpis = await Promise.all(brands.map((b) => fetchKPIData(sheetId, b)));
+  return combineKPI(kpis.filter((k): k is KPIConfig => k !== null));
 }
 
 export async function detectBrandsOrdered(sheetId: string): Promise<string[]> {

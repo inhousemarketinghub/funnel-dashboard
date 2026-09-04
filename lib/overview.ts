@@ -1,6 +1,6 @@
 import { createServerSupabase } from "@/lib/supabase/server";
 import { fetchKPIData } from "@/lib/sheets";
-import { getPerformanceData, resolveDataSource } from "@/lib/data-source";
+import { getPerformanceData, getKPIData, resolveDataSource } from "@/lib/data-source";
 import { computeMetrics, computeAchievement } from "@/lib/metrics";
 import { todayKL } from "@/lib/dates";
 import type { ClientOverview, OverviewStats } from "@/lib/types";
@@ -38,7 +38,7 @@ export async function fetchAllClientsOverview(): Promise<{
         const dataSource = resolveDataSource(client);
         const [perfResult, kpi] = await Promise.all([
           getPerformanceData(client, dataSource),
-          dataSource === "db" ? fetchKPIData(client.sheet_id).catch(() => null) : fetchKPIData(client.sheet_id),
+          dataSource === "db" ? getKPIData(client, "db").catch(() => null) : fetchKPIData(client.sheet_id),
         ]);
 
         // Filter performance data to current month
