@@ -1,8 +1,8 @@
 import { createServerSupabase } from "@/lib/supabase/server";
 import { after } from "next/server";
 import { writeReportSnapshot } from "@/lib/report-audit";
-import { countEstShowUp, fetchKPIData, fetchOverallKPI } from "@/lib/sheets";
-import { getPerformanceData, getLeadData, getBrands, resolveDataSource } from "@/lib/data-source";
+import { countEstShowUp } from "@/lib/sheets";
+import { getPerformanceData, getLeadData, getBrands, getKPIData, getOverallKPI, resolveDataSource } from "@/lib/data-source";
 import { getProjectPermissions } from "@/lib/auth";
 import { computeMetrics, computeMoM, computeAchievement, budgetScenario, computeWeeklyBreakdown } from "@/lib/metrics";
 import { fmtRM, fmtROAS, fmtPct } from "@/lib/utils";
@@ -52,7 +52,7 @@ export default async function ReportPage({
 
   // Fetch Overall (db mode: KPI targets still come from the sheet but degrade
   // gracefully instead of failing the whole report)
-  const kpiPromise = isMultiBrand ? fetchOverallKPI(client.sheet_id, brands) : fetchKPIData(client.sheet_id);
+  const kpiPromise = isMultiBrand ? getOverallKPI(client, dataSource, brands) : getKPIData(client, dataSource);
   const [overallPerf, overallLead, overallKPI] = await Promise.all([
     getPerformanceData(client, dataSource),
     getLeadData(client, dataSource),
@@ -90,7 +90,7 @@ export default async function ReportPage({
   const brandBundles: BrandBundle[] = [];
   if (isMultiBrand) {
     for (const b of brands) {
-      const bkPromise = fetchKPIData(client.sheet_id, b);
+      const bkPromise = getKPIData(client, dataSource, b);
       const [bp, bk] = await Promise.all([
         getPerformanceData(client, dataSource, b),
         dataSource === "db" ? bkPromise.catch(() => null) : bkPromise,

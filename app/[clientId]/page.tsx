@@ -1,7 +1,7 @@
 import { createServerSupabase } from "@/lib/supabase/server";
 import { getProjectPermissions } from "@/lib/auth";
 import { fetchKPIData, fetchOverallKPI, fetchBrandPerformance } from "@/lib/sheets";
-import { getPerformanceData, getPersonData, getFreshness, getBrands, resolveDataSource } from "@/lib/data-source";
+import { getPerformanceData, getPersonData, getFreshness, getBrands, getKPIData, getOverallKPI, resolveDataSource } from "@/lib/data-source";
 import { changesSinceSnapshot } from "@/lib/report-audit";
 import { DataChangedBadge } from "@/components/dashboard/data-changed-badge";
 import type { PersonData, PerfResult, BrandPerformanceData } from "@/lib/sheets";
@@ -114,7 +114,7 @@ export default async function DashboardPage({
         getFreshness(client, "db"),
       ]);
       [sheetKPI, brandPerformance] = await Promise.all([
-        fetchKPIData(client.sheet_id, selectedBrand).catch(() => null),
+        getKPIData(client, "db", selectedBrand).catch(() => null),
         fetchBrandPerformance(client.sheet_id, reportStart, reportEnd).catch(() => null),
       ]);
     } else {
@@ -134,7 +134,7 @@ export default async function DashboardPage({
   // For Overall (multi-brand, no selectedBrand): ALWAYS sum all brand KPIs
   if (brands.length > 1 && !selectedBrand) {
     sheetKPI = dataSource === "db"
-      ? await fetchOverallKPI(client.sheet_id, brands).catch(() => sheetKPI)
+      ? await getOverallKPI(client, "db", brands).catch(() => sheetKPI)
       : await fetchOverallKPI(client.sheet_id, brands);
   }
 

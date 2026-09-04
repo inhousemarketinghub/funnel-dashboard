@@ -18,7 +18,7 @@ import { createAdminSupabase } from "./supabase/admin";
 import {
   listSheetTabs, fetchSheetData, pickTab, TAB_RULES,
   diagnosePerfColumns, detectFunnelTypeFromColumns, parsePerformanceRows,
-  deriveTracked, extractLeadRows,
+  deriveTracked, extractLeadRows, extractKPIMirror,
 } from "./sheets";
 import { formatDateParam } from "./dates";
 import type { DailyMetric } from "./types";
@@ -99,6 +99,8 @@ export interface SyncStats {
   lead_rows: number;
   lead_skipped_unchanged: boolean;
   quarantined: number;
+  kpi_brands?: number;
+  kpi_error?: string;
 }
 
 export async function syncClient(
@@ -229,6 +231,14 @@ export async function syncClient(
       }
     }
 
+    // KPI mirror (speed project C): auxiliary — a broken KPI tab must not
+    // sink the funnel sync, so failures land in stats instead of throwing.
+    try {
+      stats.kpi_brands = await refreshKPIMirror(clientId, sheetId, tabs, db);
+    } catch (err) {
+      stats.kpi_error = err instanceof Error ? err.message : String(err);
+    }
+
     if (runId) await db.from("sync_runs").update({
       status: "success", finished_at: new Date().toISOString(), stats,
     }).eq("id", runId);
@@ -271,6 +281,33 @@ export async function markStaleRuns(
     .update({ status: "error", error: "killed before completion (marked stale by sync janitor)" })
     .eq("status", "running")
     .lt("started_at", cutoff);
+}
+
+/**
+ * Rebuild one client's kpi_mirror from the live KPI tab. Called by the sync
+ * engine (reusing its tab list) and by /api/kpi POST right after a write-back,
+ * so saves are read-your-own-writes on the mirror.
+ */
+export async function refreshKPIMirror(
+  clientId: string,
+  sheetId: string,
+  tabs?: Awaited<ReturnType<typeof listSheetTabs>>,
+  db: ReturnType<typeof createAdminSupabase> = createAdminSupabase(),
+): Promise<number> {
+  const tabList = tabs ?? await listSheetTabs(sheetId);
+  const kpiTab = pickTab(tabList, TAB_RULES.kpi);
+  if (!kpiTab) return 0;
+  const rows = await fetchSheetData(sheetId, kpiTab, { fresh: true });
+  const entries = extractKPIMirror(rows);
+  await db.from("kpi_mirror").delete().eq("client_id", clientId);
+  if (entries.length > 0) {
+    const { error } = await db.from("kpi_mirror").insert(entries.map((e) => ({
+      client_id: clientId, brand: e.brand, kpi: e.kpi, derived: e.derived,
+      position: e.position, synced_at: new Date().toISOString(),
+    })));
+    if (error) throw new Error(`kpi_mirror insert: ${error.message}`);
+  }
+  return entries.length;
 }
 
 /**

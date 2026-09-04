@@ -16,11 +16,13 @@ import { createAdminSupabase } from "./supabase/admin";
 import {
   fetchPerformanceData, fetchPersonData, fetchLeadData, getDataFetchedAt,
   detectBrandsOrdered, buildPersonDataFromRows, mergeTracked,
+  fetchKPIData, fetchOverallKPI, combineKPI,
   type PerfResult, type PersonData, type SyncLeadRow, type TrackedMetrics,
+  type KPIMirrorEntry,
 } from "./sheets";
 import { parseDateParam } from "./dates";
 import { parseProfile, dataSourceOf } from "./profile";
-import type { DailyMetric, Lead } from "./types";
+import type { DailyMetric, Lead, KPIConfig } from "./types";
 
 export interface DataClient { id: string; sheet_id: string; profile?: unknown }
 export type DataSourceMode = "sheets" | "db";
@@ -196,11 +198,57 @@ export async function getFreshness(client: DataClient, mode: DataSourceMode): Pr
   return data?.finished_at ? Date.parse(String(data.finished_at)) : null;
 }
 
-/** Brand list. Sheets: KPI-tab section order. DB: brand_states by tab name —
- *  order may differ cosmetically, but keeps the page alive when Google is
- *  unreachable for a db-sourced client. */
+/** Ordered kpi_mirror entries for a client (empty = not mirrored yet). */
+export async function readKPIMirror(clientId: string): Promise<KPIMirrorEntry[]> {
+  const db = createAdminSupabase();
+  const { data, error } = await db.from("kpi_mirror")
+    .select("brand, kpi, derived, position")
+    .eq("client_id", clientId)
+    .order("position");
+  if (error) throw new Error(`kpi_mirror read: ${error.message}`);
+  return (data ?? []).map((r) => ({
+    brand: String(r.brand ?? ""),
+    kpi: r.kpi as KPIMirrorEntry["kpi"],
+    derived: r.derived as KPIMirrorEntry["derived"],
+    position: Number(r.position),
+  }));
+}
+
+/** Match one mirror entry the way the sheet parser would resolve a brand ask:
+ *  exact brand match; no-brand ask prefers the single-brand "" entry; a lone
+ *  section serves any ask (parseKPIRows' default-offset behavior). */
+export function pickKPIMirrorEntry(entries: KPIMirrorEntry[], brandName?: string): KPIMirrorEntry | undefined {
+  return (brandName !== undefined
+    ? entries.find((e) => e.brand.toLowerCase() === brandName.toLowerCase())
+    : entries.find((e) => e.brand === "")) ?? (entries.length === 1 ? entries[0] : undefined);
+}
+
+export async function getKPIData(
+  client: DataClient, mode: DataSourceMode, brandName?: string,
+): Promise<KPIConfig | null> {
+  if (mode === "sheets") return fetchKPIData(client.sheet_id, brandName);
+  const entries = await readKPIMirror(client.id);
+  if (entries.length === 0) return fetchKPIData(client.sheet_id, brandName); // pre-first-sync fallback
+  return pickKPIMirrorEntry(entries, brandName)?.kpi ?? null;
+}
+
+export async function getOverallKPI(
+  client: DataClient, mode: DataSourceMode, brands: string[],
+): Promise<KPIConfig> {
+  if (mode === "sheets") return fetchOverallKPI(client.sheet_id, brands);
+  const entries = await readKPIMirror(client.id);
+  if (entries.length === 0) return fetchOverallKPI(client.sheet_id, brands);
+  const wanted = new Set(brands.map((b) => b.toLowerCase()));
+  return combineKPI(entries.filter((e) => wanted.has(e.brand.toLowerCase())).map((e) => e.kpi));
+}
+
+/** Brand list. Sheets: KPI-tab section order. DB: kpi_mirror position order
+ *  (same source as the sheet path), falling back to brand_states for clients
+ *  whose mirror hasn't filled yet. */
 export async function getBrands(client: DataClient, mode: DataSourceMode): Promise<string[]> {
   if (mode === "sheets") return detectBrandsOrdered(client.sheet_id);
+  const named = (await readKPIMirror(client.id)).filter((e) => e.brand !== "").map((e) => e.brand);
+  if (named.length > 0) return named;
   const db = createAdminSupabase();
   const { data, error } = await db.from("brand_states")
     .select("brand, tab_name")
