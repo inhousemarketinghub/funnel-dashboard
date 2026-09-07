@@ -55,6 +55,9 @@ export function Sidebar({ clientId, clientName, logoUrl, email, features, lang, 
   const can = (k: string) => features.includes(k);
   const pathname = usePathname();
   const router = useRouter();
+  // Fixed-geometry reveal: the inner column is ALWAYS laid out at full width;
+  // the aside's animated width just clips it. Labels fade so nothing pops.
+  const fade = "whitespace-nowrap transition-opacity duration-150 " + (collapsed ? "opacity-0" : "opacity-100 delay-100");
 
   const dataItems: NavItem[] = [
     { href: `/${clientId}`, labelKey: "overviewTab", icon: LayoutDashboard, exact: true },
@@ -81,23 +84,20 @@ export function Sidebar({ clientId, clientName, logoUrl, email, features, lang, 
         href={item.href}
         title={collapsed ? t(lang, item.labelKey) : undefined}
         className={`flex items-center gap-2.5 rounded-[8px] px-3 py-2 text-[13px] font-medium no-underline transition-colors ${
-          collapsed ? "justify-center px-0" : ""
-        } ${
           active
             ? "bg-[var(--sidebar-primary)] text-[var(--sidebar-primary-foreground)]"
             : "text-[var(--t2)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]"
         }`}
       >
         <Icon className="h-4 w-4 shrink-0" />
-        {!collapsed && t(lang, item.labelKey)}
+        <span className={fade}>{t(lang, item.labelKey)}</span>
       </Link>
     );
   }
 
   function groupLabel(key: string) {
-    if (collapsed) return <div className="mt-4 mb-1 border-t border-[var(--sidebar-border)]" />;
     return (
-      <div className="font-label px-3 pt-5 pb-1.5 text-[10px] uppercase tracking-[0.18em] text-[var(--t4)]">
+      <div className={`font-label px-3 pt-5 pb-1.5 text-[10px] uppercase tracking-[0.18em] text-[var(--t4)] ${fade}`}>
         {t(lang, key)}
       </div>
     );
@@ -113,42 +113,37 @@ export function Sidebar({ clientId, clientName, logoUrl, email, features, lang, 
 
   return (
     <aside
-      className={`app-sidebar hidden md:flex flex-col sticky top-[3px] h-[calc(100dvh-3px)] bg-[var(--sidebar)] border-r border-[var(--sidebar-border)] py-4 overflow-y-auto transition-[width] duration-200 ${
+      className={`app-sidebar hidden md:flex flex-col sticky top-[3px] h-[calc(100dvh-3px)] bg-[var(--sidebar)] border-r border-[var(--sidebar-border)] py-4 px-3 overflow-y-auto overflow-x-hidden transition-[width] duration-200 ease-out ${
         overlaying ? "z-50 shadow-[8px_0_32px_rgba(0,0,0,0.14)]" : "z-30"
       } ${
-        collapsed ? "w-[64px] px-2" : "w-[232px] px-3"
+        collapsed ? "w-[64px]" : "w-[232px]"
       }`}
     >
+      {/* Inner column laid out at FULL width regardless of aside width — the
+          width animation is pure clipping, so nothing reflows frame-to-frame */}
+      <div className="flex w-[208px] shrink-0 grow flex-col">
       {/* Project Overview — top exit, above the brand block */}
       <Link
         href="/projects"
         title={collapsed ? t(lang, "projectOverview") : undefined}
-        className={`mb-2 flex items-center gap-2.5 rounded-[8px] px-3 py-1.5 text-[12px] text-[var(--t4)] no-underline transition-colors hover:bg-[var(--sidebar-accent)] hover:text-[var(--t1)] ${
-          collapsed ? "justify-center px-0" : ""
-        }`}
+        className="mb-2 flex items-center gap-2.5 rounded-[8px] px-3 py-1.5 text-[12px] text-[var(--t4)] no-underline transition-colors hover:bg-[var(--sidebar-accent)] hover:text-[var(--t1)]"
       >
         <LayoutGrid className="h-4 w-4 shrink-0" />
-        {!collapsed && t(lang, "projectOverview")}
+        <span className={fade}>{t(lang, "projectOverview")}</span>
       </Link>
 
       {/* Brand block = project quick-switcher dropdown */}
       <DropdownMenu onOpenChange={onSwitcherOpenChange}>
         <DropdownMenuTrigger
-          className={`flex w-full items-center gap-3 rounded-[10px] px-2 py-2 text-left transition-colors hover:bg-[var(--sidebar-accent)] ${
-            collapsed ? "justify-center px-0" : ""
-          }`}
+          className="flex w-full items-center gap-3 rounded-[10px] py-2 pl-1 pr-2 text-left transition-colors hover:bg-[var(--sidebar-accent)]"
           title={collapsed ? clientName : undefined}
         >
           {logoBlock}
-          {!collapsed && (
-            <>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[13px] font-semibold leading-tight text-[var(--sidebar-foreground)]">{clientName}</div>
-                <div className="font-label text-[9px] uppercase tracking-widest text-[var(--t4)]">Performance Tracker</div>
-              </div>
-              <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-[var(--t4)]" />
-            </>
-          )}
+          <div className={`min-w-0 flex-1 ${fade}`}>
+            <div className="truncate text-[13px] font-semibold leading-tight text-[var(--sidebar-foreground)]">{clientName}</div>
+            <div className="font-label text-[9px] uppercase tracking-widest text-[var(--t4)]">Performance Tracker</div>
+          </div>
+          <ChevronsUpDown className={`h-3.5 w-3.5 shrink-0 text-[var(--t4)] ${fade}`} />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="min-w-[210px]">
           {projects.map((p) => (
@@ -196,35 +191,32 @@ export function Sidebar({ clientId, clientName, logoUrl, email, features, lang, 
       <div className="flex-1" />
 
       {/* Bottom: overview of all projects, toggles, identity, collapse */}
-      <div className={`flex flex-col gap-2 border-t border-[var(--sidebar-border)] pt-3 ${collapsed ? "items-center" : ""}`}>
+      <div className="flex flex-col gap-2 border-t border-[var(--sidebar-border)] pt-3">
         {can("edit_settings") && (
           <Link
             href={`/${clientId}/settings`}
             title={collapsed ? t(lang, "settings") : undefined}
             className={`flex items-center gap-2.5 rounded-[8px] px-3 py-2 text-[13px] font-medium no-underline transition-colors ${
-              collapsed ? "justify-center px-0 w-full" : ""
-            } ${
               pathname.startsWith(`/${clientId}/settings`)
                 ? "bg-[var(--sidebar-primary)] text-[var(--sidebar-primary-foreground)]"
                 : "text-[var(--t2)] hover:bg-[var(--sidebar-accent)]"
             }`}
           >
             <Settings className="h-4 w-4 shrink-0" />
-            {!collapsed && t(lang, "settings")}
+            <span className={fade}>{t(lang, "settings")}</span>
           </Link>
         )}
-        {!collapsed && (
-          <>
-            <div className="flex items-center gap-2 px-3">
-              <LanguageToggle lang={lang} />
-              <ThemeToggle />
-            </div>
-            <div className="flex items-center justify-between gap-2 px-3 pb-1">
-              <span className="num min-w-0 truncate text-[10px] text-[var(--t4)]">{email}</span>
-              <LogoutButton lang={lang} />
-            </div>
-          </>
-        )}
+        <div className={`${fade} ${collapsed ? "pointer-events-none" : ""}`}>
+          <div className="flex items-center gap-2 px-3">
+            <LanguageToggle lang={lang} />
+            <ThemeToggle />
+          </div>
+          <div className="mt-2 flex items-center justify-between gap-2 px-3 pb-1">
+            <span className="num min-w-0 truncate text-[10px] text-[var(--t4)]">{email}</span>
+            <LogoutButton lang={lang} />
+          </div>
+        </div>
+      </div>
       </div>
     </aside>
   );

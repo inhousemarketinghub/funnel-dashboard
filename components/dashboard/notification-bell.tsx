@@ -101,10 +101,10 @@ export function NotificationBell({
           variant === "nav" ? (
             <button
               title={collapsed ? t(lang, "notifications") : undefined}
-              className={`flex w-full items-center gap-2.5 rounded-[8px] px-3 py-2 text-[13px] font-medium text-[var(--t2)] transition-colors hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)] ${collapsed ? "justify-center px-0" : ""}`}
+              className="flex w-full items-center gap-2.5 rounded-[8px] px-3 py-2 text-[13px] font-medium text-[var(--t2)] transition-colors hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]"
             >
               {icon}
-              {!collapsed && t(lang, "notifications")}
+              <span className={"whitespace-nowrap transition-opacity duration-150 " + (collapsed ? "opacity-0" : "opacity-100 delay-100")}>{t(lang, "notifications")}</span>
               {!collapsed && unread > 0 && (
                 <span className="ml-auto rounded-full bg-[var(--red)]/15 px-1.5 text-[11px] font-semibold text-[var(--red)]">{unread}</span>
               )}
