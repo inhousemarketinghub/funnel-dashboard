@@ -275,3 +275,22 @@ describe("todayKL", () => {
     expect(formatDateParam(r.to)).toBe("2026-09-01");
   });
 });
+
+describe("last-N presets end yesterday (complete days only)", () => {
+  const now = new Date(2026, 8, 7); // Mon Sep 7 2026
+  it("last-7 = Aug 31 – Sep 6", () => {
+    const r = getPresetRange("last-7", now);
+    expect(formatDateParam(r.from)).toBe("2026-08-31");
+    expect(formatDateParam(r.to)).toBe("2026-09-06");
+  });
+  it("last-30 = Aug 8 – Sep 6", () => {
+    const r = getPresetRange("last-30", now);
+    expect(formatDateParam(r.from)).toBe("2026-08-08");
+    expect(formatDateParam(r.to)).toBe("2026-09-06");
+  });
+  it("month boundary: last-7 on Oct 3 reaches back into September", () => {
+    const r = getPresetRange("last-7", new Date(2026, 9, 3));
+    expect(formatDateParam(r.from)).toBe("2026-09-26");
+    expect(formatDateParam(r.to)).toBe("2026-10-02");
+  });
+});

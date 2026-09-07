@@ -178,14 +178,21 @@ export function getPresetRange(preset: string, now: Date = todayKL()): DateRange
       return { from, to };
     }
     case "last-7": {
-      const from = new Date(today);
-      from.setDate(today.getDate() - 6);
-      return { from, to: today };
+      // Complete days only — ends YESTERDAY (owner spec 2026-09-07): today is
+      // half-finished and would drag averages down.
+      const yesterday = new Date(today);
+      yesterday.setDate(today.getDate() - 1);
+      const from = new Date(yesterday);
+      from.setDate(yesterday.getDate() - 6);
+      return { from, to: yesterday };
     }
     case "last-30": {
-      const from = new Date(today);
-      from.setDate(today.getDate() - 29);
-      return { from, to: today };
+      // Same complete-days semantics as last-7.
+      const yesterday = new Date(today);
+      yesterday.setDate(today.getDate() - 1);
+      const from = new Date(yesterday);
+      from.setDate(yesterday.getDate() - 29);
+      return { from, to: yesterday };
     }
 
     case "last-4w":
