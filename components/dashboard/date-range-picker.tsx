@@ -36,6 +36,55 @@ interface Props {
   lang?: Lang;
 }
 
+const COMPARE_PRESETS = [
+  { value: "last-week", label: "Last Week" },
+  { value: "last-2w", label: "Last 2 Weeks" },
+  { value: "last-month", label: "Last Month" },
+  { value: "last-3m-full", label: "Last 3 Months" },
+  { value: "last-14", label: "Last 14 Days" },
+  { value: "last-90", label: "Last 90 Days" },
+] as const;
+const COMPARE_PRESET_ZH: Record<string, string> = {
+  "last-week": "上周", "last-2w": "前两周", "last-month": "上个月",
+  "last-3m-full": "前三个月", "last-14": "最近 14 天", "last-90": "最近 90 天",
+};
+
+/** Compare presets are relative to today; the two new "full" variants cover
+ *  complete weeks/months strictly BEFORE the current one. */
+function getComparePresetRange(preset: string): { from: Date; to: Date } {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  switch (preset) {
+    case "last-2w": {
+      const day = today.getDay();
+      const thisMonday = new Date(today);
+      thisMonday.setDate(today.getDate() - (day === 0 ? 6 : day - 1));
+      const from = new Date(thisMonday);
+      from.setDate(thisMonday.getDate() - 14);
+      const to = new Date(thisMonday);
+      to.setDate(thisMonday.getDate() - 1);
+      return { from, to };
+    }
+    case "last-3m-full": {
+      const from = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+      const to = new Date(now.getFullYear(), now.getMonth(), 0);
+      return { from, to };
+    }
+    case "last-14": {
+      const from = new Date(today);
+      from.setDate(today.getDate() - 13);
+      return { from, to: today };
+    }
+    case "last-90": {
+      const from = new Date(today);
+      from.setDate(today.getDate() - 89);
+      return { from, to: today };
+    }
+    default:
+      return getPresetRange(preset); // last-week / last-month reuse the shared defs
+  }
+}
+
 export function DateRangePicker({ clientId, basePath, presets, maxRange, extraParams, lang = "en" }: Props) {
   const presetLabel = (p: DatePreset) => (lang === "zh" && PRESET_ZH[p.value]) || p.label;
   const effectiveBasePath = basePath ?? `/${clientId}`;
@@ -225,14 +274,26 @@ export function DateRangePicker({ clientId, basePath, presets, maxRange, extraPa
                   selected={calRange}
                   onSelect={handleCalendarSelect}
                   numberOfMonths={2}
+                  showOutsideDays={false}
                   defaultMonth={new Date(current.from.getFullYear(), current.from.getMonth() - 1)}
                 />
               </div>
             </>
           ) : (
             <>
-              <div className="p-3 text-[12px] text-[var(--t3)] border-b border-[var(--border)]">
-                {t(lang, "comparePeriodHint")}
+              <div className="flex flex-wrap gap-1 border-b border-[var(--border)] p-2">
+                {COMPARE_PRESETS.map((cp) => (
+                  <button
+                    key={cp.value}
+                    onClick={() => {
+                      const r = getComparePresetRange(cp.value);
+                      setCompareRange({ from: r.from, to: r.to });
+                    }}
+                    className="rounded-[6px] px-2.5 py-1 text-[12px] text-[var(--t3)] transition-colors hover:bg-[var(--bg3)] hover:text-[var(--t1)]"
+                  >
+                    {(lang === "zh" && COMPARE_PRESET_ZH[cp.value]) || cp.label}
+                  </button>
+                ))}
               </div>
               <div className="p-3">
                 <Calendar
@@ -240,6 +301,7 @@ export function DateRangePicker({ clientId, basePath, presets, maxRange, extraPa
                   selected={compareRange}
                   onSelect={handleCompareSelect}
                   numberOfMonths={2}
+                  showOutsideDays={false}
                   defaultMonth={new Date(prev.from.getFullYear(), prev.from.getMonth() - 1)}
                 />
               </div>
@@ -260,6 +322,11 @@ export function DateRangePicker({ clientId, basePath, presets, maxRange, extraPa
               {calRange?.from && calRange?.to
                 ? formatRangeLabel(calRange.from, calRange.to)
                 : t(lang, "selectDateRange")}
+              {compareRange?.from && compareRange?.to && (
+                <span className="text-[var(--t3)]">
+                  {" "}{t(lang, "vsLabel")} {formatRangeLabel(compareRange.from, compareRange.to)}
+                </span>
+              )}
             </span>
             <div className="flex gap-2">
               <Button variant="ghost" size="sm" onClick={() => setOpen(false)} className="text-xs h-7 text-[var(--t3)]">
