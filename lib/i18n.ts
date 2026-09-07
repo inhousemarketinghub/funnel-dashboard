@@ -123,6 +123,7 @@ const D: Dict = {
   notTracked: { en: "Not tracked", zh: "未追踪" },
   notTrackedHint: { en: "Column missing in Performance Tracker", zh: "Performance Tracker 缺少该列" },
   source: { en: "Source", zh: "来源" },
+  exclSst: { en: "Excl SST", zh: "不含 SST" },
   allSources: { en: "All sources", zh: "全部来源" },
   signOut: { en: "Sign Out", zh: "登出" },
   trends: { en: "Trends", zh: "趋势" },
