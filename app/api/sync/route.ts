@@ -3,6 +3,7 @@ import { getUserRole, getProjectPermissions } from "@/lib/auth";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { syncClient, listActiveClients, fanOutSync, markStaleRuns, recentSuccessWithin } from "@/lib/sync";
+import { generateDailyDigests } from "@/lib/notify";
 
 // A single sequential 8-client run outgrew the 60s Hobby ceiling (timed out two
 // days running, 2026-08-25/26). The cron GET is now a dispatcher: it marks
@@ -56,6 +57,14 @@ export async function GET(req: NextRequest) {
     const base = prodHost ? `https://${prodHost}` : req.nextUrl.origin;
     const results = await fanOutSync(base, clients, secret);
     console.log(`sync dispatch via ${base}:`, JSON.stringify(results));
+
+    // Daily health digests (notification center): after the fan-out so run
+    // stats and change logs are fresh. Never allowed to sink the cron.
+    try {
+      await generateDailyDigests(clients);
+    } catch (err) {
+      console.error("daily digests:", err);
+    }
     const failed = results.filter((r) => !r.ok);
     return NextResponse.json({ synced: results.length, failed }, { status: failed.length ? 500 : 200 });
   } catch (err) {

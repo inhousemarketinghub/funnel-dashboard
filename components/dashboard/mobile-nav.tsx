@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Menu } from "lucide-react";
+import { NotificationBell } from "./notification-bell";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ThemeToggle } from "./theme-toggle";
 import { LanguageToggle } from "./language-toggle";
@@ -15,6 +16,7 @@ interface Props {
   email?: string | null;
   features: string[];
   lang: Lang;
+  unread: number;
 }
 
 const ITEM =
@@ -26,7 +28,7 @@ const ITEM =
  * Settings / theme / sign out). Replaces the desktop topbar below md, which
  * eliminates the cramped, overlapping wrapped bar.
  */
-export function MobileNav({ clientId, clientName, logoUrl, email, features, lang }: Props) {
+export function MobileNav({ clientId, clientName, logoUrl, email, features, lang, unread }: Props) {
   return (
     <div
       className="md:hidden sticky top-[3px] z-[101] flex h-[52px] items-center justify-between gap-2 px-4"
@@ -49,7 +51,9 @@ export function MobileNav({ clientId, clientName, logoUrl, email, features, lang
         </Link>
       </div>
 
-      <Popover>
+      <div className="flex flex-shrink-0 items-center gap-1">
+        <NotificationBell lang={lang} initialUnread={unread} variant="icon" />
+        <Popover>
         <PopoverTrigger
           render={
             <button
@@ -95,7 +99,8 @@ export function MobileNav({ clientId, clientName, logoUrl, email, features, lang
             </div>
           </div>
         </PopoverContent>
-      </Popover>
+        </Popover>
+      </div>
     </div>
   );
 }

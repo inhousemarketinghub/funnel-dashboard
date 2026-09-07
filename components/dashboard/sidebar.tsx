@@ -10,6 +10,7 @@ import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { MonthPickerDialog } from "./month-picker-dialog";
+import { NotificationBell } from "./notification-bell";
 import { LanguageToggle } from "./language-toggle";
 import { ThemeToggle } from "./theme-toggle";
 import { LogoutButton } from "./logout-button";
@@ -30,6 +31,7 @@ export interface SidebarProps {
   lang: Lang;
   projects: ProjectItem[];
   collapsed: boolean;
+  unread: number;
 }
 
 interface NavItem {
@@ -46,7 +48,7 @@ interface NavItem {
  * brand block is a project quick-switcher; collapse state persists in
  * localStorage. Class `app-sidebar` is referenced by the print rules.
  */
-export function Sidebar({ clientId, clientName, logoUrl, email, features, lang, projects, collapsed }: SidebarProps) {
+export function Sidebar({ clientId, clientName, logoUrl, email, features, lang, projects, collapsed, unread }: SidebarProps) {
   const can = (k: string) => features.includes(k);
   const pathname = usePathname();
   const router = useRouter();
@@ -163,6 +165,9 @@ export function Sidebar({ clientId, clientName, logoUrl, email, features, lang, 
           ))}
         </DropdownMenuContent>
       </DropdownMenu>
+
+      {/* 通知中心: daily health digests (bell + unread dot) */}
+      <NotificationBell lang={lang} initialUnread={unread} variant="nav" collapsed={collapsed} />
 
       {/* Nav groups */}
       {groupLabel("navData")}

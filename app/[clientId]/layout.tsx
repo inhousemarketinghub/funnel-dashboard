@@ -25,6 +25,17 @@ export default async function ClientLayout({ children, params }: { children: Rea
     .eq("status", "active")
     .order("name");
 
+  // Unread digest count for the bell. RLS scopes notifications to this
+  // user's accessible clients; user_states holds their own read cursor.
+  const { data: seenRow } = await supabase
+    .from("user_states").select("notifications_seen_at").maybeSingle();
+  const seenAt = seenRow?.notifications_seen_at ?? "1970-01-01T00:00:00Z";
+  const { count: unreadCount } = await supabase
+    .from("notifications")
+    .select("id", { count: "exact", head: true })
+    .gt("created_at", seenAt);
+  const unread = unreadCount ?? 0;
+
   return (
     <div>
       <div className="bauhaus-stripe"><div/><div/><div/><div/></div>
@@ -39,6 +50,7 @@ export default async function ClientLayout({ children, params }: { children: Rea
           features,
           lang,
           projects: projectList ?? [],
+          unread,
         }}
       >
         <MobileNav
@@ -48,6 +60,7 @@ export default async function ClientLayout({ children, params }: { children: Rea
           email={email}
           features={features}
           lang={lang}
+          unread={unread}
         />
         <main className="mx-auto max-w-[1280px] px-4 sm:px-8 pt-7 pb-20">{children}</main>
       </AppShell>
