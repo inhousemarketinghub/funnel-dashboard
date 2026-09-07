@@ -32,6 +32,9 @@ export interface SidebarProps {
   projects: ProjectItem[];
   collapsed: boolean;
   unread: number;
+  /** Peek mode: floating over content (shadow + higher z), width owned by wrapper */
+  overlaying?: boolean;
+  onSwitcherOpenChange?: (open: boolean) => void;
 }
 
 interface NavItem {
@@ -48,7 +51,7 @@ interface NavItem {
  * brand block is a project quick-switcher; collapse state persists in
  * localStorage. Class `app-sidebar` is referenced by the print rules.
  */
-export function Sidebar({ clientId, clientName, logoUrl, email, features, lang, projects, collapsed, unread }: SidebarProps) {
+export function Sidebar({ clientId, clientName, logoUrl, email, features, lang, projects, collapsed, unread, overlaying = false, onSwitcherOpenChange }: SidebarProps) {
   const can = (k: string) => features.includes(k);
   const pathname = usePathname();
   const router = useRouter();
@@ -110,7 +113,9 @@ export function Sidebar({ clientId, clientName, logoUrl, email, features, lang, 
 
   return (
     <aside
-      className={`app-sidebar hidden md:flex shrink-0 flex-col sticky top-[3px] h-[calc(100dvh-3px)] z-30 bg-[var(--sidebar)] border-r border-[var(--sidebar-border)] py-4 overflow-y-auto transition-[width] duration-200 ${
+      className={`app-sidebar hidden md:flex flex-col sticky top-[3px] h-[calc(100dvh-3px)] bg-[var(--sidebar)] border-r border-[var(--sidebar-border)] py-4 overflow-y-auto transition-[width] duration-200 ${
+        overlaying ? "z-50 shadow-[8px_0_32px_rgba(0,0,0,0.14)]" : "z-30"
+      } ${
         collapsed ? "w-[64px] px-2" : "w-[232px] px-3"
       }`}
     >
@@ -127,7 +132,7 @@ export function Sidebar({ clientId, clientName, logoUrl, email, features, lang, 
       </Link>
 
       {/* Brand block = project quick-switcher dropdown */}
-      <DropdownMenu>
+      <DropdownMenu onOpenChange={onSwitcherOpenChange}>
         <DropdownMenuTrigger
           className={`flex w-full items-center gap-3 rounded-[10px] px-2 py-2 text-left transition-colors hover:bg-[var(--sidebar-accent)] ${
             collapsed ? "justify-center px-0" : ""
