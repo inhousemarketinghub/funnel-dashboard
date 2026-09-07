@@ -46,6 +46,17 @@ export function DateRangePicker({ clientId, basePath, presets, maxRange, extraPa
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"current" | "compare">("current");
 
+  function handleOpenChange(next: boolean) {
+    if (next) {
+      // Fresh session every open: Current tab + the URL's actual ranges,
+      // never last time's half-finished selection.
+      setActiveTab("current");
+      setCalRange({ from: current.from, to: current.to });
+      setCompareRange({ from: prev.from, to: prev.to });
+    }
+    setOpen(next);
+  }
+
   // Read current range from URL
   const fromParam = parseDateParam(searchParams.get("from") ?? undefined);
   const toParam = parseDateParam(searchParams.get("to") ?? undefined);
@@ -72,7 +83,11 @@ export function DateRangePicker({ clientId, basePath, presets, maxRange, extraPa
   });
 
   function navigate(from: Date, to: Date, prevFrom?: Date, prevTo?: Date) {
-    const params = new URLSearchParams();
+    // Preserve every unrelated param (brand tab, source filter…) — only the
+    // date family is ours to change.
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("prevFrom");
+    params.delete("prevTo");
     params.set("from", formatDateParam(from));
     params.set("to", formatDateParam(to));
     if (prevFrom && prevTo) {
@@ -114,7 +129,14 @@ export function DateRangePicker({ clientId, basePath, presets, maxRange, extraPa
     navigate(range.from, range.to);
   }
 
-  function handleCalendarSelect(range: DateRange | undefined) {
+  function handleCalendarSelect(range: DateRange | undefined, day?: Date) {
+    // A completed range + a new click = start a FRESH selection. Without this,
+    // react-day-picker "adjusts" the old range (drags an endpoint), which makes
+    // picking a new period feel impossible.
+    if (calRange?.from && calRange?.to && day) {
+      setCalRange({ from: day, to: undefined });
+      return;
+    }
     setCalRange(range);
     if (range?.from && range?.to) {
       const autoPrev = getPreviousPeriod(range.from, range.to);
@@ -122,7 +144,11 @@ export function DateRangePicker({ clientId, basePath, presets, maxRange, extraPa
     }
   }
 
-  function handleCompareSelect(range: DateRange | undefined) {
+  function handleCompareSelect(range: DateRange | undefined, day?: Date) {
+    if (compareRange?.from && compareRange?.to && day) {
+      setCompareRange({ from: day, to: undefined });
+      return;
+    }
     setCompareRange(range);
   }
 
@@ -136,7 +162,7 @@ export function DateRangePicker({ clientId, basePath, presets, maxRange, extraPa
 
   return (
     <div className="flex flex-col items-end gap-0.5">
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover open={open} onOpenChange={handleOpenChange}>
         <PopoverTrigger
           className={`
             inline-flex items-center gap-2 px-4 py-2

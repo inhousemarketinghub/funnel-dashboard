@@ -406,6 +406,11 @@ export function ProjectionClient({ lang, canSave = true }: { lang: Lang; canSave
                   ? fmtRM(resultValue)
                   : `${resultValue.toFixed(2)}%`}
               </div>
+              {activeCalc.output.key === "cpl" && (
+                <div className="num mt-0.5 text-[14px] font-semibold text-[var(--t3)]">
+                  {tl("Excl SST")}: {fmtRM(resultValue / 1.08)}
+                </div>
+              )}
               <p className="text-[12px] text-[var(--t3)] mt-1">
                 {tl("Auto-calculated from the inputs above — this is the target that gets saved.")}
               </p>
