@@ -62,7 +62,10 @@ export function AppShell({
             )}
           </div>
         </div>
-        {children}
+        {/* Collapsed: the floating chip needs headroom at the TOP of the page
+            (it was covering the page title before any scroll); once scrolling,
+            gliding over content is the intended glass behavior. */}
+        <div className={collapsed ? "md:pt-9" : ""}>{children}</div>
       </div>
     </div>
   );
