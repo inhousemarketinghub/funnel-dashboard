@@ -43,10 +43,10 @@ export function MonthPickerDialog({ clientId, lang = "en", variant = "button", c
       {variant === "nav" ? (
         <DialogTrigger
           title={collapsed ? t(lang, "monthlyReport") : undefined}
-          className={`flex w-full items-center gap-2.5 rounded-[8px] px-3 py-2 text-[13px] font-medium text-[var(--t2)] transition-colors hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)] ${collapsed ? "justify-center px-0" : ""}`}
+          className="flex w-full items-center gap-2.5 rounded-[8px] px-3 py-2 text-[13px] font-medium text-[var(--t2)] transition-colors hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]"
         >
           <FileText className="h-4 w-4 shrink-0" />
-          {!collapsed && t(lang, "monthlyReport")}
+          <span className={"whitespace-nowrap transition-opacity duration-150 " + (collapsed ? "opacity-0" : "opacity-100 delay-100")}>{t(lang, "monthlyReport")}</span>
         </DialogTrigger>
       ) : (
         <DialogTrigger className="topbar-btn">
