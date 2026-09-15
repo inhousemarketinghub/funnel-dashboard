@@ -325,6 +325,33 @@ describe("buildPersonData source filter", () => {
   });
 });
 
+describe("recruitment lead tab dialect (Carress@BD shape)", () => {
+  const csv = `Date,BD,Name,Phone No.,State,City,Shop,Status,Source,Appointment,Appointment Date,Showed Up,Remarks,Price Offered,x,Month Filter,Week ending,x,Signed Up Date,Order No.,Item Purchase,Sales
+01/09/2026,Alice,Tan,012,KL,KL,Shop A,Open,Facebook,Yes,02/09/2026,Yes,,RM3000,,Sep 2026,06/09/2026,,05/09/2026,001,Package,RM2500
+02/09/2026,Ben,Lim,013,KL,KL,Shop B,Open,Instagram,Yes,03/09/2026,No,,,,Sep 2026,06/09/2026,,,,,0`;
+  const rows = csvToRows(csv);
+
+  it('"BD" column is recognized as the sales person', () => {
+    const d = buildPersonData(rows, new Date(2026, 8, 1), new Date(2026, 8, 30));
+    const names = d.salesPersons.map((p) => p.name).sort();
+    expect(names).toEqual(["Alice", "Ben"]);
+  });
+
+  it('"Signed Up Date" acts as the purchase date (orders + sales credited)', () => {
+    const d = buildPersonData(rows, new Date(2026, 8, 1), new Date(2026, 8, 30));
+    const alice = d.salesPersons.find((p) => p.name === "Alice")!;
+    expect(alice.orders).toBe(1);
+    expect(alice.sales).toBe(2500);
+  });
+
+  it("ordinary headers containing 'bd' cannot false-hit (exact match only)", () => {
+    const csv2 = `Date,CBD Zone,Name,Sales Person,Appointment Date,Showed Up,Purchase Date,Sales
+01/09/2026,North,Tan,Carol,02/09/2026,Yes,03/09/2026,RM100`;
+    const d = buildPersonData(csvToRows(csv2), new Date(2026, 8, 1), new Date(2026, 8, 30));
+    expect(d.salesPersons.map((p) => p.name)).toEqual(["Carol"]);
+  });
+});
+
 describe("countEstShowUp", () => {
   it("counts leads with appointment dates in range", () => {
     const leads = parseLeadSalesCSV(leadCSV);

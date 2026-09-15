@@ -406,13 +406,18 @@ function detectLeadColumns(header: string[]): LeadColumnMap {
       : 0,
     appointmentPerson: h.findIndex((v) => v.includes("appointment") && v.includes("person")) >= 0
       ? h.findIndex((v) => v.includes("appointment") && v.includes("person")) : null,
-    salesPerson: h.findIndex((v) => v.includes("sales person") || (v === "sales person")) >= 0
-      ? h.findIndex((v) => v.includes("sales person")) : null,
+    // Recruitment funnels (Carress@BD) label the rep column just "BD" —
+    // exact match only, so ordinary headers containing "bd" can't false-hit.
+    salesPerson: h.findIndex((v) => v.includes("sales person")) >= 0
+      ? h.findIndex((v) => v.includes("sales person"))
+      : h.findIndex((v) => v === "bd") >= 0
+        ? h.findIndex((v) => v === "bd") : null,
     appointmentDate: h.findIndex((v) => v.includes("appointment") && v.includes("date")) >= 0
       ? h.findIndex((v) => v.includes("appointment") && v.includes("date")) : null,
     showedUp: showedUpIdx >= 0 ? showedUpIdx : null,
-    purchaseDate: h.findIndex((v) => v.includes("purchase") && v.includes("date")) >= 0
-      ? h.findIndex((v) => v.includes("purchase") && v.includes("date")) : null,
+    // "Signed Up Date" is the recruitment funnel's conversion date
+    purchaseDate: h.findIndex((v) => (v.includes("purchase") || v.includes("signed up")) && v.includes("date")) >= 0
+      ? h.findIndex((v) => (v.includes("purchase") || v.includes("signed up")) && v.includes("date")) : null,
     sales: h.findIndex((v) => v === "sales" || (v.includes("sales") && !v.includes("person") && !v.includes("new") && !v.includes("repeat") && !v.includes("total"))) >= 0
       ? h.findIndex((v) => v === "sales" || (v.includes("sales") && !v.includes("person") && !v.includes("new") && !v.includes("repeat") && !v.includes("total"))) : null,
     brand: h.findIndex((v) => v.includes("brand")) >= 0
