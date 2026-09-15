@@ -94,6 +94,12 @@ export default async function DashboardPage({
   const brandParam = sp.brand as string | undefined;
   // "Overall" or no selection = no brand filter (aggregate all)
   const selectedBrand = brandParam && brandParam !== "Overall" ? brandParam : brands.length === 1 ? brands[0] : undefined;
+  // Lead-tab fetches must only brand-filter MULTI-brand sheets. Single-brand
+  // clients own their whole lead tab, and their perf-tab suffix ("Carres
+  // Penang Perai") routinely differs from the lead Brand column values
+  // ("Carres") — filtering would silently drop every row (hid the whole
+  // Person Performance section for Perai/Molek).
+  const leadBrand = brands.length > 1 ? selectedBrand : undefined;
 
   let perfResult: PerfResult = { data: [], funnelType: "appointment", tracked: { appointment: true, est_showup: true, showup: true } };
   let sheetKPI: KPIConfig | null = null;
