@@ -145,7 +145,7 @@ export function Sidebar({ clientId, clientName, logoUrl, email, features, lang, 
           </div>
           <ChevronsUpDown className={`h-3.5 w-3.5 shrink-0 text-[var(--t4)] ${fade}`} />
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="min-w-[210px]">
+        <DropdownMenuContent align="start" style={{ width: "max-content", minWidth: 230, maxWidth: 360 }}>
           {projects.map((p) => (
             <DropdownMenuItem
               key={p.id}

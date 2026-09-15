@@ -483,3 +483,22 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Calendar: make TODAY unmistakable. A clay outline drawn as ::after works in
+   every state — even when today sits inside/at the edge of a selected range,
+   the ring stays visible on top of the pill. Unselected today also gets a
+   clay bold digit. */
+td[data-today="true"] { position: relative; }
+td[data-today="true"]::after {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border: 2px solid var(--blue);
+  border-radius: 9px;
+  pointer-events: none;
+  z-index: 5;
+}
+td[data-today="true"] button:not([data-range-start="true"]):not([data-range-end="true"]):not([data-range-middle="true"]):not([data-selected-single="true"]) {
+  color: var(--blue);
+  font-weight: 650;
+}

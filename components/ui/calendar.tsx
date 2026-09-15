@@ -119,7 +119,9 @@ function Calendar({
           defaultClassNames.range_end
         ),
         today: cn(
-          "rounded-(--cell-radius) bg-muted text-foreground data-[selected=true]:rounded-none",
+          // Visual treatment lives in globals.css (td[data-today] ::after ring)
+          // so it survives selection states and Tailwind class generation.
+          "rounded-(--cell-radius) data-[selected=true]:rounded-none",
           defaultClassNames.today
         ),
         outside: cn(
