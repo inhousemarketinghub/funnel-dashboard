@@ -24,11 +24,23 @@ export async function getUserRole(): Promise<{ email: string | null; role: UserR
   const { data: { user } } = await supabase.auth.getUser();
   if (!user?.email) return { email: null, role: null, agencyId: null, memberRole: null };
 
-  const { data: agency } = await supabase
+  let { data: agency } = await supabase
     .from("agencies")
     .select("id, role")
     .eq("email", user.email)
     .single();
+
+  // Self-heal: agencies rows were only created in the OAuth callback, so
+  // email+password signups never got one and were invisible to Manage Access.
+  // Create it on first authenticated read from any login path.
+  if (!agency?.id) {
+    const { data: created } = await supabase
+      .from("agencies")
+      .insert({ email: user.email, name: (user.user_metadata?.full_name as string) || user.email.split("@")[0] })
+      .select("id, role")
+      .single();
+    if (created?.id) agency = created;
+  }
 
   if (!agency?.id) {
     return {
