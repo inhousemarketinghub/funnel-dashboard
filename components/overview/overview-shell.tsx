@@ -25,11 +25,16 @@ const FUNNEL_OPTIONS: { value: FunnelFilter; label: string }[] = [
 export function OverviewShell({
   clients: initialClients,
   stats: _initialStats,
+  isOwner = false,
 }: {
   clients: ClientOverview[];
   stats: OverviewStats;
+  isOwner?: boolean;
 }) {
   const [clients, setClients] = useState(initialClients);
+  const [deleteTarget, setDeleteTarget] = useState<ClientOverview | null>(null);
+  const [confirmName, setConfirmName] = useState("");
+  const [deleting, setDeleting] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [funnelFilter, setFunnelFilter] = useState<FunnelFilter>("all");
 
@@ -66,6 +71,43 @@ export function OverviewShell({
     setClients((prev) =>
       prev.map((c) => (c.id === id ? { ...c, status: newStatus } : c)),
     );
+  }
+
+  async function handleArchive(id: string) {
+    const res = await fetch("/api/client-lifecycle", {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId: id, status: "archived" }),
+    });
+    if (!res.ok) { toast.error("Failed to archive"); return; }
+    setClients((prev) => prev.filter((c) => c.id !== id)); // drops off the overview
+    toast.success("Project archived");
+  }
+
+  async function handleDeleteConfirmed() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      // Server requires archived state before a permanent delete, so archive
+      // first (harmless if already archived) then delete in one flow.
+      await fetch("/api/client-lifecycle", {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientId: deleteTarget.id, status: "archived" }),
+      });
+      const res = await fetch("/api/client-lifecycle", {
+        method: "DELETE", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientId: deleteTarget.id, confirmName }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+      setClients((prev) => prev.filter((c) => c.id !== deleteTarget.id));
+      toast.success("Project permanently deleted");
+      setDeleteTarget(null);
+      setConfirmName("");
+    } catch (err) {
+      toast.error(`Delete failed: ${err instanceof Error ? err.message : ""}`);
+    } finally {
+      setDeleting(false);
+    }
   }
 
   return (
@@ -120,7 +162,12 @@ export function OverviewShell({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {sorted.map((client, i) => (
             <CardReveal key={client.id} delay={i * 100}>
-              <ClientKpiCard client={client} onToggleStatus={handleToggleStatus} />
+              <ClientKpiCard
+                client={client}
+                onToggleStatus={handleToggleStatus}
+                onArchive={isOwner ? handleArchive : undefined}
+                onDelete={isOwner ? (id) => { const t = clients.find((c) => c.id === id); if (t) { setConfirmName(""); setDeleteTarget(t); } } : undefined}
+              />
             </CardReveal>
           ))}
         </div>
@@ -135,6 +182,45 @@ export function OverviewShell({
           >
             Clear filters
           </button>
+        </div>
+      )}
+
+      {/* Permanent-delete confirmation: type the exact name to arm the button */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => !deleting && setDeleteTarget(null)}>
+          <div className="w-full max-w-[440px] rounded-[12px] border border-[var(--border)] bg-[var(--bg2)] p-6" onClick={(e) => e.stopPropagation()}>
+            <h2 className="font-heading text-[20px] font-semibold text-[var(--t1)]">Delete this project?</h2>
+            <p className="mt-2 text-[13px] text-[var(--t3)]">
+              This permanently removes <span className="font-semibold text-[var(--t1)]">{deleteTarget.name}</span> and
+              all of its data — metrics, reports, sync history, notifications and access. This cannot be undone.
+            </p>
+            <p className="mt-4 text-[12px] text-[var(--t3)]">
+              Type <span className="num font-semibold text-[var(--t1)]">{deleteTarget.name}</span> to confirm:
+            </p>
+            <input
+              autoFocus
+              value={confirmName}
+              onChange={(e) => setConfirmName(e.target.value)}
+              className="mt-1.5 w-full rounded-[6px] border border-[var(--border)] bg-[var(--bg1)] px-3 py-2 text-[13px] text-[var(--t1)] outline-none focus:border-[var(--red)]"
+              placeholder={deleteTarget.name}
+            />
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                onClick={() => { setDeleteTarget(null); setConfirmName(""); }}
+                disabled={deleting}
+                className="rounded-full px-5 py-2 text-[13px] text-[var(--t2)] hover:bg-[var(--bg3)]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteConfirmed}
+                disabled={deleting || confirmName.trim() !== deleteTarget.name}
+                className="rounded-full bg-[var(--red)] px-5 py-2 text-[13px] font-medium text-white transition-opacity disabled:opacity-40"
+              >
+                {deleting ? "Deleting..." : "Delete permanently"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </>
