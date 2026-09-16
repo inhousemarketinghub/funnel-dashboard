@@ -25,6 +25,7 @@ export async function POST(req: NextRequest) {
       .from("invitations")
       .insert({
         agency_id: agencyId,
+        invited_by: agencyId,   // NOT NULL: the agency that issued the invite
         email,
         role: inviteRole,
         client_ids,
