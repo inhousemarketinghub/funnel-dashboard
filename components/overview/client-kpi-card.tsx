@@ -7,6 +7,8 @@ import { CountUp } from "@/components/animations/count-up";
 interface Props {
   client: ClientOverview;
   onToggleStatus?: (id: string, newStatus: "active" | "inactive") => void;
+  onArchive?: (id: string) => void;   // owner-only: hide + stop syncing (reversible)
+  onDelete?: (id: string) => void;    // owner-only: permanent delete flow (typed confirm)
 }
 
 function achievementColor(pct: number): string {
@@ -26,7 +28,8 @@ function healthBadgeStyle(health: ClientOverview["health"]): { bg: string; color
   }
 }
 
-export function ClientKpiCard({ client, onToggleStatus }: Props) {
+export function ClientKpiCard({ client, onToggleStatus, onArchive, onDelete }: Props) {
+  const [menuOpen, setMenuOpen] = useState(false);
   const isActive = client.status === "active";
   const badge = healthBadgeStyle(client.health);
   const avg = client.achievement.average;
@@ -104,6 +107,40 @@ export function ClientKpiCard({ client, onToggleStatus }: Props) {
         >
           {badge.label}
         </span>
+        {(onArchive || onDelete) && (
+          <div className="relative flex-shrink-0">
+            <button
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMenuOpen((o) => !o); }}
+              className="flex h-6 w-6 items-center justify-center rounded-[6px] text-[var(--t4)] transition-colors hover:bg-[var(--bg3)] hover:text-[var(--t1)]"
+              title="More"
+            >
+              &#8943;
+            </button>
+            {menuOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMenuOpen(false); }} />
+                <div className="absolute right-0 top-7 z-20 w-40 overflow-hidden rounded-[8px] border border-[var(--border)] bg-[var(--bg2)] shadow-md">
+                  {onArchive && (
+                    <button
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMenuOpen(false); onArchive(client.id); }}
+                      className="block w-full px-3 py-2 text-left text-[13px] text-[var(--t2)] hover:bg-[var(--bg3)]"
+                    >
+                      Archive project
+                    </button>
+                  )}
+                  {onDelete && (
+                    <button
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMenuOpen(false); onDelete(client.id); }}
+                      className="block w-full px-3 py-2 text-left text-[13px] text-[var(--red)] hover:bg-[var(--red-bg)]"
+                    >
+                      Delete permanently
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 4 metrics grid with CountUp */}

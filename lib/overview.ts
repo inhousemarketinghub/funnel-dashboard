@@ -21,6 +21,7 @@ export async function fetchAllClientsOverview(): Promise<{
   const { data: rows } = await supabase
     .from("clients")
     .select("id, name, logo_url, sheet_id, status, funnel_type, profile")
+    .neq("status", "archived")
     .order("created_at", { ascending: false });
 
   if (!rows || rows.length === 0) {

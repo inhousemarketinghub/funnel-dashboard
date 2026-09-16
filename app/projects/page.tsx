@@ -71,7 +71,7 @@ export default async function ClientsPage() {
         {clients.length > 0 ? (
           showOverview ? (
             /* Owners/managers: stats bar + filterable card grid */
-            <OverviewShell clients={clients} stats={stats} />
+            <OverviewShell clients={clients} stats={stats} isOwner={memberRole === "owner"} />
           ) : (
             /* Viewers with multiple clients: plain grid, no stats */
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
