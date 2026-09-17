@@ -3,7 +3,7 @@ import { fetchKPIData } from "@/lib/sheets";
 import { getPerformanceData, getKPIData, resolveDataSource } from "@/lib/data-source";
 import { computeMetrics, computeAchievement } from "@/lib/metrics";
 import { todayKL } from "@/lib/dates";
-import type { ClientOverview, OverviewStats } from "@/lib/types";
+import type { ClientOverview, OverviewStats, ArchivedClient } from "@/lib/types";
 
 function currentMonthRange(): { start: Date; end: Date } {
   const now = todayKL();
@@ -29,6 +29,20 @@ export async function fetchAllClientsOverview(): Promise<{
       clients: [],
       stats: { activeClients: 0, needAttention: 0, totalAdSpend: 0, totalSales: 0 },
     };
+  }
+
+  // Freshness: one batched query for the latest successful sync per client
+  // (sync_runs is the authority; getFreshness is per-client and would N+1 here).
+  const ids = rows.map((r) => r.id);
+  const { data: runs } = await supabase
+    .from("sync_runs")
+    .select("client_id, finished_at")
+    .eq("status", "success")
+    .in("client_id", ids)
+    .order("finished_at", { ascending: false });
+  const lastSync = new Map<string, string>();
+  for (const run of runs ?? []) {
+    if (run.finished_at && !lastSync.has(run.client_id)) lastSync.set(run.client_id, run.finished_at);
   }
 
   const { start, end } = currentMonthRange();
@@ -89,6 +103,7 @@ export async function fetchAllClientsOverview(): Promise<{
             average,
           },
           health,
+          last_synced_at: lastSync.get(client.id) ?? null,
         };
       } catch {
         const status: "active" | "inactive" = client.status === "active" ? "active" : "inactive";
@@ -102,6 +117,7 @@ export async function fetchAllClientsOverview(): Promise<{
           metrics: { sales: 0, cpl: 0, roas: 0, cpa_pct: 0, conv_rate: 0, ad_spend: 0 },
           achievement: { sales: 0, cpl: 0, roas: 0, cpa_pct: 0, conv_rate: 0, average: 0 },
           health: "alert" as const,
+          last_synced_at: lastSync.get(client.id) ?? null,
         };
       }
     })
@@ -115,4 +131,15 @@ export async function fetchAllClientsOverview(): Promise<{
   };
 
   return { clients, stats };
+}
+
+/** Archived projects for the recycle bin — lightweight (no live KPIs needed). */
+export async function fetchArchivedClients(): Promise<ArchivedClient[]> {
+  const supabase = await createServerSupabase();
+  const { data } = await supabase
+    .from("clients")
+    .select("id, name, logo_url")
+    .eq("status", "archived")
+    .order("name");
+  return (data ?? []).map((c) => ({ id: c.id, name: c.name, logo_url: c.logo_url ?? null }));
 }

@@ -82,6 +82,7 @@ export function MobileNav({ clientId, clientName, logoUrl, email, features, lang
               <Link href={`/${clientId}/settings`} className={ITEM}>{t(lang, "settings")}</Link>
             )}
             <Link href="/projects" className={ITEM}>{t(lang, "projectOverview")}</Link>
+            <Link href="/account" className={ITEM}>{t(lang, "myAccount")}</Link>
 
             <div className="mt-1 flex items-center justify-between border-t border-[var(--border)] px-2.5 pt-2">
               <span className="text-[13px] text-[var(--t3)]">{t(lang, "theme")}</span>

@@ -27,6 +27,8 @@ export interface SidebarProps {
   clientName: string;
   logoUrl?: string | null;
   email?: string | null;
+  userName?: string | null;
+  userAvatar?: string | null;
   features: string[];
   lang: Lang;
   projects: ProjectItem[];
@@ -51,7 +53,7 @@ interface NavItem {
  * brand block is a project quick-switcher; collapse state persists in
  * localStorage. Class `app-sidebar` is referenced by the print rules.
  */
-export function Sidebar({ clientId, clientName, logoUrl, email, features, lang, projects, collapsed, unread, overlaying = false, onSwitcherOpenChange }: SidebarProps) {
+export function Sidebar({ clientId, clientName, logoUrl, email, userName, userAvatar, features, lang, projects, collapsed, unread, overlaying = false, onSwitcherOpenChange }: SidebarProps) {
   const can = (k: string) => features.includes(k);
   const pathname = usePathname();
   const router = useRouter();
@@ -211,8 +213,22 @@ export function Sidebar({ clientId, clientName, logoUrl, email, features, lang, 
             <LanguageToggle lang={lang} />
             <ThemeToggle />
           </div>
-          <div className="mt-2 flex items-center justify-between gap-2 px-3 pb-1">
-            <span className="num min-w-0 truncate text-[10px] text-[var(--t4)]">{email}</span>
+          <div className="mt-2 flex items-center justify-between gap-2 px-1 pb-1">
+            <Link
+              href="/account"
+              title={email ?? t(lang, "myAccount")}
+              className="flex min-w-0 flex-1 items-center gap-2 rounded-[8px] px-2 py-1.5 no-underline transition-colors hover:bg-[var(--sidebar-accent)]"
+            >
+              {userAvatar ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={userAvatar} alt="" className="h-6 w-6 shrink-0 rounded-full object-cover" />
+              ) : (
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--sand)] text-[11px] font-semibold text-[var(--t2)]">
+                  {(userName || email || "?").charAt(0).toUpperCase()}
+                </span>
+              )}
+              <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-[var(--t2)]">{userName || email}</span>
+            </Link>
             <LogoutButton lang={lang} />
           </div>
         </div>

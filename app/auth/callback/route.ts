@@ -33,10 +33,14 @@ export async function GET(request: Request) {
             method: "POST",
             headers: { "Content-Type": "application/json" },
           });
-          return NextResponse.redirect(new URL("/projects", origin));
         }
 
-        return NextResponse.redirect(`${origin}/projects`);
+        // Honor a relative ?next= (the password-reset flow points it at the
+        // set-new-password page). Reject absolute/protocol-relative URLs so the
+        // callback can't be turned into an open redirect.
+        const nextParam = requestUrl.searchParams.get("next");
+        const dest = nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//") ? nextParam : "/projects";
+        return NextResponse.redirect(new URL(dest, origin));
       }
     }
   }

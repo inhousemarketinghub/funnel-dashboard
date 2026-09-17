@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { Check } from "lucide-react";
 import type { ClientOverview } from "@/lib/types";
 import { CountUp } from "@/components/animations/count-up";
 
@@ -9,6 +10,9 @@ interface Props {
   onToggleStatus?: (id: string, newStatus: "active" | "inactive") => void;
   onArchive?: (id: string) => void;   // owner-only: hide + stop syncing (reversible)
   onDelete?: (id: string) => void;    // owner-only: permanent delete flow (typed confirm)
+  selectMode?: boolean;
+  selected?: boolean;
+  onSelectToggle?: (id: string) => void;
 }
 
 function achievementColor(pct: number): string {
@@ -28,13 +32,36 @@ function healthBadgeStyle(health: ClientOverview["health"]): { bg: string; color
   }
 }
 
-export function ClientKpiCard({ client, onToggleStatus, onArchive, onDelete }: Props) {
+const TONE_COLOR = { fresh: "var(--green)", stale: "var(--yellow)", old: "var(--red)" } as const;
+
+// Relative freshness of the last successful sync. Computed client-side (after
+// mount) so it never mismatches the server-rendered HTML.
+function freshnessOf(iso: string | null): { label: string; tone: keyof typeof TONE_COLOR } | null {
+  if (!iso) return null;
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return null;
+  const mins = Math.max(0, Math.round((Date.now() - then) / 60000));
+  let label: string;
+  if (mins < 1) label = "just now";
+  else if (mins < 60) label = `${mins}m ago`;
+  else if (mins < 60 * 24) label = `${Math.round(mins / 60)}h ago`;
+  else label = `${Math.round(mins / (60 * 24))}d ago`;
+  const tone: keyof typeof TONE_COLOR = mins <= 60 * 24 ? "fresh" : mins <= 60 * 24 * 3 ? "stale" : "old";
+  return { label, tone };
+}
+
+export function ClientKpiCard({ client, onToggleStatus, onArchive, onDelete, selectMode = false, selected = false, onSelectToggle }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const isActive = client.status === "active";
   const badge = healthBadgeStyle(client.health);
   const avg = client.achievement.average;
   const barRef = useRef<HTMLDivElement>(null);
   const [barVisible, setBarVisible] = useState(false);
+  const [fresh, setFresh] = useState<{ label: string; tone: keyof typeof TONE_COLOR } | null>(null);
+
+  useEffect(() => {
+    setFresh(freshnessOf(client.last_synced_at));
+  }, [client.last_synced_at]);
 
   useEffect(() => {
     const el = barRef.current;
@@ -62,11 +89,21 @@ export function ClientKpiCard({ client, onToggleStatus, onArchive, onDelete }: P
   return (
     <Link
       href={`/${client.id}`}
-      className="card-base block no-underline transition-all hover:shadow-md hover:border-[var(--blue)] hover:-translate-y-[1px] hover:scale-[1.01]"
+      onClick={selectMode ? (e) => { e.preventDefault(); onSelectToggle?.(client.id); } : undefined}
+      className={`card-base relative block no-underline transition-all hover:shadow-md hover:border-[var(--blue)] hover:-translate-y-[1px] hover:scale-[1.01] ${selected ? "ring-2 ring-[var(--blue)]" : ""}`}
       style={{ transitionDuration: "150ms", opacity: isActive ? 1 : 0.5 }}
     >
-      {/* Header: logo/initial + name + toggle + health badge */}
+      {/* Header: (checkbox) + logo/initial + name + toggle + health badge */}
       <div className="flex items-center gap-3 mb-4">
+        {selectMode && (
+          <span
+            className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-[5px] border transition-colors ${
+              selected ? "border-[var(--blue)] bg-[var(--blue)] text-white" : "border-[var(--border)] bg-[var(--bg2)]"
+            }`}
+          >
+            {selected && <Check className="h-3.5 w-3.5" />}
+          </span>
+        )}
         {client.logo_url ? (
           <img
             src={client.logo_url}
@@ -84,7 +121,7 @@ export function ClientKpiCard({ client, onToggleStatus, onArchive, onDelete }: P
         <span className="font-heading text-[18px] font-semibold text-[var(--t1)] truncate flex-1">
           {client.name}
         </span>
-        {onToggleStatus && (
+        {!selectMode && onToggleStatus && (
           <button
             onClick={(e) => {
               e.preventDefault();
@@ -107,7 +144,7 @@ export function ClientKpiCard({ client, onToggleStatus, onArchive, onDelete }: P
         >
           {badge.label}
         </span>
-        {(onArchive || onDelete) && (
+        {!selectMode && (onArchive || onDelete) && (
           <div className="relative flex-shrink-0">
             <button
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMenuOpen((o) => !o); }}
@@ -178,6 +215,14 @@ export function ClientKpiCard({ client, onToggleStatus, onArchive, onDelete }: P
           />
         </div>
       </div>
+
+      {/* Sync freshness */}
+      {fresh && (
+        <div className="mt-3 flex items-center gap-1.5 border-t border-[var(--border)] pt-2.5">
+          <span className="h-1.5 w-1.5 rounded-full" style={{ background: TONE_COLOR[fresh.tone] }} />
+          <span className="text-[10px] text-[var(--t4)]">Updated {fresh.label}</span>
+        </div>
+      )}
     </Link>
   );
 }
