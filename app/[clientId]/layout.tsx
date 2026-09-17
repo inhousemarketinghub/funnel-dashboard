@@ -17,6 +17,9 @@ export default async function ClientLayout({ children, params }: { children: Rea
   const perms = await getProjectPermissions(clientId);
   const features = perms;
 
+  // Current user's own profile (for the sidebar's account chip).
+  const { data: me } = await supabase.from("agencies").select("name, avatar_url").eq("email", email ?? "").single();
+
   // Accessible projects for the sidebar's quick switcher (RLS scopes the list
   // to what this user may see).
   const { data: projectList } = await supabase
@@ -47,6 +50,8 @@ export default async function ClientLayout({ children, params }: { children: Rea
           clientName: client.name,
           logoUrl: client.logo_url,
           email,
+          userName: me?.name ?? null,
+          userAvatar: me?.avatar_url ?? null,
           features,
           lang,
           projects: projectList ?? [],

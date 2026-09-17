@@ -32,8 +32,10 @@ export default function LoginPage() {
     setSuccess(null);
 
     if (mode === "reset") {
+      // Route through the callback so the recovery code is exchanged for a
+      // session server-side, then land on the set-new-password page.
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/login`,
+        redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
       });
       setLoading(false);
       if (error) { setError(error.message); return; }

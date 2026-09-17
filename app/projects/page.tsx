@@ -2,12 +2,11 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getUserRole } from "@/lib/auth";
 import { canViewOverview, canCreateClient } from "@/lib/permissions";
-import { fetchAllClientsOverview } from "@/lib/overview";
+import { fetchAllClientsOverview, fetchArchivedClients } from "@/lib/overview";
 import { OverviewShell } from "@/components/overview/overview-shell";
 import { ClientKpiCard } from "@/components/overview/client-kpi-card";
 import { SplitText } from "@/components/animations/split-text";
-import { ThemeToggle } from "@/components/dashboard/theme-toggle";
-import { LogoutButton } from "@/components/dashboard/logout-button";
+import { WorkspaceShell } from "@/components/dashboard/workspace-shell";
 
 export default async function ClientsPage() {
   const { email, memberRole } = await getUserRole();
@@ -23,6 +22,9 @@ export default async function ClientsPage() {
     redirect(`/${clients[0].id}`);
   }
 
+  // Archived projects power the owner-only recycle bin.
+  const archived = memberRole === "owner" ? await fetchArchivedClients() : [];
+
   const showOverview = canViewOverview(memberRole);
   const canCreate = canCreateClient(memberRole);
 
@@ -30,86 +32,65 @@ export default async function ClientsPage() {
   const title = "Project Overview";
 
   return (
-    <div className="min-h-dvh bg-[var(--bg)]" style={{ transition: "background 500ms ease" }}>
-      <div className="bauhaus-stripe"><div /><div /><div /><div /></div>
+    <WorkspaceShell maxWidth="max-w-7xl">
+      {/* Header — account / theme / access now live in the sidebar; only the
+          title and the primary "New Client" CTA remain here. */}
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <SplitText text={title} />
+          <p className="mt-1 text-[13px] text-[var(--t3)]">
+            {isOwnerOrManager
+              ? "Current month performance across all clients"
+              : "Select a project to view performance"}
+          </p>
+        </div>
+        {canCreate && (
+          <Link
+            href="/projects/new"
+            className="topbar-btn"
+            style={{ background: "var(--blue)", color: "white", borderColor: "var(--blue)" }}
+          >
+            + New Client
+          </Link>
+        )}
+      </div>
 
-      <div className="max-w-7xl mx-auto p-4 sm:p-8">
-        {/* Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center mb-8">
-          <div>
-            <SplitText text={title} />
-            <p className="text-[13px] text-[var(--t3)] mt-1">
-              {isOwnerOrManager
-                ? "Current month performance across all clients"
-                : "Select a project to view performance"}
-            </p>
+      {/* Client grid */}
+      {clients.length > 0 ? (
+        showOverview ? (
+          <OverviewShell clients={clients} stats={stats} isOwner={memberRole === "owner"} archived={archived} />
+        ) : (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+            {clients.map((client) => (
+              <ClientKpiCard key={client.id} client={client} />
+            ))}
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Mounting ThemeToggle here also runs its theme-init effect, so a
-                direct load of this post-login landing page honors the saved theme. */}
-            <ThemeToggle />
-            {isOwnerOrManager && (
-              <Link href="/projects/access?back=/projects" className="topbar-btn">
-                Access Management
-              </Link>
-            )}
-            {canCreate && (
+        )
+      ) : (
+        <div className="py-16 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--sand)] text-[22px] text-[var(--t4)]">
+            +
+          </div>
+          {canCreate ? (
+            <>
+              <p className="mb-1 text-[15px] font-medium text-[var(--t2)]">No projects yet</p>
+              <p className="mb-4 text-[13px] text-[var(--t4)]">Create your first project to start tracking performance</p>
               <Link
                 href="/projects/new"
-                className="topbar-btn"
+                className="topbar-btn inline-flex"
                 style={{ background: "var(--blue)", color: "white", borderColor: "var(--blue)" }}
               >
                 + New Client
               </Link>
-            )}
-            <span className="topbar-email text-[11px] text-[var(--t4)] num">{email}</span>
-            <LogoutButton />
-          </div>
-        </div>
-
-        {/* Client grid */}
-        {clients.length > 0 ? (
-          showOverview ? (
-            /* Owners/managers: stats bar + filterable card grid */
-            <OverviewShell clients={clients} stats={stats} isOwner={memberRole === "owner"} />
+            </>
           ) : (
-            /* Viewers with multiple clients: plain grid, no stats */
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {clients.map((client) => (
-                <ClientKpiCard key={client.id} client={client} />
-              ))}
-            </div>
-          )
-        ) : (
-          <div className="col-span-2 text-center py-16">
-            <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-[var(--sand)] flex items-center justify-center text-[22px] text-[var(--t4)]">
-              +
-            </div>
-            {canCreate ? (
-              <>
-                <p className="text-[var(--t2)] text-[15px] font-medium mb-1">No projects yet</p>
-                <p className="text-[var(--t4)] text-[13px] mb-4">
-                  Create your first project to start tracking performance
-                </p>
-                <Link
-                  href="/projects/new"
-                  className="topbar-btn inline-flex"
-                  style={{ background: "var(--blue)", color: "white", borderColor: "var(--blue)" }}
-                >
-                  + New Client
-                </Link>
-              </>
-            ) : (
-              <>
-                <p className="text-[var(--t2)] text-[15px] font-medium mb-1">No projects assigned</p>
-                <p className="text-[var(--t4)] text-[13px]">
-                  Contact your admin to get access to a project
-                </p>
-              </>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
+            <>
+              <p className="mb-1 text-[15px] font-medium text-[var(--t2)]">No projects assigned</p>
+              <p className="text-[13px] text-[var(--t4)]">Contact your admin to get access to a project</p>
+            </>
+          )}
+        </div>
+      )}
+    </WorkspaceShell>
   );
 }

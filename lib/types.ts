@@ -153,6 +153,14 @@ export interface ClientOverview {
     average: number;
   };
   health: "good" | "watch" | "alert";
+  /** Last successful sync (ISO) from sync_runs; null if never synced / sheet-live. */
+  last_synced_at: string | null;
+}
+
+export interface ArchivedClient {
+  id: string;
+  name: string;
+  logo_url: string | null;
 }
 
 export interface OverviewStats {
