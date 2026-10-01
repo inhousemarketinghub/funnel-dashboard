@@ -19,6 +19,7 @@ const D: Dict = {
   totalSales: { en: "Total Sales", zh: "总销售额" },
   totalAdSpend: { en: "Total Ad Spend", zh: "总广告花费" },
   adSpend: { en: "Ad Spend", zh: "广告花费" },
+  leadFunnelSpend: { en: "↳ Lead Funnel (CPL basis)", zh: "↳ Lead Funnel(CPL 基准)" },
   cpl: { en: "CPL", zh: "CPL" },
   cpaPct: { en: "CPA%", zh: "CPA%" },
   orders: { en: "Orders", zh: "订单数" },
