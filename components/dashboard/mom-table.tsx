@@ -13,7 +13,7 @@ interface FunnelRow {
   inverted: boolean;
 }
 
-function buildRows(
+export function buildRows(
   tm: FunnelMetrics,
   lm: FunnelMetrics,
   mom: MoMResult,
@@ -32,12 +32,26 @@ function buildRows(
   const visitRate = tm.inquiry > 0 ? (tm.contact / tm.inquiry) * 100 : 0;
   const visitRatePrev = lm.inquiry > 0 ? (lm.contact / lm.inquiry) * 100 : 0;
   const visitRateMom = visitRatePrev > 0 ? ((visitRate - visitRatePrev) / visitRatePrev) * 100 : null;
-  const tmCPL = tm.inquiry > 0 ? tm.ad_spend / tm.inquiry : 0;
-  const lmCPL = lm.inquiry > 0 ? lm.ad_spend / lm.inquiry : 0;
+  // CPL comes from the canonical metric (Lead Funnel spend × 1.08 ÷ inquiry),
+  // NOT ad_spend/inquiry — ad_spend is the TOTAL (lead funnel + branding), so
+  // recomputing here diverged from the KPI card and every other surface.
+  const tmCPL = tm.cpl;
+  const lmCPL = lm.cpl;
   const cplMom = lmCPL > 0 ? ((tmCPL - lmCPL) / lmCPL) * 100 : null;
+
+  // Lead-funnel spend (incl 8% SST) is the CPL denominator — surfaced as a
+  // sub-row under total Ad Spend so CPL = Lead Funnel ÷ Inquiry visibly tallies.
+  // Only shown when the lead/branding split exists (else ad_spend IS the basis).
+  const tmLF = tm.lead_funnel_spend * 1.08;
+  const lmLF = lm.lead_funnel_spend * 1.08;
+  const lfMom = lmLF > 0 ? ((tmLF - lmLF) / lmLF) * 100 : null;
+  const showLeadFunnel = tm.lead_funnel_spend > 0 || lm.lead_funnel_spend > 0;
 
   const rows: FunnelRow[] = [
     { label: t(lang, "adSpend"), tmFmt: fmtRM(tm.ad_spend), lmFmt: fmtRM(lm.ad_spend), mom: mom.ad_spend ?? null, kpiFmt: fmtRM(kpi.ad_spend), inverted: false },
+    ...(showLeadFunnel
+      ? [{ label: t(lang, "leadFunnelSpend"), tmFmt: fmtRM(tmLF), lmFmt: fmtRM(lmLF), mom: lfMom, kpiFmt: "—", inverted: false }]
+      : []),
     { label: t(lang, "inquiryPM"), tmFmt: String(tm.inquiry), lmFmt: String(lm.inquiry), mom: mom.inquiry ?? null, kpiFmt: kpi.cpl > 0 ? String(Math.round(kpi.ad_spend / kpi.cpl)) : "—", inverted: false },
     { label: t(lang, "cpl"), tmFmt: fmtRM(tmCPL), lmFmt: fmtRM(lmCPL), mom: cplMom, kpiFmt: kpi.cpl > 0 ? fmtRM(kpi.cpl) : "—", inverted: true },
     { label: isWalkin ? t(lang, "visit") : t(lang, "contact"), tmFmt: String(tm.contact), lmFmt: String(lm.contact), mom: mom.contact ?? null, kpiFmt: String(kpi.target_contact), inverted: false },
