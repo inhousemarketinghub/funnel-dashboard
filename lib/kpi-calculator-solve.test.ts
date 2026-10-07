@@ -77,3 +77,35 @@ describe("completeInputs — appointment inverse calculators", () => {
     expect(computeSettingsDerived(out, "appointment", 30).cpl).toBeCloseTo(fwd.cpl, 6);
   });
 });
+
+describe("completeInputs — Sales from Ad Spend + CPL (CPA% derived)", () => {
+  it("recovers Sales 200000 by pushing leads forward through the funnel (walk-in)", () => {
+    const base = { sales: 200000, aov: 3500, cpa_pct: 5, conv_rate: 60, respond_rate: 15 };
+    const fwd = computeSettingsDerived(base, "walkin", 30); // full-precision CPL + monthly spend
+    const out = completeInputs("sales", "walkin", {
+      ad_spend: fwd.monthly_ad_incl, cpl: fwd.cpl, aov: 3500, conv_rate: 60, respond_rate: 15,
+    });
+    expect(out.sales).toBeCloseTo(200000, 3);
+    expect(out.cpa_pct).toBeCloseTo(5, 4); // CPA% derived back
+    // the completed set reproduces the same CPL and monthly spend
+    const back = computeSettingsDerived(out, "walkin", 30);
+    expect(back.cpl).toBeCloseTo(fwd.cpl, 6);
+    expect(back.monthly_ad_incl).toBeCloseTo(fwd.monthly_ad_incl, 6);
+  });
+
+  it("recovers Sales 200000 by pushing leads forward (appointment)", () => {
+    const base = { sales: 200000, aov: 3500, cpa_pct: 5, conv_rate: 60, showup_rate: 50, appt_rate: 80, respond_rate: 70 };
+    const fwd = computeSettingsDerived(base, "appointment", 30);
+    const out = completeInputs("sales", "appointment", {
+      ad_spend: fwd.monthly_ad_incl, cpl: fwd.cpl, aov: 3500, conv_rate: 60, showup_rate: 50, appt_rate: 80, respond_rate: 70,
+    });
+    expect(out.sales).toBeCloseTo(200000, 3);
+    expect(computeSettingsDerived(out, "appointment", 30).cpl).toBeCloseTo(fwd.cpl, 6);
+  });
+
+  it("guards divide-by-zero (CPL 0 → Sales 0, never NaN)", () => {
+    const out = completeInputs("sales", "walkin", { ad_spend: 10000, cpl: 0, aov: 3500, conv_rate: 60, respond_rate: 15 });
+    expect(out.sales).toBe(0);
+    expect(Number.isNaN(out.sales)).toBe(false);
+  });
+});

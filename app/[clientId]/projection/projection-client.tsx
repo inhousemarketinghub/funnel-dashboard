@@ -35,6 +35,7 @@ const SETTINGS_ZH: Record<string, string> = {
   "Targeted Show Up Rate": "目标出席率", "Targeted Appointment Rate": "目标预约率",
   "Targeted Respond Rate": "目标回复率", "Targeted Visit Rate": "目标到访率",
   "Targeted CPL (Incl SST)": "目标 CPL(含 SST)", "Targeted Order": "目标订单数",
+  "Targeted Monthly Ad Spend (Incl SST)": "目标每月广告花费(含 SST)",
   "CPL (Incl SST)": "CPL(含 SST)", "CP.Acquisition (Incl SST)": "获客成本(含 SST)",
   "FB Leads Inquiry": "FB 询问线索", "CP.Visit (Incl SST)": "每次到访成本(含 SST)",
   "Visit": "到访", "CP.Show Up (Incl SST)": "每次出席成本(含 SST)", "Show Up": "出席",
@@ -105,6 +106,7 @@ interface DerivedMetric {
 const DERIVED_METRICS: DerivedMetric[] = [
   { label: "Targeted Order", key: "orders", format: "count" },
   { label: "CPL (Incl SST)", key: "cpl", format: "rm" },
+  { label: "CPA %", key: "cpa_pct", format: "pct" },
   { label: "CP.Acquisition (Incl SST)", key: "cp_acquisition", format: "rm" },
   { label: "FB Leads Inquiry", key: "fb_leads", format: "count" },
   { label: "CP.Visit (Incl SST)", key: "cp_visit", format: "rm", funnelFilter: "walkin" },
@@ -133,6 +135,9 @@ function formatDerived(val: number, format: DerivedMetric["format"]) {
 // moves to a read-only "result", and CPL becomes an editable input instead.
 
 const CPL_FIELD: FieldDef = { key: "cpl", label: "Targeted CPL (Incl SST)", step: "0.01", prefix: "RM" };
+// Ad Spend as a calculator INPUT (monthly, incl SST) — only used by the Sales
+// calculator, which inverts Sales = Ad Spend ÷ CPA%.
+const AD_SPEND_FIELD: FieldDef = { key: "ad_spend", label: "Targeted Monthly Ad Spend (Incl SST)", step: "100", prefix: "RM" };
 
 interface CalcDef {
   mode: CalculatorMode;
@@ -148,6 +153,8 @@ const WALKIN_CALCS: CalcDef[] = [
     output: { key: "respond_rate", label: "Targeted Visit Rate", format: "pct" } },
   { mode: "cpa", label: "CPA %", inputKeys: ["sales", "aov", "conv_rate", "respond_rate", "cpl"],
     output: { key: "cpa_pct", label: "Targeted CPA %", format: "pct" } },
+  { mode: "sales", label: "Targeted Sales", inputKeys: ["ad_spend", "cpl", "aov", "conv_rate", "respond_rate"],
+    output: { key: "sales", label: "Targeted Sales", format: "rm" } },
 ];
 
 const APPOINTMENT_CALCS: CalcDef[] = [
@@ -160,12 +167,15 @@ const APPOINTMENT_CALCS: CalcDef[] = [
   { mode: "cpa", label: "CPA %",
     inputKeys: ["sales", "aov", "conv_rate", "showup_rate", "appt_rate", "respond_rate", "cpl"],
     output: { key: "cpa_pct", label: "Targeted CPA %", format: "pct" } },
+  { mode: "sales", label: "Targeted Sales",
+    inputKeys: ["ad_spend", "cpl", "aov", "conv_rate", "showup_rate", "appt_rate", "respond_rate"],
+    output: { key: "sales", label: "Targeted Sales", format: "rm" } },
 ];
 
 // Field definitions indexed by key, per funnel (respond_rate's label differs by funnel).
 function fieldMapFor(funnelType: "appointment" | "walkin"): Record<string, FieldDef> {
   const base = funnelType === "walkin" ? WALKIN_FIELDS : APPOINTMENT_FIELDS;
-  return Object.fromEntries([...base, CPL_FIELD].map((f) => [f.key, f]));
+  return Object.fromEntries([...base, CPL_FIELD, AD_SPEND_FIELD].map((f) => [f.key, f]));
 }
 
 export function ProjectionClient({ lang, canSave = true }: { lang: Lang; canSave?: boolean }) {
@@ -207,9 +217,13 @@ export function ProjectionClient({ lang, canSave = true }: { lang: Lang; canSave
     return computeSettingsDerived(completeForm, funnelType, daysInMonth);
   }, [completeForm, funnelType]);
 
-  // Derived grid hides CPL — it's the calculator's input or its headline result.
+  // Derived grid hides whatever IS the calculator's input or headline result —
+  // CPL in most modes; when Ad Spend is the Sales-calculator input, also hide
+  // the (now redundant) derived Monthly Ad Spend (Incl).
+  const hiddenDerived = new Set<string>([activeCalc.output.key, ...activeCalc.inputKeys]);
+  if (activeCalc.inputKeys.includes("ad_spend")) hiddenDerived.add("monthly_ad_incl");
   const visibleDerived = DERIVED_METRICS.filter(
-    (m) => (!m.funnelFilter || m.funnelFilter === funnelType) && m.key !== "cpl",
+    (m) => (!m.funnelFilter || m.funnelFilter === funnelType) && !hiddenDerived.has(m.key),
   );
 
   // The highlighted result for the active calculator.
@@ -248,6 +262,10 @@ export function ProjectionClient({ lang, canSave = true }: { lang: Lang; canSave
         formValues.daily_ad = derivedData.daily_ad_current_excl ?? kpi.daily_ad ?? 0;
         // Seed CPL so the Visit Rate / CPA calculators have a sensible starting target.
         formValues.cpl = kpi.cpl ?? derivedData.cpl ?? 0;
+
+        // Seed Ad Spend (monthly, incl SST) for the Sales calculator — prefer the
+        // sheet-derived monthly spend, else reconstruct it from Sales × CPA%.
+        formValues.ad_spend = derivedData.monthly_ad_incl ?? ((kpi.sales ?? 0) * (kpi.cpa_pct ?? 0)) / 100;
         setForm(formValues);
 
         setSheetDerived(derivedData);
@@ -275,12 +293,15 @@ export function ProjectionClient({ lang, canSave = true }: { lang: Lang; canSave
   async function handleSave() {
     setSaving(true);
     try {
+      // ad_spend is a transient calculator input (drives the solved Sales), not
+      // a saved KPI target — strip it so only real targets reach the sheet.
+      const { ad_spend: _adSpend, ...saveFields } = completeForm;
       const res = await fetch("/api/kpi", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           clientId,
-          fields: completeForm,
+          fields: saveFields,
           brand: selectedBrand || undefined,
         }),
       });
