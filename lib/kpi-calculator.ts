@@ -11,6 +11,7 @@ export interface SettingsDerived {
   [key: string]: number;
   orders: number;
   cpl: number;
+  cpa_pct: number;
   cp_acquisition: number;
   fb_leads: number;
   target_visit: number;
@@ -90,6 +91,7 @@ export function computeSettingsDerived(
   return {
     orders,
     cpl,
+    cpa_pct: form.cpa_pct || 0,
     cp_acquisition: cpAcquisition,
     fb_leads: fbLeads,
     target_visit: funnelType === "walkin" ? pipelineEnd : 0,
@@ -117,7 +119,28 @@ export function computeSettingsDerived(
 // base-input form, so computeSettingsDerived() can run on it unchanged. This keeps
 // one source of truth for the forward math and guarantees round-trip consistency.
 
-export type CalculatorMode = "cpl" | "visit_rate" | "cpa" | "appt_rate";
+export type CalculatorMode = "cpl" | "visit_rate" | "cpa" | "appt_rate" | "sales";
+
+// Solve Targeted Sales from a monthly Ad Spend budget (incl SST) + CPL, pushing
+// leads FORWARD through the funnel:
+//   FB Leads = AdSpendExcl / CPL  →  … funnel rates …  →  Orders  →  Sales = Orders × AOV
+// CPA% is no longer an input here; it's derived afterwards (= AdSpendIncl / Sales).
+function solveSales(form: Record<string, number>, funnelType: "appointment" | "walkin"): number {
+  const adSpendExcl = (form.ad_spend || 0) / 1.08;
+  const cpl = form.cpl || 0;
+  const aov = form.aov || 0;
+  const conv = (form.conv_rate || 0) / 100;
+  if (cpl <= 0) return 0;
+  const fbLeads = adSpendExcl / cpl;
+  if (funnelType === "walkin") {
+    const visitRate = (form.respond_rate || 0) / 100;
+    return fbLeads * visitRate * conv * aov;
+  }
+  const respond = (form.respond_rate || 0) / 100;
+  const apptRate = (form.appt_rate || 0) / 100;
+  const showupRate = (form.showup_rate || 0) / 100;
+  return fbLeads * respond * apptRate * showupRate * conv * aov;
+}
 
 // Walk-in: solve Visit Rate (%) from a target CPL.
 // FB Leads = AdSpendExcl / CPL, and FB Leads = Visit / VisitRate, so
@@ -199,6 +222,14 @@ export function completeInputs(
   form: Record<string, number>,
 ): Record<string, number> {
   if (mode === "cpl") return { ...form };
+  if (mode === "sales") {
+    const sales = solveSales(form, funnelType);
+    // Backfill the now-derived CPA% so computeSettingsDerived (which keys Monthly
+    // Ad Spend off Sales × CPA%) stays internally consistent and reproduces the
+    // input Ad Spend and CPL exactly.
+    const cpaPct = sales > 0 ? ((form.ad_spend || 0) / sales) * 100 : 0;
+    return { ...form, sales, cpa_pct: cpaPct };
+  }
 
   if (funnelType === "walkin") {
     if (mode === "visit_rate") return { ...form, respond_rate: solveWalkinVisitRate(form) };
