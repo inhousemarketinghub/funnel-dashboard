@@ -5,6 +5,7 @@ import { todayKL } from "@/lib/dates";
 import { fetchKPIData, fetchDerivedKPI, writeKPIValues, detectBrandsOrdered } from "@/lib/sheets";
 import { readKPIMirror, pickKPIMirrorEntry } from "@/lib/data-source";
 import { refreshKPIMirror } from "@/lib/sync";
+import { appendTargetVersion } from "@/lib/kpi-history";
 import { revalidateTag } from "next/cache";
 
 // GET /api/kpi?clientId=xxx&brand=yyy
@@ -78,7 +79,7 @@ export async function GET(req: NextRequest) {
 // Writes KPI values to Google Sheet + Supabase
 export async function POST(req: NextRequest) {
   try {
-    const { role } = await getUserRole();
+    const { role, agencyId } = await getUserRole();
     if (!role) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const { clientId, fields, brand } = await req.json();
@@ -162,6 +163,23 @@ export async function POST(req: NextRequest) {
 
     if (dbError) {
       console.error("Supabase upsert error:", dbError);
+    }
+
+    // Append an immutable history snapshot (additive — does not affect anything above).
+    try {
+      await appendTargetVersion(clientId, brandName ?? "", {
+        sales, orders, aov, cpl,
+        respond_rate: fields.respond_rate ?? 0,
+        appt_rate: fields.appt_rate ?? 0,
+        showup_rate: fields.showup_rate ?? 0,
+        conv_rate: fields.conv_rate ?? 0,
+        ad_spend: adSpend, daily_ad: dailyAdIncl,
+        roas: Math.round(roas * 100) / 100,
+        cpa_pct: fields.cpa_pct ?? 0,
+        target_contact: 0, target_appt: 0, target_showup: 0,
+      }, agencyId);
+    } catch (err) {
+      console.error("kpi_target_versions append after save:", err);
     }
 
     return NextResponse.json({ success: true });

@@ -207,6 +207,26 @@ const D: Dict = {
   incomplete: { en: "incomplete", zh: "未完整" },
   selectMetricHint: { en: "Select at least one metric to display the chart.", zh: "请至少选择一个指标以显示图表。" },
 
+  // ── KPI target history ──
+  targetChanges: { en: "Target changes this period", zh: "本期目标变更" },
+  backfilledTag: { en: "backfilled · monthly", zh: "历史回填 · 月度" },
+  noTargetChanges: { en: "No target changes in this period.", zh: "本期内目标无变更。" },
+  kpiHistory: { en: "KPI History", zh: "KPI 历史" },
+  monthCol: { en: "Month", zh: "月份" },
+  targetCol: { en: "Target", zh: "目标" },
+  actualCol: { en: "Actual", zh: "实际" },
+  tgtActLegend: { en: "Each cell: actual (top) / target (bottom)", zh: "每格:上=实际,下=目标" },
+  changesThisMonth: { en: "Changes this month", zh: "本月变更" },
+  dailyBudgetHistory: { en: "Daily Budget History (Incl SST)", zh: "每日预算变更历史(含 SST)" },
+  noBudgetChanges: { en: "No daily-budget changes recorded yet.", zh: "暂无每日预算变更记录。" },
+  perDay: { en: "/day", zh: "/天" },
+  allYears: { en: "All years", zh: "全部年份" },
+  changesSuffix: { en: "changes", zh: "次改动" },
+  changeOne: { en: "change", zh: "次改动" },
+  noKpiChanges: { en: "No target changes this month (carried forward).", zh: "本月目标无改动(沿用上月)。" },
+  initialSet: { en: "Initial target set", zh: "初始目标设定" },
+  noChangeThisRow: { en: "No fields changed", zh: "无字段变更" },
+
   // ── My Account page ──
   myAccount: { en: "My Account", zh: "我的账户" },
   accountSubtitle: { en: "Manage your profile, sign-in and preferences", zh: "管理你的个人资料、登录与偏好" },

@@ -170,6 +170,16 @@ export interface OverviewStats {
   totalSales: number;
 }
 
+export interface KpiTargetVersion {
+  id: string;
+  client_id: string;
+  brand: string;
+  effective_from: string; // ISO timestamp
+  snapshot: KPIConfig;    // full target set at save time
+  source: "save" | "backfill";
+  changed_by: string | null;
+}
+
 export interface ColumnMapping {
   performance: Record<string, string>;
   lead: Record<string, string>;
