@@ -1,52 +1,86 @@
 "use client";
 import { useState, Fragment } from "react";
 import { ChevronDown } from "lucide-react";
-import type { KPIConfig } from "@/lib/types";
 import { t, type Lang } from "@/lib/i18n";
 import { fmtRM } from "@/lib/utils";
 
+export interface MetricSet {
+  ad_spend: number; sales: number; orders: number; aov: number; cpa_pct: number;
+  cpl: number; conv_rate: number; respond_rate: number; appt_rate: number; showup_rate: number; roas: number;
+}
 export interface HistoryRow {
   month: string;
-  target: { sales: number; ad_spend: number; cpa_pct: number; cpl: number } | null;
-  actual: { sales: number; ad_spend: number; cpa_pct: number; cpl: number };
-  changes: { id: string; effective_from: string; source: "save" | "backfill"; snapshot: KPIConfig }[];
+  target: MetricSet | null;
+  actual: MetricSet;
+  changes: { id: string; effective_from: string; source: "save" | "backfill"; target: MetricSet }[];
+}
+export interface BudgetChange {
+  id: string; effective_from: string; source: "save" | "backfill"; daily_ad: number; from: number | null;
 }
 
-const TD = "px-4 py-3 text-right num whitespace-nowrap";
-const TH = "px-4 py-2 font-label text-[10px] uppercase tracking-wider text-[var(--t4)] whitespace-nowrap";
+type Kind = "rm" | "pct" | "count" | "roas";
+interface Col { key: keyof MetricSet; label: string; kind: Kind }
 
-export function KpiHistoryClient({ rows, lang }: { rows: HistoryRow[]; lang: Lang }) {
+const COMMON: Col[] = [
+  { key: "ad_spend", label: "Ad Spend (Incl SST)", kind: "rm" },
+  { key: "sales", label: "Sales", kind: "rm" },
+  { key: "orders", label: "Orders", kind: "count" },
+  { key: "aov", label: "AOV", kind: "rm" },
+  { key: "cpa_pct", label: "CPA%", kind: "pct" },
+  { key: "cpl", label: "CPL (Incl SST)", kind: "rm" },
+  { key: "conv_rate", label: "Conv Rate", kind: "pct" },
+];
+const WALKIN_EXTRA: Col[] = [{ key: "respond_rate", label: "Visit Rate", kind: "pct" }];
+const APPT_EXTRA: Col[] = [
+  { key: "respond_rate", label: "Respond Rate", kind: "pct" },
+  { key: "appt_rate", label: "Appt Rate", kind: "pct" },
+  { key: "showup_rate", label: "Show Up Rate", kind: "pct" },
+];
+const ROAS_COL: Col = { key: "roas", label: "ROAS", kind: "roas" };
+
+function fmt(kind: Kind, v: number): string {
+  if (kind === "rm") return fmtRM(v);
+  if (kind === "pct") return `${v.toFixed(1)}%`;
+  if (kind === "roas") return `${v.toFixed(1)}x`;
+  return String(Math.round(v));
+}
+
+export function KpiHistoryClient({ rows, dailyBudget, funnel, lang }: {
+  rows: HistoryRow[]; dailyBudget: BudgetChange[]; funnel: "walkin" | "appointment"; lang: Lang;
+}) {
   const [open, setOpen] = useState<string | null>(null);
-  const tgtAct = `${t(lang, "targetCol")} / ${t(lang, "actualCol")}`;
+  const cols: Col[] = [...COMMON, ...(funnel === "walkin" ? WALKIN_EXTRA : APPT_EXTRA), ROAS_COL];
 
   return (
     <div>
       <h1 className="mb-1 font-heading text-2xl font-bold tracking-tight text-[var(--t1)]">{t(lang, "kpiHistory")}</h1>
-      <p className="mb-6 text-[13px] text-[var(--t3)]">{tgtAct}</p>
+      <p className="mb-5 text-[12px] text-[var(--t4)]">{t(lang, "tgtActLegend")}</p>
+
       <div className="overflow-x-auto rounded-[12px] border border-[var(--border)] bg-[var(--bg2)]">
-        <table className="w-full text-[13px]">
+        <table className="w-full text-[12px]">
           <thead className="bg-[var(--bg3)]">
             <tr>
-              <th className={`${TH} text-left`}>{t(lang, "monthCol")}</th>
-              <th className={`${TH} text-right`}>Sales</th>
-              <th className={`${TH} text-right`}>Ad Spend</th>
-              <th className={`${TH} text-right`}>CPA%</th>
-              <th className={`${TH} text-right`}>CPL</th>
-              <th className={TH}></th>
+              <th className="sticky left-0 z-10 bg-[var(--bg3)] px-4 py-2 text-left font-label text-[10px] uppercase tracking-wider text-[var(--t4)]">{t(lang, "monthCol")}</th>
+              {cols.map((c) => (
+                <th key={c.key} className="whitespace-nowrap px-4 py-2 text-right font-label text-[10px] uppercase tracking-wider text-[var(--t4)]">{c.label}</th>
+              ))}
+              <th className="px-3 py-2"></th>
             </tr>
           </thead>
           <tbody>
             {rows.map((r) => (
               <Fragment key={r.month}>
                 <tr className="border-t border-[var(--border)]">
-                  <td className="whitespace-nowrap px-4 py-3 font-medium text-[var(--t1)] num">{r.month}</td>
-                  <td className={TD}>{r.target ? fmtRM(r.target.sales) : "—"}<span className="text-[var(--t4)]"> / {fmtRM(r.actual.sales)}</span></td>
-                  <td className={TD}>{r.target ? fmtRM(r.target.ad_spend) : "—"}<span className="text-[var(--t4)]"> / {fmtRM(r.actual.ad_spend)}</span></td>
-                  <td className={TD}>{r.target ? `${r.target.cpa_pct.toFixed(1)}%` : "—"}<span className="text-[var(--t4)]"> / {r.actual.cpa_pct.toFixed(1)}%</span></td>
-                  <td className={TD}>{r.target ? fmtRM(r.target.cpl) : "—"}<span className="text-[var(--t4)]"> / {fmtRM(r.actual.cpl)}</span></td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="sticky left-0 z-10 whitespace-nowrap bg-[var(--bg2)] px-4 py-3 font-medium text-[var(--t1)] num">{r.month}</td>
+                  {cols.map((c) => (
+                    <td key={c.key} className="whitespace-nowrap px-4 py-3 text-right num">
+                      <div className="font-medium text-[var(--t1)]">{r.target ? fmt(c.kind, r.target[c.key]) : "—"}</div>
+                      <div className="text-[var(--t4)]">{fmt(c.kind, r.actual[c.key])}</div>
+                    </td>
+                  ))}
+                  <td className="px-3 py-3 text-right">
                     {r.changes.length > 0 && (
-                      <button onClick={() => setOpen(open === r.month ? null : r.month)} className="text-[var(--t4)] transition-colors hover:text-[var(--t1)]" title={`${r.changes.length}`}>
+                      <button onClick={() => setOpen(open === r.month ? null : r.month)} className="text-[var(--t4)] transition-colors hover:text-[var(--t1)]" title={String(r.changes.length)}>
                         <ChevronDown className={`h-4 w-4 transition-transform ${open === r.month ? "rotate-180" : ""}`} />
                       </button>
                     )}
@@ -54,15 +88,19 @@ export function KpiHistoryClient({ rows, lang }: { rows: HistoryRow[]; lang: Lan
                 </tr>
                 {open === r.month && (
                   <tr className="bg-[var(--bg3)]/40">
-                    <td colSpan={6} className="px-4 py-2">
+                    <td colSpan={cols.length + 2} className="px-4 py-3">
+                      <div className="mb-2 font-label text-[10px] uppercase tracking-wider text-[var(--t4)]">{t(lang, "changesThisMonth")}</div>
                       {r.changes.map((c) => (
-                        <div key={c.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-[var(--border)] py-1.5 text-[12px] text-[var(--t2)] last:border-0">
-                          <span className="num text-[var(--t3)]">{new Date(c.effective_from).toLocaleDateString()}</span>
-                          {c.source === "backfill" && <span className="rounded-full bg-[var(--bg2)] px-2 py-0.5 text-[10px] text-[var(--t4)]">{t(lang, "backfilledTag")}</span>}
-                          <span className="num">Sales {fmtRM(c.snapshot.sales)}</span>
-                          <span className="num">Ad Spend {fmtRM(c.snapshot.ad_spend)}</span>
-                          <span className="num">CPA% {c.snapshot.cpa_pct.toFixed(1)}%</span>
-                          <span className="num">CPL {fmtRM(c.snapshot.cpl)}</span>
+                        <div key={c.id} className="border-b border-[var(--border)] py-2 last:border-0">
+                          <div className="mb-1 flex items-center gap-2 text-[12px] text-[var(--t3)]">
+                            <span className="num">{c.effective_from.slice(0, 10)}</span>
+                            {c.source === "backfill" && <span className="rounded-full bg-[var(--bg2)] px-2 py-0.5 text-[10px] text-[var(--t4)]">{t(lang, "backfilledTag")}</span>}
+                          </div>
+                          <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-[12px] text-[var(--t2)]">
+                            {cols.map((col) => (
+                              <span key={col.key} className="num">{col.label}: {fmt(col.kind, c.target[col.key])}</span>
+                            ))}
+                          </div>
                         </div>
                       ))}
                     </td>
@@ -72,6 +110,27 @@ export function KpiHistoryClient({ rows, lang }: { rows: HistoryRow[]; lang: Lan
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* Daily budget change log — separate from the per-month target rows. */}
+      <div className="mt-8">
+        <h2 className="mb-3 font-heading text-[17px] font-semibold text-[var(--t1)]">{t(lang, "dailyBudgetHistory")}</h2>
+        <div className="rounded-[12px] border border-[var(--border)] bg-[var(--bg2)] p-4">
+          {dailyBudget.length === 0 ? (
+            <p className="text-[12px] text-[var(--t4)]">{t(lang, "noBudgetChanges")}</p>
+          ) : (
+            dailyBudget.map((b) => (
+              <div key={b.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-[var(--border)] py-2 text-[13px] last:border-0">
+                <span className="num w-[90px] text-[var(--t3)]">{b.effective_from.slice(0, 10)}</span>
+                <span className="num font-medium text-[var(--t1)]">{fmtRM(b.daily_ad)}{t(lang, "perDay")}</span>
+                {b.from !== null && b.from !== b.daily_ad && (
+                  <span className="num text-[12px] text-[var(--t4)]">({fmtRM(b.from)} → {fmtRM(b.daily_ad)})</span>
+                )}
+                {b.source === "backfill" && <span className="rounded-full bg-[var(--bg3)] px-2 py-0.5 text-[10px] text-[var(--t4)]">{t(lang, "backfilledTag")}</span>}
+              </div>
+            ))
+          )}
+        </div>
       </div>
     </div>
   );

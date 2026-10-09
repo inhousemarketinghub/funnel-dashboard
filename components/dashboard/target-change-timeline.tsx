@@ -41,7 +41,7 @@ export function TargetChangeTimeline({ versions, rangeStart, rangeEnd, lang }: {
             return (
               <div key={v.id} className="border-b border-[var(--border)] py-2 last:border-0">
                 <div className="flex items-center gap-2 text-[12px] text-[var(--t3)]">
-                  <span className="num">{new Date(v.effective_from).toLocaleDateString()}</span>
+                  <span className="num">{v.effective_from.slice(0, 10)}</span>
                   {v.source === "backfill" && <span className="rounded-full bg-[var(--bg3)] px-2 py-0.5 text-[10px] text-[var(--t4)]">{t(lang, "backfilledTag")}</span>}
                 </div>
                 <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-[12px] text-[var(--t2)]">
