@@ -222,6 +222,7 @@ const D: Dict = {
   perDay: { en: "/day", zh: "/天" },
   allYears: { en: "All years", zh: "全部年份" },
   changesSuffix: { en: "changes", zh: "次改动" },
+  changeOne: { en: "change", zh: "次改动" },
   noKpiChanges: { en: "No target changes this month (carried forward).", zh: "本月目标无改动(沿用上月)。" },
   initialSet: { en: "Initial target set", zh: "初始目标设定" },
   noChangeThisRow: { en: "No fields changed", zh: "无字段变更" },
