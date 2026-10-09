@@ -215,7 +215,7 @@ const D: Dict = {
   monthCol: { en: "Month", zh: "月份" },
   targetCol: { en: "Target", zh: "目标" },
   actualCol: { en: "Actual", zh: "实际" },
-  tgtActLegend: { en: "Each cell: target (top) / actual (bottom)", zh: "每格:上=目标,下=实际" },
+  tgtActLegend: { en: "Each cell: actual (top) / target (bottom)", zh: "每格:上=实际,下=目标" },
   changesThisMonth: { en: "Changes this month", zh: "本月变更" },
   dailyBudgetHistory: { en: "Daily Budget History (Incl SST)", zh: "每日预算变更历史(含 SST)" },
   noBudgetChanges: { en: "No daily-budget changes recorded yet.", zh: "暂无每日预算变更记录。" },

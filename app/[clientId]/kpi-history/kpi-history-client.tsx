@@ -123,40 +123,31 @@ export function KpiHistoryClient({ rows, dailyBudget, funnel, lang }: {
                 {cols.map((c) => (
                   <div key={c.key}>
                     <div className="font-label mb-1 text-[10px] uppercase tracking-wider text-[var(--t4)]">{c.label}</div>
-                    <div className="num text-[15px] font-semibold text-[var(--t1)]">{r.target ? fmt(c.kind, r.target[c.key]) : "—"}</div>
-                    <div className="num text-[12px] text-[var(--t4)]">{fmt(c.kind, r.actual[c.key])}</div>
+                    <div className="num text-[15px] font-semibold text-[var(--t1)]">{fmt(c.kind, r.actual[c.key])}</div>
+                    <div className="num text-[12px] text-[var(--t4)]">{r.target ? fmt(c.kind, r.target[c.key]) : "—"}</div>
                   </div>
                 ))}
               </div>
 
               {expanded && (
                 <div className="mt-4 border-t border-[var(--border)] pt-3">
-                  {r.changes.map((c, idx) => {
-                    const changed = cols.filter((col) => c.prev === null || c.prev[col.key] !== c.target[col.key]);
-                    return (
-                      <div key={c.id} className="border-b border-[var(--border)] py-2 last:border-0">
-                        <div className="mb-1 flex items-center gap-2 text-[12px] text-[var(--t3)]">
-                          <span className="num font-medium text-[var(--t2)]">#{idx + 1}</span>
-                          <span className="num">{stamp(c.effective_from, c.source)}</span>
-                          {c.source === "backfill" && <span className="rounded-full bg-[var(--bg3)] px-2 py-0.5 text-[10px] text-[var(--t4)]">{t(lang, "backfilledTag")}</span>}
-                        </div>
-                        {c.prev === null ? (
-                          <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-[12px] text-[var(--t2)]">
-                            <span className="text-[var(--t4)]">{t(lang, "initialSet")}:</span>
-                            {cols.map((col) => <span key={col.key} className="num">{col.label} {fmt(col.kind, c.target[col.key])}</span>)}
-                          </div>
-                        ) : (
-                          <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-[12px] text-[var(--t2)]">
-                            {changed.map((col) => (
-                              <span key={col.key} className="num">
-                                {col.label}: <span className="text-[var(--t4)]">{fmt(col.kind, c.prev![col.key])}</span> → <span className="font-medium text-[var(--t1)]">{fmt(col.kind, c.target[col.key])}</span>
-                              </span>
-                            ))}
-                          </div>
-                        )}
+                  {r.changes.map((c, idx) => (
+                    <div key={c.id} className="border-b border-[var(--border)] py-2.5 last:border-0">
+                      <div className="mb-2 flex items-center gap-2 text-[12px] text-[var(--t3)]">
+                        <span className="num font-medium text-[var(--t2)]">#{idx + 1}</span>
+                        <span className="num">{stamp(c.effective_from, c.source)}</span>
+                        {c.source === "backfill" && <span className="rounded-full bg-[var(--bg3)] px-2 py-0.5 text-[10px] text-[var(--t4)]">{t(lang, "backfilledTag")}</span>}
                       </div>
-                    );
-                  })}
+                      <div className="grid grid-cols-2 gap-x-5 gap-y-1.5 sm:grid-cols-3 md:grid-cols-4">
+                        {cols.map((col) => (
+                          <div key={col.key} className="flex items-baseline justify-between gap-2">
+                            <span className="text-[11px] text-[var(--t4)]">{col.label}</span>
+                            <span className="num text-[12px] font-medium text-[var(--t1)]">{fmt(col.kind, c.target[col.key])}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
