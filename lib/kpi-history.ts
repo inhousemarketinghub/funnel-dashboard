@@ -75,12 +75,13 @@ export async function appendTargetVersion(
 /** All versions for a client scoped to a brand (brand rows + the '' default). */
 export async function fetchTargetVersions(clientId: string, brand: string): Promise<KpiTargetVersion[]> {
   const db = createAdminSupabase();
-  const { data } = await db
+  let q = db
     .from("kpi_target_versions")
     .select("id, client_id, brand, effective_from, snapshot, source, changed_by")
-    .eq("client_id", clientId)
-    .in("brand", brand ? [brand, ""] : [""])
-    .order("effective_from", { ascending: false });
+    .eq("client_id", clientId);
+  q = brand ? q.in("brand", [brand, ""]) : q.eq("brand", "");
+  const { data, error } = await q.order("effective_from", { ascending: false });
+  if (error) console.error("fetchTargetVersions:", error.message);
   return (data ?? []) as KpiTargetVersion[];
 }
 

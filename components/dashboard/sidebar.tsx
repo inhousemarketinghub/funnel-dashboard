@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, TrendingUp, Settings, Activity, Calculator,
-  SlidersHorizontal, LayoutGrid, ChevronsUpDown, Check,
+  SlidersHorizontal, LayoutGrid, ChevronsUpDown, Check, History,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
@@ -66,7 +66,10 @@ export function Sidebar({ clientId, clientName, logoUrl, email, userName, userAv
     ...(can("view_trends") ? [{ href: `/${clientId}/trends`, labelKey: "trends", icon: TrendingUp }] : []),
   ];
   const planningItems: NavItem[] = can("view_projection")
-    ? [{ href: `/${clientId}/projection`, labelKey: "adsProjection", icon: Calculator }]
+    ? [
+        { href: `/${clientId}/projection`, labelKey: "adsProjection", icon: Calculator },
+        { href: `/${clientId}/kpi-history`, labelKey: "kpiHistory", icon: History },
+      ]
     : [];
   const adminItems: NavItem[] = [
     ...(can("edit_customization") ? [{ href: `/${clientId}/customization`, labelKey: "projectCustomization", icon: SlidersHorizontal }] : []),

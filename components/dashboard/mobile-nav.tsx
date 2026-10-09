@@ -72,6 +72,9 @@ export function MobileNav({ clientId, clientName, logoUrl, email, features, lang
             {features.includes("view_projection") && (
               <Link href={`/${clientId}/projection`} className={ITEM}>{t(lang, "adsProjection")}</Link>
             )}
+            {features.includes("view_projection") && (
+              <Link href={`/${clientId}/kpi-history`} className={ITEM}>{t(lang, "kpiHistory")}</Link>
+            )}
             {features.includes("edit_customization") && (
               <Link href={`/${clientId}/customization`} className={ITEM}>{t(lang, "projectCustomization")}</Link>
             )}
