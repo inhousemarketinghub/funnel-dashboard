@@ -220,6 +220,9 @@ const D: Dict = {
   dailyBudgetHistory: { en: "Daily Budget History (Incl SST)", zh: "每日预算变更历史(含 SST)" },
   noBudgetChanges: { en: "No daily-budget changes recorded yet.", zh: "暂无每日预算变更记录。" },
   perDay: { en: "/day", zh: "/天" },
+  allYears: { en: "All years", zh: "全部年份" },
+  initialSet: { en: "Initial target set", zh: "初始目标设定" },
+  noChangeThisRow: { en: "No fields changed", zh: "无字段变更" },
 
   // ── My Account page ──
   myAccount: { en: "My Account", zh: "我的账户" },

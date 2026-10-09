@@ -37,6 +37,11 @@ export default async function KpiHistoryPage({ params }: { params: Promise<{ cli
   if (!client) notFound();
 
   const versions = await fetchTargetVersions(clientId, ""); // newest first
+  const asc = [...versions].reverse();                      // oldest first
+  // prior snapshot for each version (so a change can be shown as a diff)
+  const prevById = new Map<string, MetricSet | null>();
+  asc.forEach((v, i) => prevById.set(v.id, i > 0 ? fromSnapshot(asc[i - 1].snapshot) : null));
+
   const perf = await getPerformanceData(client, resolveDataSource(client));
   const funnel: "walkin" | "appointment" = client.funnel_type === "walkin" ? "walkin" : "appointment";
   const now = new Date();
@@ -57,13 +62,15 @@ export default async function KpiHistoryPage({ params }: { params: Promise<{ cli
       actual: fromMetrics(actual),
       changes: changes
         .sort((a, b) => a.effective_from.localeCompare(b.effective_from))
-        .map((v) => ({ id: v.id, effective_from: v.effective_from, source: v.source, target: fromSnapshot(v.snapshot) })),
+        .map((v) => ({
+          id: v.id, effective_from: v.effective_from, source: v.source,
+          target: fromSnapshot(v.snapshot), prev: prevById.get(v.id) ?? null,
+        })),
     };
   });
 
-  // Daily-budget change log (separate from the target rows). Walk oldest→newest,
+  // Daily-budget change log (separate from the target rows). Oldest→newest,
   // emit a record only when the daily budget (Incl SST) actually changes.
-  const asc = [...versions].reverse();
   const dailyBudget: BudgetChange[] = [];
   let prevBudget: number | null = null;
   for (const v of asc) {
@@ -73,7 +80,7 @@ export default async function KpiHistoryPage({ params }: { params: Promise<{ cli
       prevBudget = d;
     }
   }
-  dailyBudget.reverse(); // newest first for display
+  dailyBudget.reverse(); // newest first
 
   return <KpiHistoryClient rows={rows} dailyBudget={dailyBudget} funnel={funnel} lang={lang} />;
 }
