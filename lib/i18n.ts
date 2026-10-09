@@ -207,6 +207,15 @@ const D: Dict = {
   incomplete: { en: "incomplete", zh: "未完整" },
   selectMetricHint: { en: "Select at least one metric to display the chart.", zh: "请至少选择一个指标以显示图表。" },
 
+  // ── KPI target history ──
+  targetChanges: { en: "Target changes this period", zh: "本期目标变更" },
+  backfilledTag: { en: "backfilled · monthly", zh: "历史回填 · 月度" },
+  noTargetChanges: { en: "No target changes in this period.", zh: "本期内目标无变更。" },
+  kpiHistory: { en: "KPI History", zh: "KPI 历史" },
+  monthCol: { en: "Month", zh: "月份" },
+  targetCol: { en: "Target", zh: "目标" },
+  actualCol: { en: "Actual", zh: "实际" },
+
   // ── My Account page ──
   myAccount: { en: "My Account", zh: "我的账户" },
   accountSubtitle: { en: "Manage your profile, sign-in and preferences", zh: "管理你的个人资料、登录与偏好" },

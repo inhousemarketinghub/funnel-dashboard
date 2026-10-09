@@ -8,7 +8,8 @@ import type { PersonData, PerfResult, BrandPerformanceData } from "@/lib/sheets"
 import { BrandSelector } from "@/components/dashboard/brand-selector";
 import { computeMetrics, computeMoM, computeAchievement } from "@/lib/metrics";
 import { fmtRM, fmtROAS } from "@/lib/utils";
-import { resolveSearchParams, getPreviousPeriod, formatRangeLabel, formatDateParam } from "@/lib/dates";
+import { resolveSearchParams, getPreviousPeriod, formatRangeLabel, formatDateParam, todayKL } from "@/lib/dates";
+import { fetchTargetVersions, effectiveVersionAsOf } from "@/lib/kpi-history";
 import { HeroCards } from "@/components/dashboard/hero-cards";
 import { FunnelFlow } from "@/components/dashboard/funnel-flow";
 import { KPIChart } from "@/components/dashboard/kpi-chart";
@@ -16,6 +17,7 @@ import { PersonPerformance } from "@/components/dashboard/person-performance";
 import { RefreshButton } from "@/components/dashboard/refresh-button";
 import { BrandPerformance } from "@/components/dashboard/brand-performance";
 import { MoMTable } from "@/components/dashboard/mom-table";
+import { TargetChangeTimeline } from "@/components/dashboard/target-change-timeline";
 import { DateRangePicker } from "@/components/dashboard/date-range-picker";
 import { SplitText } from "@/components/animations/split-text";
 import { MonthPickerDialog } from "@/components/dashboard/month-picker-dialog";
@@ -144,8 +146,16 @@ export default async function DashboardPage({
       : await fetchOverallKPI(client.sheet_id, brands);
   }
 
-  // KPI: prefer Sheet data, fallback to Supabase, then defaults
-  const kpi: KPIConfig = sheetKPI || kpiRow || {
+  // KPI target history: for a PAST period show the target that was in effect at
+  // the end of the viewed range; for the CURRENT month keep the live sheet target
+  // so the current view is byte-for-byte unchanged. (versions reused by the timeline.)
+  const targetVersions = await fetchTargetVersions(clientId, selectedBrand ?? "");
+  const curMonthStart = (() => { const n = todayKL(); return new Date(n.getFullYear(), n.getMonth(), 1); })();
+  const effectiveKpi: KPIConfig | null =
+    reportEnd >= curMonthStart ? null : (effectiveVersionAsOf(targetVersions, reportEnd)?.snapshot ?? null);
+
+  // KPI: historical target (past periods) → Sheet → Supabase → defaults
+  const kpi: KPIConfig = effectiveKpi || sheetKPI || kpiRow || {
     sales: 300000, orders: 6, aov: 50000, cpl: 26, respond_rate: 30,
     appt_rate: 33, showup_rate: 90, conv_rate: 25, ad_spend: 7500,
     daily_ad: 250, roas: 40, cpa_pct: 2.5, target_contact: 80, target_appt: 27, target_showup: 24,
@@ -369,6 +379,7 @@ export default async function DashboardPage({
               <div className="text-[14px] font-semibold text-[var(--t1)] mb-4">{t(lang, "periodComparison")}</div>
             </BlurText>
             <MoMTable tm={tm} lm={lm} mom={mom} kpi={kpi} thisMonth={thisRangeLabel} lastMonth={prevRangeLabel} funnelType={detectedFunnelType} lang={lang} tracked={perfResult.tracked} />
+            <TargetChangeTimeline versions={targetVersions} rangeStart={reportStart.toISOString()} rangeEnd={reportEnd.toISOString()} lang={lang} />
           </div>
         </CardReveal>
 
