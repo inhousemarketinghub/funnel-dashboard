@@ -1,4 +1,5 @@
 import type { KpiTargetVersion, KPIConfig } from "./types";
+import { createAdminSupabase } from "./supabase/admin";
 
 const SNAPSHOT_KEYS: (keyof KPIConfig)[] = [
   "sales", "orders", "aov", "cpl", "respond_rate", "appt_rate", "showup_rate",
@@ -51,4 +52,40 @@ export function monthStartsBetween(earliest: Date, now: Date): Date[] {
     if (++m > 11) { m = 0; y++; }
   }
   return out;
+}
+
+// ── DB layer (service role) ──────────────────────────────────
+
+/** Append one immutable target snapshot. Never updates existing rows. */
+export async function appendTargetVersion(
+  clientId: string, brand: string, snapshot: KPIConfig, changedBy: string | null,
+): Promise<void> {
+  const db = createAdminSupabase();
+  const { error } = await db.from("kpi_target_versions").insert({
+    client_id: clientId,
+    brand: brand || "",
+    effective_from: new Date().toISOString(),
+    snapshot,
+    source: "save",
+    changed_by: changedBy,
+  });
+  if (error) throw new Error(`kpi_target_versions insert: ${error.message}`);
+}
+
+/** All versions for a client scoped to a brand (brand rows + the '' default). */
+export async function fetchTargetVersions(clientId: string, brand: string): Promise<KpiTargetVersion[]> {
+  const db = createAdminSupabase();
+  const { data } = await db
+    .from("kpi_target_versions")
+    .select("id, client_id, brand, effective_from, snapshot, source, changed_by")
+    .eq("client_id", clientId)
+    .in("brand", brand ? [brand, ""] : [""])
+    .order("effective_from", { ascending: false });
+  return (data ?? []) as KpiTargetVersion[];
+}
+
+/** The target snapshot in effect as of `asOf` (carry-forward). null if none. */
+export async function fetchEffectiveTarget(clientId: string, brand: string, asOf: Date): Promise<KPIConfig | null> {
+  const versions = await fetchTargetVersions(clientId, brand);
+  return effectiveVersionAsOf(versions, asOf)?.snapshot ?? null;
 }
